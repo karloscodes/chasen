@@ -77,3 +77,58 @@ func TestDeviceLogin(t *testing.T) {
 		}
 	})
 }
+
+func TestLimits(t *testing.T) {
+	newServer := func() *httptest.Server {
+		login := &Server{
+			Name:         "test",
+			Authenticate: func(key string) (string, bool) { return "owner", key == "right" },
+			Issue:        func(string) (string, error) { return "token", nil },
+		}
+		mux := http.NewServeMux()
+		login.Register(mux)
+		return httptest.NewServer(mux)
+	}
+
+	t.Run("the login page stops after many wrong keys, also for the right one", func(t *testing.T) {
+		server := newServer()
+		defer server.Close()
+		try := func(key string) int {
+			resp, err := http.PostForm(server.URL+"/oauth/device", url.Values{"user_code": {"AAAA-AAAA"}, "key": {key}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			return resp.StatusCode
+		}
+
+		for range maxFailures {
+			try("wrong")
+		}
+
+		if status := try("right"); status != http.StatusTooManyRequests {
+			t.Errorf("status after %d wrong keys = %d, want 429", maxFailures, status)
+		}
+	})
+
+	t.Run("only so many logins can wait at one time", func(t *testing.T) {
+		server := newServer()
+		defer server.Close()
+		start := func() int {
+			resp, err := http.Post(server.URL+"/oauth/device_authorization", "", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			return resp.StatusCode
+		}
+
+		for range maxGrants {
+			start()
+		}
+
+		if status := start(); status != http.StatusTooManyRequests {
+			t.Errorf("status of login %d = %d, want 429", maxGrants+1, status)
+		}
+	})
+}

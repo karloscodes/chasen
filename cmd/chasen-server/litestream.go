@@ -191,8 +191,10 @@ func stageLive(name string, s3 *s3Config) (staged map[string]string, err error) 
 		if err := os.MkdirAll(filepath.Dir(db), 0755); err != nil {
 			return nil, err
 		}
-		tmp := db + ".restore"
-		os.Remove(tmp)
+		tmp, err := stagingFile(name, db)
+		if err != nil {
+			return nil, err
+		}
 		staged[db] = tmp
 		replica := litestream.NewReplicaWithClient(litestream.NewDB(db), replicaClient(s3, name, rel))
 		if err := replica.Restore(context.Background(), litestream.RestoreOptions{OutputPath: tmp}); err != nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -76,11 +77,17 @@ func serverCheck(name, version string) error {
 	for _, v := range sh.Volumes {
 		args = append(args, "-v", filepath.Join(appDir(scratch), path.Base(v))+":"+v)
 	}
+	// `-e NAME` takes the value from the environment of the docker command, so
+	// a secret is not in its arguments, where every user of the server sees it.
+	var env []string
 	for k, v := range appEnv(settings, []string{name + ".check"}, version, privateKey, sh) {
-		args = append(args, "-e", k+"="+v)
+		args = append(args, "-e", k)
+		env = append(env, k+"="+v)
 	}
-	if out, err := docker(append(args, image)...); err != nil {
-		report(false, "the container starts: %s", out)
+	run := exec.Command("docker", append(args, image)...)
+	run.Env = append(os.Environ(), env...)
+	if out, err := run.CombinedOutput(); err != nil {
+		report(false, "the container starts: %s", strings.TrimSpace(string(out)))
 		return verdict()
 	}
 

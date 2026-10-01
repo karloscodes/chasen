@@ -98,6 +98,13 @@ In CI there is no login: the token of the server (or the key of the account) is 
 
 A plain server answers `404` to `/v1/placement`, and the client then asks no question.
 
+## Limits
+
+- A command is one word from the list. The server refuses every other word, and the client sends the word as one path segment.
+- The login page accepts 20 wrong keys or codes in a minute, for all visitors together, and 1000 logins can wait at one time. After that it answers `429`.
+- The API reads the headers of a request for 10 seconds at most. It has no limit on the time of a response: a deploy streams for minutes.
+- The client sends a token over plain `http://` only to this computer or to a private network address.
+
 ## Compatibility
 
 - The path says `/v1`. A change that breaks a client gets a new number.

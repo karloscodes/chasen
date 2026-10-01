@@ -34,8 +34,10 @@ type Server struct {
 	// Issue makes and stores an access token for the subject.
 	Issue func(subject string) (token string, err error)
 
-	mu     sync.Mutex
-	grants map[string]*grant // by device code
+	mu          sync.Mutex
+	grants      map[string]*grant // by device code
+	failures    int               // wrong keys and codes in the current minute
+	windowStart time.Time
 }
 
 // A grant is one login that waits for the user. subject is empty until the
@@ -66,6 +68,13 @@ func newUserCode() string {
 	return string(b[:4]) + "-" + string(b[4:])
 }
 
+// Limits against a flood: this many logins can wait at one time, and this many
+// wrong codes or keys are accepted in one minute. A person needs one of each.
+const (
+	maxGrants   = 1000
+	maxFailures = 20
+)
+
 func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 	b := make([]byte, 32)
 	rand.Read(b)
@@ -80,6 +89,11 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 		if time.Now().After(old.expires) {
 			delete(s.grants, code)
 		}
+	}
+	if len(s.grants) >= maxGrants {
+		s.mu.Unlock()
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "slow_down"})
+		return
 	}
 	s.grants[deviceCode] = g
 	s.mu.Unlock()
@@ -124,22 +138,49 @@ func (s *Server) approve(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		pageTemplate.Execute(w, pageData{Name: s.Name, UserCode: userCode, Error: reason})
 	}
+	if !s.mayTry() {
+		w.WriteHeader(http.StatusTooManyRequests)
+		pageTemplate.Execute(w, pageData{Name: s.Name, UserCode: userCode, Error: "Too many wrong attempts. Wait a minute, then try again."})
+		return
+	}
 	subject, ok := s.Authenticate(strings.TrimSpace(r.FormValue("key")))
 	if !ok {
+		s.failed()
 		refuse("That key is not correct.")
 		return
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for _, g := range s.grants {
 		if g.userCode == userCode && time.Now().Before(g.expires) {
 			g.subject = subject
+			s.mu.Unlock()
 			pageTemplate.Execute(w, pageData{Name: s.Name, Done: true})
 			return
 		}
 	}
+	s.mu.Unlock()
+	s.failed()
 	refuse("That code is not correct, or it is too old. Run chasen login again.")
+}
+
+// mayTry reports whether the login page accepts one more attempt. Wrong keys
+// and wrong codes count together, for all visitors, in windows of one minute.
+// ponytail: one counter for everyone. A flood of wrong attempts blocks real
+// logins for a minute; count by address when that happens.
+func (s *Server) mayTry() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if time.Since(s.windowStart) > time.Minute {
+		s.windowStart, s.failures = time.Now(), 0
+	}
+	return s.failures < maxFailures
+}
+
+func (s *Server) failed() {
+	s.mu.Lock()
+	s.failures++
+	s.mu.Unlock()
 }
 
 func (s *Server) token(w http.ResponseWriter, r *http.Request) {

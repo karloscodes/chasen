@@ -519,7 +519,9 @@ func stageBackup(name, stamp string) (staged map[string]string, err error) {
 		if err := os.MkdirAll(filepath.Dir(db), 0755); err != nil {
 			return nil, err
 		}
-		staged[db] = db + ".restore"
+		if staged[db], err = stagingFile(name, db); err != nil {
+			return nil, err
+		}
 		if err := gunzipFile(filepath.Join(dir, file), staged[db]); err != nil {
 			return nil, err
 		}
@@ -528,6 +530,23 @@ func stageBackup(name, stamp string) (staged map[string]string, err error) {
 		}
 	}
 	return staged, nil
+}
+
+// stagingFile returns where a restore prepares a database before the swap: a
+// directory of the app that only root can write. The volumes of an app belong
+// to the user of its image, so a file staged there could be replaced by a
+// link to any file on the server. The scan for databases skips this directory.
+func stagingFile(name, db string) (string, error) {
+	rel, err := filepath.Rel(appDir(name), db)
+	if err != nil || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("%s is not a database of %s", db, name)
+	}
+	tmp := filepath.Join(appDir(name), "pre-restore-staging", rel)
+	if err := os.MkdirAll(filepath.Dir(tmp), 0700); err != nil {
+		return "", err
+	}
+	os.Remove(tmp)
+	return tmp, nil
 }
 
 func discard(staged map[string]string) {
@@ -544,8 +563,12 @@ func swap(name string, staged map[string]string) (string, error) {
 	aside := filepath.Join(appDir(name), "pre-restore-"+time.Now().UTC().Format(stampLayout))
 	for db, tmp := range staged {
 		// The restored file gets the owner and the mode of the file it replaces.
-		owner, err := os.Stat(db)
-		if err != nil {
+		// A link at the place of the database, or of its directory, must not send the write somewhere else.
+		if real, err := filepath.EvalSymlinks(filepath.Dir(db)); err != nil || !strings.HasPrefix(real+"/", appDir(name)+"/") {
+			return "", fmt.Errorf("%s is not inside the storage of %s", filepath.Dir(db), name)
+		}
+		owner, err := os.Lstat(db)
+		if err != nil || owner.Mode()&fs.ModeSymlink != 0 {
 			if owner, err = os.Stat(filepath.Dir(db)); err != nil {
 				return "", err
 			}
@@ -553,7 +576,7 @@ func swap(name string, staged map[string]string) (string, error) {
 			return "", err
 		}
 		if st, ok := owner.Sys().(*syscall.Stat_t); ok {
-			if err := os.Chown(tmp, int(st.Uid), int(st.Gid)); err != nil {
+			if err := os.Lchown(tmp, int(st.Uid), int(st.Gid)); err != nil {
 				return "", err
 			}
 		}

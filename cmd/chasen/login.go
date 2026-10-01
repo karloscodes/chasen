@@ -174,7 +174,8 @@ func connect(target string) error {
 	}
 	// The token goes in each request. Plain http is only for a server on this machine or in a test.
 	host := server.Hostname()
-	local := host == "localhost" || strings.HasSuffix(host, ".localhost") || net.ParseIP(host) != nil
+	ip := net.ParseIP(host)
+	local := host == "localhost" || strings.HasSuffix(host, ".localhost") || (ip != nil && (ip.IsLoopback() || ip.IsPrivate()))
 	if server.Scheme != "https" && !(server.Scheme == "http" && local) {
 		return errors.New("the address must start with https://")
 	}

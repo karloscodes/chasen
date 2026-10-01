@@ -112,7 +112,8 @@ func serverServe() error {
 	}
 	login.Register(mux)
 	log.Print("chasen-server listens on :" + apiPort)
-	return http.ListenAndServe(":"+apiPort, mux)
+	api := &http.Server{Addr: ":" + apiPort, Handler: mux, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
+	return api.ListenAndServe()
 }
 
 func isOwner(cfg serverConfig, token string) bool {

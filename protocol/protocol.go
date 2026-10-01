@@ -140,7 +140,7 @@ type Client struct {
 // Do sends one command and returns the response as it is.
 func (c Client) Do(ctx context.Context, command string, args []string, stdin io.Reader) (*http.Response, error) {
 	query := url.Values{"arg": args}
-	req, err := http.NewRequestWithContext(ctx, "POST", c.URL+"/v1/"+command+"?"+query.Encode(), stdin)
+	req, err := http.NewRequestWithContext(ctx, "POST", c.URL+"/v1/"+url.PathEscape(command)+"?"+query.Encode(), stdin)
 	if err != nil {
 		return nil, err
 	}
