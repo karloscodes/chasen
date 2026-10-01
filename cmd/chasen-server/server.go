@@ -244,9 +244,6 @@ func serverBucket(args []string) error {
 	if err := startAgent(self); err != nil {
 		return err
 	}
-	if err := installTimer(self, cfg.AutoUpdate == nil || *cfg.AutoUpdate); err != nil {
-		return err
-	}
 	_, err = routeAgent(cfg.Domain)
 	return err
 }
@@ -336,6 +333,10 @@ func serverSetup(args []string) error {
 		return err
 	}
 	if err := startAgent(self); err != nil {
+		return err
+	}
+	// The server keeps itself up to date, unless config.yml says `auto_update: false`.
+	if err := installTimer(self, cfg.AutoUpdate == nil || *cfg.AutoUpdate); err != nil {
 		return err
 	}
 	routed, err := routeAgent(cfg.Domain)
