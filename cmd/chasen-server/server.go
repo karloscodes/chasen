@@ -2,10 +2,10 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -79,15 +79,13 @@ func runServer(args []string) error {
 	}
 
 	switch cmd {
-	case "env", "deploy", "enable", "restart", "domains", "restore", "remove":
+	case "deploy", "enable", "restart", "domains", "restore", "remove":
 		if err := lock(); err != nil {
 			return err
 		}
 	}
 
 	switch cmd {
-	case "env":
-		return serverEnv(name, args)
 	case "deploy":
 		if len(args) != 1 {
 			return errors.New("usage: chasen-server deploy <app> <version>")
@@ -260,12 +258,13 @@ func engine(name string, app matcha.AppConfig) *matcha.Matcha {
 	return matcha.NewFromApp(name, app, matcha.Config{
 		ConfigPath:  appsPath(),
 		DataDirBase: root() + "/var/matcha",
+		SkipPull:    true, // chasen pulls the image itself, with the login of the deploy
 	})
 }
 
-// imageRepo names the images that chasen builds on the server. The registry
-// host is under .invalid, which never resolves, so no registry can serve an
-// image with this name. matcha tries a pull before each deploy.
+// imageRepo is the local name of the images of an app. The server pulls an
+// image under its real name and keeps it under this one. The registry host is
+// under .invalid, which never resolves, so nothing can pull or push this name.
 func imageRepo(name string) string { return "chasen.invalid/" + name }
 
 // run runs a command and shows its output.
@@ -382,18 +381,59 @@ var versionRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$`)
 // imageRe matches an image with its tag or digest: ghcr.io/you/app:3f9a2c1.
 var imageRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*(:[0-9]+)?(/[a-z0-9._/-]+)*[:@][A-Za-z0-9._:-]{1,128}$`)
 
+// A static website follows the standard like an app: Caddy listens on $PORT
+// and answers /up. This is the only image that a server makes, and the server
+// owns its Dockerfile: the client sends the files and nothing else.
+const (
+	websiteDockerfile = "FROM caddy:2-alpine\nCOPY Caddyfile /etc/caddy/Caddyfile\nADD site.tar.gz /srv\n"
+	websiteCaddyfile  = `{
+	admin off
+	auto_https off
+}
+:{$PORT} {
+	root * /srv
+	respond /up 200
+	file_server {
+		hide Dockerfile Caddyfile chasen.yml
+	}
+}
+`
+)
+
+// websiteImage makes the image of a website from the tar.gz archive of its files.
+func websiteImage(files io.Reader, as string) error {
+	dir, err := os.MkdirTemp("", "chasen-website-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	archive, err := os.Create(filepath.Join(dir, "site.tar.gz"))
+	if err != nil {
+		return err
+	}
+	size, err := io.Copy(archive, files)
+	archive.Close()
+	if err != nil {
+		return err
+	}
+	if size == 0 {
+		return errors.New("nothing to deploy. A website sends its files, and an app names its image in chasen.yml")
+	}
+	os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(websiteDockerfile), 0644)
+	os.WriteFile(filepath.Join(dir, "Caddyfile"), []byte(websiteCaddyfile), 0644)
+	if out, err := exec.Command("docker", "build", "-q", "-t", as, dir).CombinedOutput(); err != nil {
+		return fmt.Errorf("cannot make the image of the website: %s", lastLine(string(out)))
+	}
+	return nil
+}
+
 // fetchImage puts the image of a version on the server, under the name `as`.
 // An app is an image in a registry: the server pulls it, with the login of
-// the settings when the image is private. A website has no image: the server
-// builds one from the tar archive on stdin, which is a copy of its files.
-func fetchImage(settings protocol.Settings, as, version string) error {
+// the settings when the image is private. A website has no image: its files
+// follow the settings in the input.
+func fetchImage(settings protocol.Settings, files io.Reader, as string) error {
 	if settings.Image == "" {
-		build := exec.Command("docker", "build", "-q", "--build-arg", "APP_VERSION="+version, "-t", as, "-")
-		build.Stdin, build.Stderr = os.Stdin, os.Stderr
-		if err := build.Run(); err != nil {
-			return errors.New("no image to deploy. A website sends its files, and an app names its image in chasen.yml")
-		}
-		return nil
+		return websiteImage(files, as)
 	}
 
 	// The login stays in a directory that is gone after the pull.
@@ -431,7 +471,8 @@ func lastLine(s string) string {
 	return lines[len(lines)-1]
 }
 
-// serverDeploy gets the image of a version and deploys it.
+// serverDeploy gets the image of a version and deploys it. The input is the
+// settings on one line, then the files of a website.
 func serverDeploy(name, version string) error {
 	if !versionRe.MatchString(version) {
 		return fmt.Errorf("invalid version %q", version)
@@ -440,21 +481,17 @@ func serverDeploy(name, version string) error {
 	if err != nil {
 		return err
 	}
-	settings, err := loadSettings(settingsPath(name, false))
+	in := bufio.NewReader(os.Stdin)
+	settings, _, err := readSettings(in)
 	if err != nil {
+		return err
+	}
+	if err := saveSettings(name, settings); err != nil {
 		return err
 	}
 
 	image := imageRepo(name) + ":" + version
-	err = fetchImage(settings, image, version)
-	// The login of the registry is for this pull only. The server does not keep it.
-	if settings.Registry != nil {
-		settings.Registry = nil
-		if data, jsonErr := json.Marshal(settings); jsonErr == nil {
-			os.WriteFile(settingsPath(name, false), data, 0600)
-		}
-	}
-	if err != nil {
+	if err := fetchImage(settings, in, image); err != nil {
 		return err
 	}
 
@@ -519,9 +556,17 @@ func serverRestart(name string) error {
 		return err
 	}
 	if isBuilt(name, app.Image) {
-		// The settings can change the port, the health path, and the volumes too.
-		settings, err := loadSettings(settingsPath(name, false))
+		// New settings come with the restart. Without them, the last ones stay.
+		// They can change the port, the health path, and the volumes too.
+		settings, sent, err := readSettings(bufio.NewReader(os.Stdin))
 		if err != nil {
+			return err
+		}
+		if sent {
+			if err := saveSettings(name, settings); err != nil {
+				return err
+			}
+		} else if settings, err = loadSettings(envPath(name)); err != nil {
 			return err
 		}
 		sh, err := appShape(app.Image, settings)

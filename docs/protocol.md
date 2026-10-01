@@ -41,11 +41,10 @@ A command that fails still answers `200`: the server already sent the output whe
 | Command | Arguments | Body | What it does |
 |---|---|---|---|
 | `list` | | | The apps of the server |
-| `env` | `<app> [check]` | The settings, as JSON | Replace the settings of the app. With `check`: the settings for one check |
-| `deploy` | `<app> <version>` | For a website: its files, as `tar.gz` | Pull the image of the settings (or wrap the files of a website), back up, start, and swap |
-| `check` | `<app> <version>` | Like `deploy` | Run the image next to the live app and test it against the standard |
+| `deploy` | `<app> <version>` | The settings. For a website: then its files | Pull the image of the settings (or wrap the files of a website), back up, start, and swap |
+| `check` | `<app> <version>` | Like `deploy` | Run the image next to the live app and test it against the standard. It keeps nothing |
 | `enable` | `<addon> [domain]` | | Run an addon from its image |
-| `restart` | `<app>` | | Start the app again with the settings that were sent last |
+| `restart` | `<app>` | The settings, or nothing | Start the app again from the image it has, with these settings |
 | `status` | `<app>` | | The version, the state, the URLs, and the backups |
 | `logs` | `<app>` | | Follow the logs. It stops when the client goes away |
 | `history` | `<app> [id]` | | The activity feed, or the output of one entry |
@@ -58,25 +57,24 @@ A command that fails still answers `200`: the server already sent the output whe
 
 Every command except `logs` runs to its end on the server, also when the client goes away. So a lost connection never leaves a deploy half done.
 
-## A deploy is two requests
+## The body of a deploy
 
-1. `POST /v1/env?arg=shop` with the settings:
+`deploy`, `check`, and `restart` take the settings of the app in the request body: one line of JSON.
 
-   ```json
-   {
-     "image": "ghcr.io/you/shop:3f9a2c1d5e8b7a6094c3f2e1d0b9a8c7d6e5f4a3",
-     "registry": {"username": "you", "password": "..."},
-     "env": {"LOG_LEVEL": "info", "STRIPE_KEY": "..."},
-     "port": 3000,
-     "health": "/up",
-     "health_timeout": 30,
-     "volumes": ["/app/storage"]
-   }
-   ```
+```json
+{"image": "ghcr.io/you/shop:3f9a2c1d5e8b7a6094c3f2e1d0b9a8c7d6e5f4a3", "registry": {"username": "you", "password": "..."}, "env": {"LOG_LEVEL": "info", "STRIPE_KEY": "..."}, "port": 3000, "health": "/up", "health_timeout": 30, "volumes": ["/app/storage"]}
+```
 
-   Only `env` is always there. A zero or missing value means "use the default of the standard". The server uses `registry` for the next pull and does not keep it.
+- Only `env` is always there. A zero or missing value means "use the default of the standard".
+- The server uses `registry` for one pull and does not keep it.
+- A website has no `image`. Its files follow the line of the settings, as a `tar.gz` archive. The server puts them in a Caddy image; it is the only image a server makes.
+- `restart` with an empty body keeps the settings that the server has.
 
-2. `POST /v1/deploy?arg=shop&arg=3f9a2c1`. The second argument is the version that the app shows (`APP_VERSION`). The body is empty for an app. For a website, which has no image, the body is a `tar.gz` of its files and a Dockerfile.
+```bash
+POST /v1/deploy?arg=shop&arg=3f9a2c1
+```
+
+The second argument is the version that the app shows (`APP_VERSION`).
 
 ## The login
 
@@ -105,4 +103,5 @@ A plain server answers `404` to `/v1/placement`, and the client then asks no que
 - The path says `/v1`. A change that breaks a client gets a new number.
 - A new command is a new word in the list. An old server answers it with an error line and exit code 1.
 - A new field in the settings is ignored by an old server. So a new client with an old server can lose a setting without an error: keep the server as new as the client.
+- Version 0.2 moved the settings into the body of `deploy`, `check`, and `restart`, and removed the `env` command. A 0.1 client does not work with a 0.2 server.
 - `GET /up` answers `200` when the API runs. It needs no token.

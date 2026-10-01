@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -39,58 +40,62 @@ type shape struct {
 	Volumes       []string
 }
 
-// settingsPath holds what the client sent with `env`. A check keeps its
-// settings in a file of its own, so it changes nothing of the live app.
-func settingsPath(name string, check bool) string {
-	if check {
-		return root() + "/etc/chasen/env/" + name + ".check.json"
-	}
-	return envPath(name)
-}
-
 var (
 	envKeyRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	healthRe = regexp.MustCompile(`^/[A-Za-z0-9._~/-]*$`)
 )
 
-// serverEnv replaces the settings of the app with the JSON object on stdin.
-// They apply at the next deploy or restart.
-func serverEnv(name string, args []string) error {
-	var settings protocol.Settings
-	if err := json.NewDecoder(io.LimitReader(os.Stdin, 1<<20)).Decode(&settings); err != nil {
-		return fmt.Errorf("env: %w", err)
+// readSettings reads the settings that come with a deploy, a check, or a
+// restart: the first line of the input, as JSON. What follows the line stays
+// in the reader. An empty input gives ok = false.
+func readSettings(in *bufio.Reader) (settings protocol.Settings, ok bool, err error) {
+	line, err := in.ReadBytes('\n')
+	if len(bytes.TrimSpace(line)) == 0 {
+		return settings, false, nil
+	}
+	if len(line) > 1<<20 {
+		return settings, false, errors.New("the settings are too large")
+	}
+	if err := json.Unmarshal(line, &settings); err != nil {
+		return settings, false, fmt.Errorf("the settings are not valid: %w. Is the chasen CLI as new as the server?", err)
 	}
 	reserved := standardEnv(nil, "", "", shape{Volumes: defaultVolumes})
 	for key := range settings.Env {
 		if !envKeyRe.MatchString(key) {
-			return fmt.Errorf("invalid env name %q", key)
+			return settings, false, fmt.Errorf("invalid env name %q", key)
 		}
 		if _, ok := reserved[key]; ok {
-			return fmt.Errorf("chasen sets %s. Remove it from chasen.yml", key)
+			return settings, false, fmt.Errorf("chasen sets %s. Remove it from chasen.yml", key)
 		}
 	}
 	if settings.Image != "" && !imageRe.MatchString(settings.Image) {
-		return fmt.Errorf("invalid image %q: use the form ghcr.io/you/app:tag", settings.Image)
+		return settings, false, fmt.Errorf("invalid image %q: use the form ghcr.io/you/app:tag", settings.Image)
 	}
 	if settings.Port < 0 || settings.Port > 65535 {
-		return fmt.Errorf("invalid port %d", settings.Port)
+		return settings, false, fmt.Errorf("invalid port %d", settings.Port)
 	}
 	if settings.Health != "" && !healthRe.MatchString(settings.Health) {
-		return fmt.Errorf("invalid health path %q: it starts with / and has no query", settings.Health)
+		return settings, false, fmt.Errorf("invalid health path %q: it starts with / and has no query", settings.Health)
 	}
 	if settings.HealthTimeout < 0 || settings.HealthTimeout > 900 {
-		return fmt.Errorf("invalid health_timeout %d: use 1 to 900 seconds", settings.HealthTimeout)
+		return settings, false, fmt.Errorf("invalid health_timeout %d: use 1 to 900 seconds", settings.HealthTimeout)
 	}
 	if err := checkVolumes(settings.Volumes); err != nil {
-		return err
+		return settings, false, err
 	}
 
-	file := settingsPath(name, len(args) > 0 && args[0] == "check")
+	return settings, true, nil
+}
+
+// saveSettings keeps the settings of an app for its next restart. The login
+// of the registry is for one pull only: the server does not keep it.
+func saveSettings(name string, settings protocol.Settings) error {
+	settings.Registry = nil
 	data, _ := json.Marshal(settings)
-	if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(envPath(name)), 0700); err != nil {
 		return err
 	}
-	return os.WriteFile(file, data, 0600)
+	return os.WriteFile(envPath(name), data, 0600)
 }
 
 // checkVolumes refuses paths the engine cannot keep apart. The engine maps a

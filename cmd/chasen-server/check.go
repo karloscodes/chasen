@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,15 +20,15 @@ func serverCheck(name, version string) error {
 	if !versionRe.MatchString(version) {
 		return fmt.Errorf("invalid version %q", version)
 	}
-	// The settings of the check. They are apart from the ones of the live app.
-	settings, err := loadSettings(settingsPath(name, true))
+	// The settings come with the check. Nothing of them is kept.
+	in := bufio.NewReader(os.Stdin)
+	settings, _, err := readSettings(in)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(settingsPath(name, true))
 
 	image := imageRepo(name) + ":check-" + version
-	if err := fetchImage(settings, image, version); err != nil {
+	if err := fetchImage(settings, in, image); err != nil {
 		return err
 	}
 	defer docker("rmi", "-f", image)

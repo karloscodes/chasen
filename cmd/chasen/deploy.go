@@ -1,0 +1,283 @@
+package main
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"maps"
+	"os"
+	"os/exec"
+	"regexp"
+	"slices"
+	"strings"
+
+	"github.com/karloscodes/chasen/protocol"
+)
+
+// deploy deploys or checks the current git commit of the app in this
+// directory. An app is an image in a registry: chasen builds the image of the
+// commit, pushes it, and the server pulls it. A website is an index.html with
+// no Dockerfile: its files go to the server.
+func deploy(creds credentials, app appFile, command string) error {
+	settings, err := appSettings(app)
+	if err != nil {
+		return err
+	}
+	if command == "deploy" {
+		if creds, err = placed(creds, app.Name); err != nil {
+			return err
+		}
+	}
+
+	_, noDockerfile := os.Stat("Dockerfile")
+	// An app on GitHub needs no chasen.yml: its image is ghcr.io/<owner>/<repository>.
+	if app.Image == "" && noDockerfile == nil {
+		origin, _ := exec.Command("git", "remote", "get-url", "origin").Output()
+		if app.Image = originImage(string(origin)); app.Image == "" {
+			return errors.New(noImage)
+		}
+		fmt.Printf("No image in chasen.yml: chasen uses %s, from the git origin.\n", app.Image)
+	}
+	if app.Image == "" {
+		return deployWebsite(creds, app, settings, command)
+	}
+	return deployImage(creds, app, settings, command)
+}
+
+// appSettings returns the settings of chasen.yml with the values of the
+// secrets. It runs secrets_command, so call it one time for each command.
+func appSettings(app appFile) (protocol.Settings, error) {
+	secrets, err := secretValues(app, app.Secrets)
+	if err != nil {
+		return protocol.Settings{}, err
+	}
+	env := maps.Clone(app.Env)
+	if env == nil {
+		env = map[string]string{}
+	}
+	for _, name := range app.Secrets {
+		env[name] = secrets[name]
+	}
+	return protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes}, nil
+}
+
+// commitHash matches the full hash of a git commit.
+var commitHash = regexp.MustCompile("^[0-9a-f]{40}$")
+
+// headCommit returns the hash of the current git commit, and warns when the
+// working directory has changes that the commit does not have.
+func headCommit() (string, error) {
+	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "", errors.New("chasen deploys the current git commit. This directory has no commit")
+	}
+	commit := strings.TrimSpace(string(out))
+	if dirty, _ := exec.Command("git", "status", "--porcelain").Output(); len(dirty) > 0 {
+		fmt.Fprintf(os.Stderr, "Warning: chasen uses commit %s. It does not include your uncommitted changes.\n", commit[:7])
+	}
+	return commit, nil
+}
+
+// deployImage builds the image of the commit, pushes it, and tells the server
+// to pull it. With a tag (--tag, or in chasen.yml) the image is already in
+// the registry: nothing is built, and the directory needs no git commit.
+func deployImage(creds credentials, app appFile, settings protocol.Settings, command string) error {
+	tag := tagFlag
+	if at := strings.LastIndexAny(app.Image, ":@"); at > strings.LastIndex(app.Image, "/") {
+		if tag == "" {
+			tag = app.Image[at+1:]
+		}
+		app.Image = app.Image[:at]
+	}
+	build := tag == ""
+	if build {
+		var err error
+		if tag, err = headCommit(); err != nil {
+			return err
+		}
+	}
+	// A commit shows as its short hash.
+	version := tag
+	if commitHash.MatchString(tag) {
+		version = tag[:7]
+	}
+
+	settings.Image = app.Image + ":" + tag
+	registry, err := registryLogin(app)
+	if err != nil {
+		return err
+	}
+	settings.Registry = registry
+	if build {
+		if err := buildAndPush(settings.Image, version, registry); err != nil {
+			return err
+		}
+	}
+	return remote(creds, settings.Body(nil), os.Stdout, command, app.Name, version)
+}
+
+// deployWebsite sends the files of the current commit. The server puts them
+// in a Caddy image.
+func deployWebsite(creds credentials, app appFile, settings protocol.Settings, command string) error {
+	if _, err := os.Stat("index.html"); err != nil {
+		return errors.New("nothing to deploy here: no Dockerfile for an app, and no index.html for a website")
+	}
+	fmt.Println("No Dockerfile: chasen treats this directory as a static website.")
+	commit, err := headCommit()
+	if err != nil {
+		return err
+	}
+	archive := exec.Command("git", "archive", "--format=tar.gz", "HEAD")
+	archive.Stderr = os.Stderr
+	files, err := archive.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := archive.Start(); err != nil {
+		return err
+	}
+	if err := remote(creds, settings.Body(files), os.Stdout, command, app.Name, commit[:7]); err != nil {
+		return err
+	}
+	return archive.Wait()
+}
+
+// buildAndPush builds the image of the commit, where chasen runs (your
+// computer, or CI), and pushes it to the registry. The build gets the files
+// of the commit, not the working directory, so the image is what its tag
+// says. The login stays in a directory that is gone after the push.
+func buildAndPush(image, version string, registry *protocol.Registry) error {
+	build := []string{"build", "--build-arg", "APP_VERSION=" + version, "-t", image}
+	// The image must run on the server. Most servers are amd64, and a Mac is not.
+	if os.Getenv("DOCKER_DEFAULT_PLATFORM") == "" {
+		build = append(build, "--platform", "linux/amd64")
+	}
+	fmt.Println("Building", image)
+	archive := exec.Command("git", "archive", "--format=tar", "HEAD")
+	archive.Stderr = os.Stderr
+	files, err := archive.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := archive.Start(); err != nil {
+		return err
+	}
+	docker := exec.Command("docker", append(build, "-")...)
+	docker.Stdin, docker.Stderr = files, os.Stderr
+	if err := docker.Run(); err != nil {
+		return fmt.Errorf("docker build failed: %w", err)
+	}
+	if err := archive.Wait(); err != nil {
+		return err
+	}
+
+	config, err := os.MkdirTemp("", "chasen-registry-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(config)
+	push := []string{"push", "-q", image}
+	if registry != nil {
+		// The directory of the login has no Docker context. Name the Docker that
+		// made the build (Colima, a remote context), so the push goes to the same one.
+		with := []string{"--config", config}
+		if host, err := exec.Command("docker", "context", "inspect", "-f", "{{.Endpoints.docker.Host}}").Output(); err == nil && len(bytes.TrimSpace(host)) > 0 {
+			with = append(with, "-H", string(bytes.TrimSpace(host)))
+		}
+		login := exec.Command("docker", append(slices.Clone(with), "login", "-u", registry.Username, "--password-stdin", protocol.RegistryHost(image))...)
+		if protocol.RegistryHost(image) == "" {
+			login.Args = login.Args[:len(login.Args)-1] // Docker Hub has no host
+		}
+		login.Stdin = strings.NewReader(registry.Password)
+		// Docker warns that the login is saved unencrypted. It is gone in a moment: show its output only when it fails.
+		if out, err := login.CombinedOutput(); err != nil {
+			return fmt.Errorf("the registry refused the login of %s: %s", registry.Username, strings.TrimSpace(string(out)))
+		}
+		push = append(with, push...)
+	}
+	fmt.Println("Pushing", image)
+	pushing := exec.Command("docker", push...)
+	pushing.Stderr = os.Stderr
+	if err := pushing.Run(); err != nil {
+		return fmt.Errorf("docker push failed: %w", err)
+	}
+	return nil
+}
+
+// restart sends the settings of chasen.yml to the server and starts the app
+// again with them, from the image it already has: a change of configuration
+// or a new secret needs no build.
+func restart(creds credentials, app appFile) error {
+	settings, err := appSettings(app)
+	if err != nil {
+		return err
+	}
+	return remote(creds, settings.Body(nil), os.Stdout, "restart", app.Name)
+}
+
+// noImage is what a deploy says for an app with a Dockerfile and no image.
+const noImage = `Chasen does not know where the image of this app goes. It pushes the image to a registry, and the server pulls it. It does not build on the server.
+
+A repository with a git origin on GitHub needs no setting: the image goes to ghcr.io/<owner>/<repository>. For every other case:
+
+1. Add to chasen.yml:
+
+  image: ghcr.io/<you>/<app>
+  registry:              # only for a private image
+    username: <you>
+    password: GHCR_TOKEN # the name of a secret
+
+2. Run: chasen deploy
+   It builds the image of the commit here, pushes it, and deploys it.`
+
+// secretValues returns the values of the named secrets. A secret comes from
+// the output of secrets_command, or from the environment.
+func secretValues(app appFile, names []string) (map[string]string, error) {
+	var fetched map[string]string
+	if app.SecretsCommand != "" && len(names) > 0 {
+		cmd := exec.Command("sh", "-c", app.SecretsCommand)
+		cmd.Stdin = os.Stdin
+		cmd.Stderr = os.Stderr
+		out, err := cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("secrets_command failed: %w", err)
+		}
+		fetched = parseDotenv(string(out))
+	}
+
+	values := map[string]string{}
+	var missing []string
+	for _, name := range names {
+		value, ok := fetched[name]
+		if !ok {
+			value, ok = os.LookupEnv(name)
+		}
+		if !ok {
+			missing = append(missing, name)
+		}
+		values[name] = value
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing secrets: %s", strings.Join(missing, ", "))
+	}
+	return values, nil
+}
+
+// parseDotenv reads KEY=VALUE lines. It accepts an `export ` prefix and quotes.
+// ponytail: one line per value. Multi-line values need a real dotenv parser.
+func parseDotenv(s string) map[string]string {
+	env := map[string]string{}
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimPrefix(strings.TrimSpace(line), "export ")
+		key, value, ok := strings.Cut(line, "=")
+		if !ok || strings.HasPrefix(line, "#") {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		if len(value) >= 2 && (value[0] == '"' || value[0] == '\'') && value[len(value)-1] == value[0] {
+			value = value[1 : len(value)-1]
+		}
+		env[strings.TrimSpace(key)] = value
+	}
+	return env
+}

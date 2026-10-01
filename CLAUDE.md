@@ -4,7 +4,7 @@ Deploy the Docker image of an app with a SQLite database to one server. Two prog
 
 | Program | Directory | Job |
 |---|---|---|
-| `chasen` | `cmd/chasen` | The CLI on the developer's machine |
+| `chasen` | `cmd/chasen` | The CLI on the developer's machine: `client.go` (options, dispatch), `login.go`, `deploy.go`, `registry.go`, `placement.go` |
 | `chasen-server` | `cmd/chasen-server` | Runs on each server: API, image pulls, backups, live replica, activity feed |
 
 Shared code:
@@ -44,7 +44,10 @@ Run `mise run e2e` after a change to the protocol, the deploy, the backups, or t
 - Tests use real SQLite, real Docker, a real S3 store, and a real private registry (`registry:2` with a password). No mocks.
 - The standard is in `STANDARD.md` and in `cmd/chasen-server/standard.go`. `chasen check` (`check.go`) tests an app against it. A rule that changes must change in the document, the code, and the check.
 - The documents in `docs/` and `STANDARD.md` are also the docs of chasenhq.com: the site copies them. Write them for a reader who has no access to this repository.
-- Known workarounds, both waiting for a change in matcha: domains are joined with a comma in one field, and the server gives each pulled image the local name `chasen.invalid/<app>:<version>` so matcha's own pull fails fast.
+- The server pulls an image under its real name and keeps it under the local name `chasen.invalid/<app>:<version>`. It tells matcha not to pull (`SkipPull`). One workaround waits for a change in matcha: domains are joined with a comma in one field.
+- The settings of an app travel in the body of `deploy`, `check`, and `restart`: one line of JSON, then the files of a website. There is no `env` command.
+- The README is the pitch and a table of contents. The manual is `docs/`. Do not put manual text back into the README.
+- In examples, the base domain of a server is `example.com` (not `apps.example.com`), and a second server is `example.org`.
 
 ## Releases
 

@@ -1,6 +1,6 @@
 # The Chasen standard
 
-**Status: the rules below are built and tested, except where a section says "not built".** Not built: the `release:` command, and backups of files that are not SQLite databases.
+Two things in this document are not built yet: the `release:` command, and backups of files that are not SQLite databases. The text says so where they appear.
 
 An app that follows the standard, in a repository on GitHub, deploys with no configuration. Each rule has a default, and `chasen.yml` can change it. An app that breaks a rule does not get traffic: the deploy fails and the old version stays.
 
@@ -119,32 +119,12 @@ Chasen removes names it sets today: `APP_HOST` and `APP_URL` (use `BASE_URL`), a
 
 A secret is a variable whose value must not be in git or in the image.
 
-**One fact first, true for every design:** a container gets its secrets as environment variables, and Docker stores those on the server. Whoever is root on the server can read them. No design below changes that. What a design can change is where else the secret is, and who must have it to deploy.
+- `chasen.yml` lists the names under `secrets:`. The values come from the output of `secrets_command` (for example `fnox export`, `op inject`, or `sops -d`), or from the environment.
+- Chasen reads the values on your computer at each deploy and sends them with it, over HTTPS. A missing secret stops the deploy before it changes anything.
+- On the server, the values are in a file that only root can read, and they reach the container as environment variables. Whoever is root on the server can read them.
+- To rotate a secret, change it in your secret store and run `chasen restart`. No build.
 
-Three designs:
-
-| | A. With the deploy (built today) | B. Held on the server | C. Sealed in git |
-|---|---|---|---|
-| How | `chasen.yml` lists the names. The deploy reads the values from a command (`fnox export`) or the environment and sends them | `chasen env set KEY=value` stores them on the server. A deploy sends none | The repository holds each secret encrypted with the public key of the server. Only the server can decrypt |
-| Source of truth | Your secret store | The server | git, plus one private key |
-| A new server after a loss | `chasen deploy`: config, secrets, and data come back in one command | The secrets are gone. You set each one again, or Chasen keeps a copy in the backup bucket | You put the private key on the new server first |
-| Who needs the values to deploy | Everyone who deploys, and CI | Nobody | Nobody |
-| Rotate a secret | Change it in the store, then deploy | One command, no deploy | Seal the new value, commit, deploy |
-| Extra tool | A secret manager, or plain environment variables | None | None, but Chasen then holds keys and crypto code |
-| Like | Kamal | Heroku | Rails credentials, sealed secrets |
-
-**Decided on 1 October 2026: A, with two repairs.**
-
-The server must stay disposable. The promise on the landing page is that a dead server costs one command. Only A keeps that promise without a second step, because nothing that matters lives only on the server. B makes the server the one place where the secrets are. C makes it the one place where the key is.
-
-A also keeps Chasen out of the business of storing and encrypting secrets. The tools for that exist and are good.
-
-The two repairs:
-
-1. **`chasen restart`.** Send the current configuration and secrets and start the app again, from the image it has. Rotating a secret is then seconds, not a full deploy. This is built.
-2. **One recommended tool, documented end to end: fnox.** It keeps secrets encrypted in the repository (age) or reads them from 1Password, and `fnox export` prints what Chasen reads. In CI, the values come from the CI's own secrets as environment variables. That path works today.
-
-An earlier draft of this document recommended B. It is simpler on day one. It fails on the day the server dies.
+Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a server that is gone costs you a new server and a `chasen deploy`, not a hunt for lost keys.
 
 ## 6. Logs and signals
 

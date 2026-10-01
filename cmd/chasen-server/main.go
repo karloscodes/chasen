@@ -22,11 +22,11 @@ Run these on the server, as root:
   backup                         Back up every app now
 
 The API runs these for the chasen client:
-  env <app>                      Replace the settings of the app with the JSON on stdin
-  deploy <app> <version>         Build the tar archive on stdin and deploy it
-  check <app> <version>          Build the tar archive on stdin and test it against the standard
+  deploy <app> <version>         Deploy the image of the settings. Stdin: the settings as one line of
+                                 JSON, then the files of a website as tar.gz
+  check <app> <version>          Test that image against the standard. Stdin like deploy
   enable <addon> [domain]        Run fusionaly, formlander, or lognorth from its image
-  restart <app>                  Start the app again with the env that was sent last
+  restart <app>                  Start the app again. Stdin: new settings, or nothing to keep the last ones
   status|logs|backup|backups|remove <app>
   history <app> [id]             The activity feed of the app, or the output of one entry
   domains <app> [add|rm <domain>]

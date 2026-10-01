@@ -112,7 +112,6 @@ To test an app before it gets traffic, run `chasen check`.
 - SQLite only. Uploaded files persist across deploys, but they have no backup yet.
 - The build is for `linux/amd64`. For an ARM server, set `DOCKER_DEFAULT_PLATFORM=linux/arm64`.
 - `setup` does not harden the server. `chasen-server check` reports what is missing: SSH with keys only, a firewall, and security updates.
-- Each deploy prints one `Could not pull ...` warning and waits about 6 seconds. It is harmless.
 
 ## Update the server
 

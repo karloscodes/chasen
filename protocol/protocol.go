@@ -7,14 +7,17 @@
 //
 //	POST /v1/<command>?arg=<app>&arg=...      Authorization: Bearer <token>
 //
-// The request body is the stdin of the command. The response is the output of
-// the command as it runs. The last line is ExitMarker and the exit code.
+// The request body is the input of the command: for deploy, check, and
+// restart it is the settings of the app (see Settings). The response is the
+// output of the command as it runs. The last line is ExitMarker and the exit
+// code.
 //
 // The login is the OAuth 2.0 device flow in the oauth package.
 package protocol
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -31,11 +34,14 @@ const ExitMarker = "\x00chasen-exit "
 
 // Commands are the commands a client can run. The first argument of each one
 // is the app, except for list. For enable, the app is the name of the addon.
-var Commands = []string{"list", "env", "deploy", "check", "enable", "restart", "status", "logs", "history", "domains", "backup", "backups", "restore", "remove"}
+var Commands = []string{"list", "deploy", "check", "enable", "restart", "status", "logs", "history", "domains", "backup", "backups", "restore", "remove"}
 
-// Settings is what the client sends with the `env` command: the env and the
-// secrets of the app, and the overrides of the standard from chasen.yml. A
-// zero value means "use the default".
+// Settings is what the client sends with `deploy`, `check`, and `restart`:
+// the image, the env and the secrets of the app, and the overrides of the
+// standard from chasen.yml. A zero value means "use the default".
+//
+// The settings are the first line of the request body, as JSON. For a
+// website, the files follow that line, as a tar.gz archive.
 type Settings struct {
 	// Image is the image that the server pulls for the next deploy, with its
 	// tag: ghcr.io/you/shop:3f9a2c1. Empty for a website: its files come as
@@ -67,13 +73,23 @@ func RegistryHost(image string) string {
 	return ""
 }
 
+// Body returns the request body of deploy, check, and restart: the settings
+// on one line, then the files of a website when there are any.
+func (s Settings) Body(files io.Reader) io.Reader {
+	line, _ := json.Marshal(s)
+	if files == nil {
+		return bytes.NewReader(append(line, '\n'))
+	}
+	return io.MultiReader(bytes.NewReader(append(line, '\n')), files)
+}
+
 // Logout makes the API forget the token of the request. The API answers it
 // itself: it is not a command of an app.
 const Logout = "logout"
 
-// CreatesServer reports the commands of a deploy. In the cloud, they create
-// the server of an account that has none.
-func CreatesServer(command string) bool { return command == "env" || command == "deploy" }
+// CreatesServer reports the command that puts an app on a server. In the
+// cloud, it creates the server of an account that has none.
+func CreatesServer(command string) bool { return command == "deploy" }
 
 // Placement is the answer of the cloud to "where does this app go?". The CLI
 // asks before the first deploy of an app. A plain server has no such answer.

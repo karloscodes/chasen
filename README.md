@@ -26,7 +26,6 @@ No server yet? [Chasen cloud](https://chasenhq.com/cloud/) creates one for you a
 
 ## How it works
 
-
 ```
 your machine                          the server
 chasen  ── HTTPS + token ──▶  chasen-server (API, in a container behind the proxy)
@@ -61,11 +60,9 @@ The docs are on [chasenhq.com/docs](https://chasenhq.com/docs/). Their source is
 
 ## The cloud
 
-
 Chasen cloud is this same software on a server that we create for you at Hetzner: `chasen login`, then `chasen deploy`. It is a separate service and it is not in this repository. The CLI talks to it with the same protocol as to your own server. See [chasenhq.com/cloud](https://chasenhq.com/cloud/).
 
 ## Development
-
 
 ```bash
 mise run test     # go vet and the unit tests. No Docker
