@@ -61,10 +61,9 @@ server: example.com      # or: cloud
 ```
 /usr/local/bin/chasen-server         the binary; the API container runs it
 /usr/local/bin/chasen-server.previous  the binary before the last update
-/etc/chasen/config.yml               base domain, server token, and backup bucket
-/etc/chasen/server.sqlite3           the database of the server: logins and the activity feed
+/etc/chasen/server.sqlite3           the database of the server: its settings (domain, token, bucket),
+                                     the env and secrets of each app, the logins, and the activity feed
 /etc/chasen/apps.yml                 the apps (matcha format)
-/etc/chasen/env/<app>.json           env and secrets of each app
 /var/matcha/<app>/storage/           the storage of the app, /storage in the container
 /var/matcha/<app>/backups/<time>/    snapshots
 /var/matcha/proxy/                   certificates

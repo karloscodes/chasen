@@ -86,7 +86,7 @@ func serverReplicate() error {
 		return err
 	}
 	if cfg.Backup.S3 == nil {
-		return fmt.Errorf("no live replica: backup.s3 is not set in %s", configPath())
+		return errors.New("no live replica: this server has no bucket")
 	}
 	// One daemon at a time. A restore holds this lock while it replaces the databases.
 	if err := waitForReplicaLock(); err != nil {

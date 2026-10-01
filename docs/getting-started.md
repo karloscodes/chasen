@@ -27,11 +27,11 @@ On your machine, run:
 Server token (the login page asks for it): 3f9a...
 ```
 
-Keep the token. It is also in `/etc/chasen/config.yml`.
+Keep the token. To see it again, run `chasen-server token` on the server.
 
-## 2. Set the backup bucket
+## 2. Add a backup bucket (optional)
 
-Without a bucket, backups stay on the server, and a dead server takes them with it. Any S3-compatible store works: Cloudflare R2, Backblaze B2, Hetzner, or S3.
+A server works without a bucket: the backups then stay on its disk, and a dead server takes them with it. Add a bucket when the data matters. Any S3-compatible store works: Cloudflare R2, Backblaze B2, Hetzner, or S3.
 
 ```bash
 chasen-server bucket --endpoint https://<your-store> --name chasen-backups --access-key-id <id>
@@ -127,7 +127,7 @@ chasen-server update                      # update now
 systemctl list-timers chasen-update.timer # when the next run is
 ```
 
-To turn the nightly update off, add `auto_update: false` to `/etc/chasen/config.yml` and run `chasen-server setup`.
+To turn the nightly update off, run `chasen-server settings auto_update off`. `chasen-server settings` shows what is set.
 
 **The CLI does not update itself.** Run its install line again: `curl -fsSL https://chasenhq.com/cli | sh`.
 

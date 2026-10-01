@@ -22,18 +22,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// serverConfig is /etc/chasen/config.yml.
+// serverConfig is the settings of the server. They are rows of the settings
+// table of the database, one for each value. The yaml names are those of
+// /etc/chasen/config.yml, the file that held them before.
 type serverConfig struct {
 	// Domain is the base domain. Each app gets <name>.<Domain>.
 	Domain string `yaml:"domain"`
 	// Token is the secret that a client sends with each API request.
 	Token  string `yaml:"token"`
 	Backup struct {
+		// S3 is the bucket for the offsite copies. A server without one is
+		// complete: its backups stay on its disk.
 		S3           *s3Config `yaml:"s3,omitempty"`
 		HeartbeatURL string    `yaml:"heartbeat_url,omitempty"`
 	} `yaml:"backup,omitempty"`
 	// AutoUpdate turns the nightly update off when it is false. Without the
-	// line, the server updates itself.
+	// setting, the server updates itself.
 	AutoUpdate *bool `yaml:"auto_update,omitempty"`
 }
 
@@ -61,6 +65,15 @@ func runServer(args []string) error {
 		}
 	case "bucket":
 		return serverBucket(args)
+	case "settings":
+		return serverSettings(args)
+	case "token":
+		cfg, err := loadServerConfig()
+		if err != nil {
+			return err
+		}
+		fmt.Println(cfg.Token)
+		return nil
 	case "update":
 		return serverUpdate()
 	case "replicate":
@@ -151,29 +164,157 @@ func lock() error {
 var lockFile *os.File
 
 func loadServerConfig() (serverConfig, error) {
-	var cfg serverConfig
-	data, err := os.ReadFile(configPath())
-	if errors.Is(err, fs.ErrNotExist) {
-		return cfg, errors.New("the server is not set up. Run on the server: chasen-server setup --domain <base domain>")
+	cfg, found, err := readServerConfig()
+	if err == nil && !found {
+		err = errors.New("the server is not set up. Run on the server: chasen-server setup --domain <base domain>")
 	}
-	if err != nil {
-		return cfg, err
-	}
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return cfg, fmt.Errorf("%s: %w", configPath(), err)
-	}
-	return cfg, nil
+	return cfg, err
 }
 
+// readServerConfig reads the settings from the database. found is false on a
+// server that has none yet. A server from before the settings were in the
+// database has them in config.yml: they are copied once, and the file stays
+// for the previous version, which an update can go back to.
+func readServerConfig() (cfg serverConfig, found bool, err error) {
+	db, err := openServerDB()
+	if err != nil {
+		return cfg, false, err
+	}
+	defer db.Close()
+	rows, err := db.Query("SELECT name, value FROM settings")
+	if err != nil {
+		return cfg, false, err
+	}
+	saved := map[string]string{}
+	for rows.Next() {
+		var name, value string
+		if err := rows.Scan(&name, &value); err != nil {
+			return cfg, false, err
+		}
+		saved[name] = value
+	}
+	if err := rows.Close(); err != nil {
+		return cfg, false, err
+	}
+
+	if len(saved) == 0 {
+		data, err := os.ReadFile(configPath())
+		if errors.Is(err, fs.ErrNotExist) {
+			return cfg, false, nil
+		}
+		if err != nil {
+			return cfg, false, err
+		}
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return cfg, false, fmt.Errorf("%s: %w", configPath(), err)
+		}
+		return cfg, true, saveServerConfig(cfg)
+	}
+
+	cfg.Domain, cfg.Token = saved["domain"], saved["token"]
+	cfg.Backup.HeartbeatURL = saved["heartbeat_url"]
+	if value, ok := saved["auto_update"]; ok {
+		on := value == "true"
+		cfg.AutoUpdate = &on
+	}
+	if saved["s3_bucket"] != "" {
+		cfg.Backup.S3 = &s3Config{
+			Endpoint:        saved["s3_endpoint"],
+			Region:          saved["s3_region"],
+			Bucket:          saved["s3_bucket"],
+			AccessKeyID:     saved["s3_access_key_id"],
+			SecretAccessKey: saved["s3_secret_access_key"],
+		}
+	}
+	return cfg, true, nil
+}
+
+// saveServerConfig replaces the settings in the database. A value that is
+// empty has no row.
 func saveServerConfig(cfg serverConfig) error {
-	data, err := yaml.Marshal(cfg)
+	values := map[string]string{"domain": cfg.Domain, "token": cfg.Token, "heartbeat_url": cfg.Backup.HeartbeatURL}
+	if cfg.AutoUpdate != nil {
+		values["auto_update"] = strconv.FormatBool(*cfg.AutoUpdate)
+	}
+	if s3 := cfg.Backup.S3; s3 != nil {
+		values["s3_endpoint"], values["s3_region"], values["s3_bucket"] = s3.Endpoint, s3.Region, s3.Bucket
+		values["s3_access_key_id"], values["s3_secret_access_key"] = s3.AccessKeyID, s3.SecretAccessKey
+	}
+
+	db, err := openServerDB()
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(configPath()), 0755); err != nil {
+	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
 		return err
 	}
-	return os.WriteFile(configPath(), data, 0600)
+	defer tx.Rollback()
+	if _, err := tx.Exec("DELETE FROM settings"); err != nil {
+		return err
+	}
+	for name, value := range values {
+		if value == "" {
+			continue
+		}
+		if _, err := tx.Exec("INSERT INTO settings (name, value) VALUES (?, ?)", name, value); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// serverSettings shows the settings of the server, or changes one of the two
+// that have no other command: auto_update and heartbeat_url.
+func serverSettings(args []string) error {
+	cfg, err := loadServerConfig()
+	if err != nil {
+		return err
+	}
+	switch {
+	case len(args) == 0:
+		update, bucket, heartbeat := "on", "none: the backups stay on this server", "none"
+		if cfg.AutoUpdate != nil && !*cfg.AutoUpdate {
+			update = "off"
+		}
+		if s3 := cfg.Backup.S3; s3 != nil {
+			bucket = fmt.Sprintf("%s at %s (region %s)", s3.Bucket, s3.Endpoint, s3.Region)
+		}
+		if cfg.Backup.HeartbeatURL != "" {
+			heartbeat = cfg.Backup.HeartbeatURL
+		}
+		fmt.Printf("domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\n", cfg.Domain, update, heartbeat, bucket)
+		fmt.Println("\nThe token: chasen-server token. The bucket: chasen-server bucket.")
+		return nil
+	case len(args) == 2 && args[0] == "auto_update" && (args[1] == "on" || args[1] == "off"):
+		on := args[1] == "on"
+		cfg.AutoUpdate = &on
+		if err := saveServerConfig(cfg); err != nil {
+			return err
+		}
+		self, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("The nightly update is %s.\n", args[1])
+		return installTimer(self, on)
+	case len(args) == 2 && args[0] == "heartbeat_url":
+		if args[1] != "" && !strings.HasPrefix(args[1], "https://") && !strings.HasPrefix(args[1], "http://") {
+			return errors.New("the heartbeat URL must start with https://")
+		}
+		cfg.Backup.HeartbeatURL = args[1]
+		if err := saveServerConfig(cfg); err != nil {
+			return err
+		}
+		if args[1] == "" {
+			fmt.Println("No heartbeat.")
+		} else {
+			fmt.Println("The server calls the URL after each hourly backup that worked.")
+		}
+		return nil
+	}
+	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url>]")
 }
 
 // serverBucket sets the S3 bucket for the offsite backups and the live
@@ -291,11 +432,9 @@ func serverSetup(args []string) error {
 		return err
 	}
 
-	var cfg serverConfig
-	if data, err := os.ReadFile(configPath()); err == nil {
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
-			return fmt.Errorf("%s: %w", configPath(), err)
-		}
+	cfg, _, err := readServerConfig()
+	if err != nil {
+		return err
 	}
 	if *domain != "" {
 		cfg.Domain = *domain
@@ -335,7 +474,7 @@ func serverSetup(args []string) error {
 	if err := startAgent(self); err != nil {
 		return err
 	}
-	// The server keeps itself up to date, unless config.yml says `auto_update: false`.
+	// The server keeps itself up to date, unless `chasen-server settings auto_update off` said no.
 	if err := installTimer(self, cfg.AutoUpdate == nil || *cfg.AutoUpdate); err != nil {
 		return err
 	}
@@ -347,7 +486,7 @@ func serverSetup(args []string) error {
 	fmt.Printf("Chasen is ready. Apps get https://<name>.%s\n", cfg.Domain)
 	fmt.Printf("Point a wildcard A record for *.%s to this server.\n", cfg.Domain)
 	if cfg.Backup.S3 == nil {
-		fmt.Println("Warning: backups stay on this server. For offsite copies, run: chasen-server bucket --endpoint <url> --name <bucket> --access-key-id <id>")
+		fmt.Println("Backups stay on this server. For offsite copies too, run: chasen-server bucket --endpoint <url> --name <bucket> --access-key-id <id>")
 	}
 	if routed {
 		target := cfg.Domain
@@ -575,7 +714,7 @@ func serverRestart(name string) error {
 			if err := saveSettings(name, settings); err != nil {
 				return err
 			}
-		} else if settings, err = loadSettings(envPath(name)); err != nil {
+		} else if settings, err = loadSettings(name); err != nil {
 			return err
 		}
 		sh, err := appShape(app.Image, settings)
@@ -896,7 +1035,7 @@ func serverRemove(name string) error {
 	if err := matcha.RemoveAppFrom(appsPath(), name); err != nil {
 		return err
 	}
-	os.Remove(envPath(name))
+	forgetSettings(name)
 	fmt.Printf("Removed %s. The data and the backups stay in %s\n", name, appDir(name))
 	return nil
 }

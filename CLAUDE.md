@@ -32,9 +32,10 @@ Run `mise run e2e` after a change to the protocol, the deploy, the backups, or t
 - One owner for each server. No users or permissions on a server.
 - The matcha engine (`github.com/karloscodes/matcha`) does the proxy, HTTPS, and the container swap. Chasen imports it.
 - Litestream and SQLite are inside `chasen-server`. It must build with `CGO_ENABLED=0`: the binary runs in an Alpine container.
-- The server keeps apps in `apps.yml` (the format matcha reads) and its own records in SQLite.
+- The server keeps apps in `apps.yml` (the format matcha reads). Everything else of its own is in SQLite (`/etc/chasen/server.sqlite3`): its settings (domain, token, bucket, `auto_update`, `heartbeat_url`), the settings of each app, the logins, and the activity feed. There is no config file. A server from before copies `config.yml` and `env/<app>.json` once and leaves the files for a rollback.
+- A bucket is optional. A server without one is complete: backups stay on its disk. No message calls that an error.
 - The deploy is imperative. No desired-state file, no reconcile loop.
-- A server updates itself: `setup` installs a systemd timer that runs `chasen-server update` each night (`update.go`). It takes the newest GitHub release, checks the checksum, and goes back to the previous binary when the API does not answer. So a tag `v*` reaches every server within a day: tag only what passed the end-to-end test. `auto_update: false` in config.yml turns it off.
+- A server updates itself: `setup` installs a systemd timer that runs `chasen-server update` each night (`update.go`). It takes the newest GitHub release, checks the checksum, and goes back to the previous binary when the API does not answer. So a tag `v*` reaches every server within a day: tag only what passed the end-to-end test. `chasen-server settings auto_update off` turns it off.
 - `chasen.yml` is not a docker-compose file. An unknown key is an error.
 - Addons (`chasen enable fusionaly|formlander|lognorth`) run products from their images.
 - Backups cover every volume of an app (`/var/matcha/<app>/*`).

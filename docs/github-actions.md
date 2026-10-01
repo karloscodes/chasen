@@ -17,7 +17,7 @@ The workflow needs to know where your server is and how to log in.
 | Secret | Value |
 |---|---|
 | `CHASEN_URL` | `https://api.example.com` for your own server (`api.` + its base domain). `https://cloud.chasenhq.com` for the cloud |
-| `CHASEN_TOKEN` | The token of the server (it is in `/etc/chasen/config.yml` on the server). For the cloud: the key of your account |
+| `CHASEN_TOKEN` | The token of the server (`chasen-server token` on the server prints it). For the cloud: the key of your account |
 
 ```bash
 gh secret set CHASEN_URL --body https://api.example.com
@@ -98,7 +98,7 @@ A directory with an `index.html` and no `Dockerfile` needs no image and no regis
 | The run says | Cause | Fix |
 |---|---|---|
 | `not logged in` | `CHASEN_URL` or `CHASEN_TOKEN` is empty | Set both secrets. A workflow of a fork does not get secrets |
-| `the server does not accept the token` | `CHASEN_TOKEN` is not the token of this server | Copy it again from `/etc/chasen/config.yml` |
+| `the server does not accept the token` | `CHASEN_TOKEN` is not the token of this server | Run `chasen-server token` on the server and copy it again |
 | `the registry refused the login`, or `no login for ghcr.io` | The job cannot push | Add `packages: write` under `permissions:`, and `GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}` in `env:` of the deploy step |
 | `denied` at the push | The package exists and belongs to another repository | In the settings of the package on GitHub, give this repository write access |
 | `cannot pull ...` | The server cannot reach the registry, or the image is for another architecture | The build is for `linux/amd64`. For an ARM server, set `DOCKER_DEFAULT_PLATFORM: linux/arm64` in `env:` |

@@ -17,6 +17,10 @@ Run these on the server, as root:
   bucket --endpoint <url> --name <bucket> --access-key-id <id>
                                  Set the S3 bucket for offsite backups. Asks for the secret key
   bucket                         Show the bucket
+  settings                       Show the settings of the server
+  settings auto_update on|off    Turn the nightly update on or off
+  settings heartbeat_url <url>   Call this URL after each hourly backup that worked. "" turns it off
+  token                          Print the login token
   update                         Install the newest release now. A timer does this each night
   check                          Check the security of the server (with no arguments)
   list                           List all apps

@@ -22,7 +22,7 @@ chasen-server bucket          # show the bucket
 
 The command creates the bucket when it does not exist, then writes and deletes a test object. It saves the settings only when all of that works. Set `S3_SECRET_ACCESS_KEY` to skip the question.
 
-For a monitor that alerts when backups stop, add `heartbeat_url` under `backup:` in `/etc/chasen/config.yml`.
+For a monitor that alerts when backups stop, run `chasen-server settings heartbeat_url <url>` on the server. The server calls the URL after each hourly backup that worked.
 
 Without a bucket, the snapshots stay on the server and there is no live replica. `setup` warns you about this.
 

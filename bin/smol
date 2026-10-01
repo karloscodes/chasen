@@ -51,7 +51,7 @@ CGO_ENABLED=0 GOOS=linux go build -o tmp/smol/chasen-server ./cmd/chasen-server
 smol machine cp tmp/smol/chasen-server $name:/usr/local/bin/chasen-server >/dev/null
 inside "chmod +x /usr/local/bin/chasen-server && chasen-server setup --domain $domain >/var/log/setup.log 2>&1 || { tail -20 /var/log/setup.log; exit 1; }"
 
-token=$(inside "sed -n 's/^token: //p' /etc/chasen/config.yml" | tr -d '"\r\n')
+token=$(inside "chasen-server token" | tr -d '"\r\n')
 curl -fsS --retry 10 --retry-all-errors --retry-delay 1 -o /dev/null -H "Host: api.$domain" "http://127.0.0.1:$port/up"
 
 cat <<DONE

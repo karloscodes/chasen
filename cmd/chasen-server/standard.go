@@ -3,13 +3,13 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -92,10 +92,13 @@ func readSettings(in *bufio.Reader) (settings protocol.Settings, ok bool, err er
 func saveSettings(name string, settings protocol.Settings) error {
 	settings.Registry = nil
 	data, _ := json.Marshal(settings)
-	if err := os.MkdirAll(filepath.Dir(envPath(name)), 0700); err != nil {
+	db, err := openServerDB()
+	if err != nil {
 		return err
 	}
-	return os.WriteFile(envPath(name), data, 0600)
+	defer db.Close()
+	_, err = db.Exec("INSERT INTO app_settings (app, settings) VALUES (?, ?) ON CONFLICT (app) DO UPDATE SET settings = excluded.settings", name, string(data))
+	return err
 }
 
 // checkVolumes refuses paths the engine cannot keep apart. The engine maps a
@@ -118,19 +121,39 @@ func checkVolumes(volumes []string) error {
 	return nil
 }
 
-func loadSettings(file string) (protocol.Settings, error) {
+// loadSettings returns the settings that the last deploy of an app saved, or
+// none. An app from before the settings were in the database has them in a
+// file under /etc/chasen/env.
+func loadSettings(name string) (protocol.Settings, error) {
 	var settings protocol.Settings
-	data, err := os.ReadFile(file)
-	if errors.Is(err, fs.ErrNotExist) {
-		return settings, nil
+	db, err := openServerDB()
+	if err != nil {
+		return settings, err
+	}
+	defer db.Close()
+	var data []byte
+	err = db.QueryRow("SELECT settings FROM app_settings WHERE app = ?", name).Scan(&data)
+	if errors.Is(err, sql.ErrNoRows) {
+		if data, err = os.ReadFile(envPath(name)); errors.Is(err, fs.ErrNotExist) {
+			return settings, nil
+		}
 	}
 	if err != nil {
 		return settings, err
 	}
 	if err := json.Unmarshal(data, &settings); err != nil {
-		return settings, fmt.Errorf("%s: %w", file, err)
+		return settings, fmt.Errorf("the saved settings of %s: %w", name, err)
 	}
 	return settings, nil
+}
+
+// forgetSettings removes the saved settings of an app.
+func forgetSettings(name string) {
+	if db, err := openServerDB(); err == nil {
+		db.Exec("DELETE FROM app_settings WHERE app = ?", name)
+		db.Close()
+	}
+	os.Remove(envPath(name))
 }
 
 // imageDeclares returns the TCP ports and the volumes that the image declares

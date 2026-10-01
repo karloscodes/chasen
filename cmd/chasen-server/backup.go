@@ -421,7 +421,7 @@ func serverRestore(name, source string) error {
 	var staged map[string]string
 	if source == "live" {
 		if cfg.Backup.S3 == nil {
-			return errors.New("no live replica: backup.s3 is not set on the server")
+			return errors.New("no live replica: this server has no bucket. Set one on the server with: chasen-server bucket")
 		}
 		if staged, err = stageLive(name, cfg.Backup.S3); err == nil && len(staged) == 0 {
 			err = errors.New("the live replica has no database for this app")

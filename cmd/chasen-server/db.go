@@ -4,14 +4,24 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 )
 
-// The database of the server. It holds what the API records as it works: the
-// logins of `chasen login`, and the activity feed. The apps themselves stay in
-// apps.yml, the file that the matcha engine reads.
+// The database of the server. It holds everything that is the server's own:
+// its settings (the domain, the token, the bucket), the settings of each app,
+// the logins of `chasen login`, and the activity feed. The apps themselves
+// stay in apps.yml, the file that the matcha engine reads.
 const serverSchema = `
+CREATE TABLE IF NOT EXISTS settings (
+	name  TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS app_settings (
+	app      TEXT PRIMARY KEY,
+	settings TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS logins (
 	token_sha256 TEXT PRIMARY KEY,
 	created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -29,11 +39,15 @@ CREATE INDEX IF NOT EXISTS activity_app ON activity (app, id);`
 
 func openServerDB() (*sql.DB, error) {
 	path := root() + "/etc/chasen/server.sqlite3"
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return nil, err
+	}
 	db, err := sqliteDB(path)
 	if err != nil {
 		return nil, err
 	}
-	// Only root reads the database: it holds the logins and the output of deploys.
+	// Only root reads the database: it holds the token, the keys of the bucket,
+	// the secrets of the apps, the logins, and the output of deploys.
 	os.Chmod(path, 0600)
 	if _, err := db.Exec("PRAGMA journal_mode = WAL;" + serverSchema); err != nil {
 		db.Close()

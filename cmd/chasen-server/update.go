@@ -172,7 +172,7 @@ WantedBy=timers.target
 )
 
 // installTimer turns the nightly update on or off, on a server with systemd.
-// `auto_update: false` in config.yml turns it off.
+// `chasen-server settings auto_update off` turns it off.
 func installTimer(self string, on bool) error {
 	if _, err := os.Stat("/run/systemd/system"); err != nil || root() != "" {
 		return nil // no systemd, or a test: nothing to install
