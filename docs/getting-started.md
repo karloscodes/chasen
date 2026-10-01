@@ -5,7 +5,7 @@ Chasen puts your app on one server that you own. `chasen` is the CLI on your com
 ## What you need
 
 - **A server** with Ubuntu or Debian, root access, and ports 80 and 443 open. A small one is enough to start.
-- **A domain** for the apps of the server, with a wildcard DNS record: `*.apps.example.com` points to the address of the server. Each app then gets `<app>.apps.example.com`.
+- **A domain** for the apps of the server, with a wildcard DNS record: `*.example.com` points to the address of the server. Each app then gets `<app>.example.com`.
 - **Docker on your computer.** `chasen deploy` builds the image of your app there.
 - **An image registry.** A repository on GitHub already has one, `ghcr.io`. Docker Hub and others work too.
 - **An app with a `Dockerfile`**, in a git repository. A plain website with an `index.html` needs no Dockerfile, no Docker, and no registry.
@@ -16,14 +16,14 @@ Run this on the server, as root:
 
 ```bash
 curl -fsSL https://chasenhq.com/server | sh
-chasen-server setup --domain apps.example.com
+chasen-server setup --domain example.com
 ```
 
 The first line downloads one binary and checks its checksum. The second line installs Docker when it is missing, starts the proxy and the API, and prints the token of the server:
 
 ```
 On your machine, run:
-  chasen add server apps.example.com
+  chasen add server example.com
 Server token (the login page asks for it): 3f9a...
 ```
 
@@ -46,9 +46,9 @@ On your computer (macOS or Linux):
 
 ```bash
 curl -fsSL https://chasenhq.com/cli | sh
-chasen add server apps.example.com
+chasen add server example.com
 # Open this page to log in:
-#   https://api.apps.example.com/oauth/device?user_code=BCDF-GHJK
+#   https://api.example.com/oauth/device?user_code=BCDF-GHJK
 ```
 
 Open the page, check the code, and type the token of the server. The CLI then has a token of its own.
@@ -88,7 +88,7 @@ chasen deploy
 # Starting shop 3f9a2c1
 #
 # Deployed shop 3f9a2c1
-#   https://shop.apps.example.com
+#   https://shop.example.com
 ```
 
 `chasen deploy` builds the image of the current git commit, pushes it, and tells the server to pull it. The server backs up the databases, starts the new version next to the old one, and moves the traffic when `/up` answers. If the new version does not answer in 30 seconds, the old one keeps the traffic.

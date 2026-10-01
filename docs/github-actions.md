@@ -16,11 +16,11 @@ The workflow needs to know where your server is and how to log in.
 
 | Secret | Value |
 |---|---|
-| `CHASEN_URL` | `https://api.apps.example.com` for your own server (`api.` + its base domain). `https://cloud.chasenhq.com` for the cloud |
+| `CHASEN_URL` | `https://api.example.com` for your own server (`api.` + its base domain). `https://cloud.chasenhq.com` for the cloud |
 | `CHASEN_TOKEN` | The token of the server (it is in `/etc/chasen/config.yml` on the server). For the cloud: the key of your account |
 
 ```bash
-gh secret set CHASEN_URL --body https://api.apps.example.com
+gh secret set CHASEN_URL --body https://api.example.com
 gh secret set CHASEN_TOKEN          # asks for the value, so it stays out of your shell history
 ```
 

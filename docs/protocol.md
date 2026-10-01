@@ -22,7 +22,7 @@ Authorization: Bearer <token>
 - **The last line** is a zero byte, then `chasen-exit `, then the exit code of the command: `\x00chasen-exit 0`. A response that ends without this line means the connection broke.
 
 ```bash
-curl -N -X POST "https://api.apps.example.com/v1/status?arg=shop" \
+curl -N -X POST "https://api.example.com/v1/status?arg=shop" \
   -H "Authorization: Bearer $CHASEN_TOKEN"
 ```
 
