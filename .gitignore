@@ -1,0 +1,5 @@
+/chasen
+/chasen-server
+/tmp/
+*.sqlite3*
+.env*

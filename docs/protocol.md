@@ -1,0 +1,108 @@
+# The server protocol
+
+`chasen` talks to `chasen-server` over HTTPS. The cloud answers the same protocol and passes each request on to the server of the app, so a client does not know which one it talks to.
+
+The whole contract is in one Go file: [`protocol/protocol.go`](../protocol/protocol.go). The three programs import it. This document describes version 1 of it.
+
+## Why it is plain HTTP
+
+What crosses the wire is a command and its output. HTTP does that natively: a request body in, a stream of text out. So there is no schema compiler, no generated code, and you can call the API with `curl`. It also passes the proxy of the server and Cloudflare with no extra setting.
+
+## A command
+
+```
+POST /v1/<command>?arg=<first>&arg=<second>
+Authorization: Bearer <token>
+```
+
+- **The command** is one word from the list below.
+- **The arguments** are `arg` query parameters, in order. The first one is the app, for every command except `list`.
+- **The request body** is the input of the command. Most commands have none.
+- **The response** is `text/plain`. It is the output of the command, sent line by line as the command runs.
+- **The last line** is a zero byte, then `chasen-exit `, then the exit code of the command: `\x00chasen-exit 0`. A response that ends without this line means the connection broke.
+
+```bash
+curl -N -X POST "https://api.apps.example.com/v1/status?arg=shop" \
+  -H "Authorization: Bearer $CHASEN_TOKEN"
+```
+
+## Status codes
+
+| Code | Meaning |
+|---|---|
+| `200` | The command started. Its result is the exit code in the last line, not the status code |
+| `401` | The token is not valid. The client starts a new login |
+| `404`, `409`, `502`, `503` | The cloud only: no such server, a server choice is needed, or the server does not answer. The body is one line of text |
+
+A command that fails still answers `200`: the server already sent the output when it knows the result.
+
+## The commands
+
+| Command | Arguments | Body | What it does |
+|---|---|---|---|
+| `list` | | | The apps of the server |
+| `env` | `<app> [check]` | The settings, as JSON | Replace the settings of the app. With `check`: the settings for one check |
+| `deploy` | `<app> <version>` | For a website: its files, as `tar.gz` | Pull the image of the settings (or wrap the files of a website), back up, start, and swap |
+| `check` | `<app> <version>` | Like `deploy` | Run the image next to the live app and test it against the standard |
+| `enable` | `<addon> [domain]` | | Run an addon from its image |
+| `restart` | `<app>` | | Start the app again with the settings that were sent last |
+| `status` | `<app>` | | The version, the state, the URLs, and the backups |
+| `logs` | `<app>` | | Follow the logs. It stops when the client goes away |
+| `history` | `<app> [id]` | | The activity feed, or the output of one entry |
+| `domains` | `<app> [add\|rm <domain>]` | | List or change the domains |
+| `backup` | `<app>` | | Make a snapshot now |
+| `backups` | `<app>` | | List the backups |
+| `restore` | `<app> [backup\|live]` | | Restore a backup |
+| `remove` | `<app>` | | Stop the app. The data stays |
+| `logout` | | | Make the API forget the token of the request |
+
+Every command except `logs` runs to its end on the server, also when the client goes away. So a lost connection never leaves a deploy half done.
+
+## A deploy is two requests
+
+1. `POST /v1/env?arg=shop` with the settings:
+
+   ```json
+   {
+     "image": "ghcr.io/you/shop:3f9a2c1d5e8b7a6094c3f2e1d0b9a8c7d6e5f4a3",
+     "registry": {"username": "you", "password": "..."},
+     "env": {"LOG_LEVEL": "info", "STRIPE_KEY": "..."},
+     "port": 3000,
+     "health": "/up",
+     "health_timeout": 30,
+     "volumes": ["/app/storage"]
+   }
+   ```
+
+   Only `env` is always there. A zero or missing value means "use the default of the standard". The server uses `registry` for the next pull and does not keep it.
+
+2. `POST /v1/deploy?arg=shop&arg=3f9a2c1`. The second argument is the version that the app shows (`APP_VERSION`). The body is empty for an app. For a website, which has no image, the body is a `tar.gz` of its files and a Dockerfile.
+
+## The login
+
+The login is the OAuth 2.0 device flow (RFC 8628), in [`oauth`](../oauth/oauth.go).
+
+| Request | What it does |
+|---|---|
+| `POST /oauth/device_authorization` | Start a login. The answer has a device code, a user code, and the page to open |
+| `GET /oauth/device?user_code=...` | The page. The person types the token of the server (or the key of a cloud account) |
+| `POST /oauth/token` | The client asks until the login is approved, and gets a token of its own |
+
+In CI there is no login: the token of the server (or the key of the account) is the bearer token.
+
+## What only the cloud answers
+
+| Request | What it does |
+|---|---|
+| `GET /v1/placement?app=<app>` | Which servers the account has, and what a new one costs. JSON |
+| Header `Chasen-Server: <id>` | Send the command to this server of the account |
+| Header `Chasen-Server: new`, `new:cx33`, `new:@ash`, `new:cx33@ash` | Create a server for the app: the cheapest one, or of this type, or in this location |
+
+A plain server answers `404` to `/v1/placement`, and the client then asks no question.
+
+## Compatibility
+
+- The path says `/v1`. A change that breaks a client gets a new number.
+- A new command is a new word in the list. An old server answers it with an error line and exit code 1.
+- A new field in the settings is ignored by an old server. So a new client with an old server can lose a setting without an error: keep the server as new as the client.
+- `GET /up` answers `200` when the API runs. It needs no token.

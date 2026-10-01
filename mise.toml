@@ -1,0 +1,11 @@
+[tasks.test]
+description = "Unit tests. No Docker"
+run = "go vet ./... && go test ./..."
+
+[tasks.e2e]
+description = "End-to-end test: real Docker, proxy on ports 80/443, S3 store. Needs sudo"
+run = "bin/e2e"
+
+[tasks.smol]
+description = "A disposable Chasen server in a smolvm machine, for local tests. No sudo, no port 80"
+run = "bin/smol"

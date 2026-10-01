@@ -1,0 +1,23 @@
+# Every line is optional. A repository on GitHub needs no chasen.yml at all:
+# its image goes to ghcr.io/<owner>/<repository>.
+name: example
+
+# For a registry that is not ghcr.io of the git origin: the image, without a
+# tag, and the login. `password` is the name of a secret.
+# image: you/example
+# registry:
+#   username: you
+#   password: REGISTRY_TOKEN
+
+env:
+  GREETING: hello
+# Names of the secrets the app needs. Chasen reads each one from the output of
+# secrets_command, or from the environment. Values never go into git.
+# secrets: [STRIPE_KEY]
+# secrets_command: fnox export
+
+# Overrides of the standard. This app needs none: it listens on $PORT, answers
+# /up, and keeps its database in $DATABASE_PATH.
+# port: 3000
+# health: /_health
+# volumes: [/app/storage]

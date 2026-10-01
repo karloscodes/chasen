@@ -1,0 +1,35 @@
+# A tag v* makes a release: the CLI for macOS and Linux, the server for
+# Linux, and checksums.txt. The install scripts download the newest release.
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          flags="-s -w -X main.version=$GITHUB_REF_NAME"
+          mkdir dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            GOOS=${target%/*} GOARCH=${target#*/} go build -ldflags "$flags" -o dist/chasen-${target%/*}-${target#*/} ./cmd/chasen
+          done
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH=$arch go build -ldflags "$flags" -o dist/chasen-server-linux-$arch ./cmd/chasen-server
+          done
+          cd dist && sha256sum chasen-* > checksums.txt
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes

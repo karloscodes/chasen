@@ -1,0 +1,28 @@
+# A push to main deploys the app with Chasen: the same `chasen deploy` that
+# you run on your computer. Copy this file to .github/workflows/ of your app.
+#
+# Set two secrets in the repository:
+#   CHASEN_URL    https://api.apps.example.com (your server), or https://cloud.chasenhq.com
+#   CHASEN_TOKEN  the token of the server, or the key of your cloud account
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: curl -fsSL https://chasenhq.com/cli | sh
+      # Builds the image of this commit, pushes it to ghcr.io, and deploys it.
+      - run: chasen deploy
+        env:
+          CHASEN_URL: ${{ secrets.CHASEN_URL }}
+          CHASEN_TOKEN: ${{ secrets.CHASEN_TOKEN }}
+          # The login of the registry in chasen.yml: the token of this job.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

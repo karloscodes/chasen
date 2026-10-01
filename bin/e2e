@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# The end-to-end test: real Docker, the proxy on ports 80 and 443, an S3
+# store, and a private image registry. It needs sudo. Do not run it while
+# another job on the machine uses a matcha proxy: both want the same ports and
+# the same container name.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+out=tmp/e2e
+s3=chasen-e2e-s3
+registry=chasen-e2e-registry
+mkdir -p "$out"
+trap 'docker rm -f $s3 $registry >/dev/null 2>&1 || true' EXIT
+
+CGO_ENABLED=0 go build -o "$out/" ./cmd/...
+go test -c -o "$out/e2e.test" ./cmd/chasen-server
+
+docker network inspect matcha-network >/dev/null 2>&1 || docker network create matcha-network >/dev/null
+docker rm -f $s3 >/dev/null 2>&1 || true
+docker run -d --name $s3 --network matcha-network \
+  -e RUSTFS_ACCESS_KEY=minioadmin -e RUSTFS_SECRET_KEY=minioadmin rustfs/rustfs:latest >/dev/null
+sleep 6
+ip=$(docker inspect -f '{{(index .NetworkSettings.Networks "matcha-network").IPAddress}}' $s3)
+
+# A private registry, in the part of ghcr.io: the user chasen, the password chasen-e2e.
+echo 'chasen:$2b$05$GNJnUPo1Ji0sZvuRY8AXTeGUSbYYHdW7KSqlgWr.wZMhPhvXQ9hpa' > "$out/htpasswd"
+docker rm -f $registry >/dev/null 2>&1 || true
+docker run -d --name $registry -p 127.0.0.1:5055:5000 -v "$PWD/$out/htpasswd:/htpasswd:ro" \
+  -e REGISTRY_AUTH=htpasswd -e REGISTRY_AUTH_HTPASSWD_REALM=chasen -e REGISTRY_AUTH_HTPASSWD_PATH=/htpasswd registry:2 >/dev/null
+
+CHASEN_TEST_S3="http://$ip:9000" go test -count=1 -run TestOffsite ./cmd/chasen-server
+sudo CHASEN_TEST_S3="http://$ip:9000" CHASEN_TEST_REGISTRY=localhost:5055 CHASEN_BIN="$PWD/$out" "$out/e2e.test" -test.run TestEndToEnd "$@"
