@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -440,6 +443,60 @@ func TestEndToEnd(t *testing.T) {
 		must(app, bin, "logout")
 		if out, err := run(app, bin, "list"); err == nil || !strings.Contains(out, "not logged in") {
 			t.Errorf("list after the last logout = %q, %v, want: not logged in", out, err)
+		}
+	})
+
+	t.Run("update installs the newest release, and goes back when the new API does not start", func(t *testing.T) {
+		// A release is a directory on a web server: the binary and checksums.txt.
+		release := t.TempDir()
+		asset := "chasen-server-linux-" + runtime.GOARCH
+		publish := func(binary []byte) {
+			t.Helper()
+			os.WriteFile(filepath.Join(release, asset), binary, 0644)
+			os.WriteFile(filepath.Join(release, "checksums.txt"), []byte(checksum(binary)+"  "+asset+"\n"), 0644)
+		}
+		web := httptest.NewServer(http.FileServer(http.Dir(release)))
+		defer web.Close()
+		t.Setenv("CHASEN_DOWNLOADS", web.URL)
+		apiUp := func() bool {
+			req, _ := http.NewRequest("GET", "http://127.0.0.1/up", nil)
+			req.Host = "api.localhost"
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return false
+			}
+			resp.Body.Close()
+			return resp.StatusCode == http.StatusOK
+		}
+		current, err := os.ReadFile(server)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		publish(current)
+		if out := must(".", server, "update"); !strings.Contains(out, "up to date") {
+			t.Errorf("update to the same release = %q, want: up to date", out)
+		}
+
+		// The same program with other bytes at its end: a new release that works.
+		newer := append(slices.Clone(current), []byte("\n# a newer release\n")...)
+		publish(newer)
+		appBefore, _ := docker("ps", "-q", "--filter", "name=^example")
+		out := must(".", server, "update")
+		installed, _ := os.ReadFile(server)
+		if !strings.Contains(out, "Updated to") || checksum(installed) != checksum(newer) || !apiUp() {
+			t.Errorf("update = %q, want the new binary in place and the API up", out)
+		}
+		if appAfter, _ := docker("ps", "-q", "--filter", "name=^example"); appBefore == "" || appAfter != appBefore {
+			t.Errorf("the container of the app was %q and is %q, want the same one: an update does not restart the apps", appBefore, appAfter)
+		}
+
+		// A release that cannot start: the server must keep the version it has.
+		publish([]byte("#!/bin/sh\nexit 1\n"))
+		out, err = run(".", server, "update")
+		installed, _ = os.ReadFile(server)
+		if err == nil || !strings.Contains(out, "The previous version runs again") || checksum(installed) != checksum(newer) || !apiUp() {
+			t.Errorf("update to a broken release = %q, %v, want the previous binary back and the API up", out, err)
 		}
 	})
 }

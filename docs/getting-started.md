@@ -113,6 +113,32 @@ To test an app before it gets traffic, run `chasen check`.
 - The build is for `linux/amd64`. For an ARM server, set `DOCKER_DEFAULT_PLATFORM=linux/arm64`.
 - `setup` does not harden the server. `chasen-server check` reports what is missing: SSH with keys only, a firewall, and security updates.
 
-## Update the server
+## Updates
 
-Run both lines of step 1 again. Keep the server as new as the CLI.
+**The server updates itself.** Each night, at a random minute between 03:00 and 05:00, a timer runs `chasen-server update`:
+
+- It compares the checksum of the newest release with the binary that runs. When they are the same, nothing happens.
+- It keeps the old binary as `chasen-server.previous`, installs the new one, and starts the API again. Your apps do not restart.
+- When the new API does not answer in 30 seconds, it puts the old binary back.
+- It never interrupts a deploy: it waits for the next night.
+
+```bash
+chasen-server update                      # update now
+systemctl list-timers chasen-update.timer # when the next run is
+```
+
+To turn the nightly update off, add `auto_update: false` to `/etc/chasen/config.yml` and run `chasen-server setup`.
+
+**The CLI does not update itself.** Run its install line again: `curl -fsSL https://chasenhq.com/cli | sh`.
+
+**The operating system is yours.** Chasen does not change how your server installs its own updates. On Ubuntu, turn on automatic security updates, and let the server reboot at night when an update needs it:
+
+```bash
+apt-get install -y unattended-upgrades
+cat > /etc/apt/apt.conf.d/52chasen-reboot <<'CONF'
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+CONF
+```
+
+A reboot is safe: Docker starts at boot, and the proxy, the API, and your apps start again by themselves. It costs about one minute of downtime.

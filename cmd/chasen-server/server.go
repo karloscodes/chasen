@@ -32,6 +32,9 @@ type serverConfig struct {
 		S3           *s3Config `yaml:"s3,omitempty"`
 		HeartbeatURL string    `yaml:"heartbeat_url,omitempty"`
 	} `yaml:"backup,omitempty"`
+	// AutoUpdate turns the nightly update off when it is false. Without the
+	// line, the server updates itself.
+	AutoUpdate *bool `yaml:"auto_update,omitempty"`
 }
 
 // CHASEN_ROOT moves all server state under one directory. Tests use it.
@@ -58,6 +61,8 @@ func runServer(args []string) error {
 		}
 	case "bucket":
 		return serverBucket(args)
+	case "update":
+		return serverUpdate()
 	case "replicate":
 		return serverReplicate()
 	case "serve":
@@ -237,6 +242,9 @@ func serverBucket(args []string) error {
 		return err
 	}
 	if err := startAgent(self); err != nil {
+		return err
+	}
+	if err := installTimer(self, cfg.AutoUpdate == nil || *cfg.AutoUpdate); err != nil {
 		return err
 	}
 	_, err = routeAgent(cfg.Domain)

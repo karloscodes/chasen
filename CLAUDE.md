@@ -34,6 +34,7 @@ Run `mise run e2e` after a change to the protocol, the deploy, the backups, or t
 - Litestream and SQLite are inside `chasen-server`. It must build with `CGO_ENABLED=0`: the binary runs in an Alpine container.
 - The server keeps apps in `apps.yml` (the format matcha reads) and its own records in SQLite.
 - The deploy is imperative. No desired-state file, no reconcile loop.
+- A server updates itself: `setup` installs a systemd timer that runs `chasen-server update` each night (`update.go`). It takes the newest GitHub release, checks the checksum, and goes back to the previous binary when the API does not answer. So a tag `v*` reaches every server within a day: tag only what passed the end-to-end test. `auto_update: false` in config.yml turns it off.
 - `chasen.yml` is not a docker-compose file. An unknown key is an error.
 - Addons (`chasen enable fusionaly|formlander|lognorth`) run products from their images.
 - Backups cover every volume of an app (`/var/matcha/<app>/*`).

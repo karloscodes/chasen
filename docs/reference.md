@@ -24,6 +24,17 @@
 | `chasen remove` | Stop the app. Keeps the data and the backups |
 | `chasen list` | List all apps on the server |
 
+On the server, as root:
+
+| Command | What it does |
+|---|---|
+| `chasen-server setup --domain <domain>` | Start the proxy and the API, and the timer of the nightly update |
+| `chasen-server bucket ...` | Set the S3 bucket for offsite backups |
+| `chasen-server update` | Install the newest release now. The timer does this each night |
+| `chasen-server check` | Report what the security of the server lacks |
+| `chasen-server list` | List all apps |
+| `chasen-server backup` | Back up every app now |
+
 ## Several servers
 
 You can be logged in to several servers and to the cloud at the same time.
@@ -49,6 +60,7 @@ server: example.com      # or: cloud
 
 ```
 /usr/local/bin/chasen-server         the binary; the API container runs it
+/usr/local/bin/chasen-server.previous  the binary before the last update
 /etc/chasen/config.yml               base domain, server token, and backup bucket
 /etc/chasen/server.sqlite3           the database of the server: logins and the activity feed
 /etc/chasen/apps.yml                 the apps (matcha format)
