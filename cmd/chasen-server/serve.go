@@ -220,6 +220,7 @@ func startAgent(self string) error {
 	}
 	docker("rm", "-f", agentContainer)
 	out, err := docker("run", "-d", "--name", agentContainer, "--restart", "unless-stopped",
+		"--log-opt", "max-size=10m", "--log-opt", "max-file=3", // the engine caps the logs of the apps the same way
 		"--network", "matcha-network",
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
 		"-v", self+":/usr/local/bin/chasen-server:ro",

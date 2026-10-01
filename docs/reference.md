@@ -74,6 +74,7 @@ server: example.com      # or: cloud
 
 ## Limits
 
+- The log of each container is capped at 3 files of 10 MB. `chasen logs` shows the newest lines; ship the logs elsewhere (the LogNorth addon) to keep more.
 - One owner for each server. Every login to a server can deploy every app on that server.
 - An app stays on its server. No command moves it to another one.
 - One container for each app. 512 MB of memory for each container (a matcha default).
