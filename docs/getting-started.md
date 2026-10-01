@@ -142,3 +142,18 @@ CONF
 ```
 
 A reboot is safe: Docker starts at boot, and the proxy, the API, and your apps start again by themselves. It costs about one minute of downtime.
+
+**You can turn the automatic reboot off.** Do this when one minute of downtime at night is not acceptable, and you want to choose the moment yourself:
+
+```bash
+echo 'Unattended-Upgrade::Automatic-Reboot "false";' > /etc/apt/apt.conf.d/52chasen-reboot
+```
+
+Ubuntu still installs each security update. A new kernel then waits on the disk: the server runs the old kernel, with its known holes, until you reboot. So check and reboot yourself:
+
+```bash
+cat /var/run/reboot-required   # the file exists when a reboot is waiting
+reboot
+```
+
+To move the reboot to another hour, keep `"true"` and change `Automatic-Reboot-Time`. A server from the Chasen cloud has the reboot on at 04:00; the same file turns it off.
