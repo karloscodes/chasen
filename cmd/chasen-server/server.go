@@ -932,7 +932,7 @@ func serverEnable(name string, args []string) error {
 		Port:       defaultPort,
 		HealthPath: product.Health,
 		Volumes:    product.Volumes,
-		Env:        standardEnv([]string{domain}, "latest", privateKey, shape{Port: defaultPort, Volumes: product.Volumes}),
+		Env:        addonEnv(old.Env, standardEnv([]string{domain}, "latest", privateKey, shape{Port: defaultPort, Volumes: product.Volumes})),
 	}
 	fmt.Println("Starting", name)
 	if err := apply(name, app); err != nil {
@@ -940,6 +940,20 @@ func serverEnable(name string, args []string) error {
 	}
 	fmt.Printf("\nEnabled %s\n  %s\n", name, link(domain))
 	return nil
+}
+
+// addonEnv is the env of an addon that runs again: what it had, then what
+// Chasen sets. An update must not take away a setting that the owner gave
+// the app, or that came with an app adopted from matcha.
+func addonEnv(had, standard map[string]string) map[string]string {
+	env := map[string]string{}
+	for k, v := range had {
+		env[k] = v
+	}
+	for k, v := range standard {
+		env[k] = v
+	}
+	return env
 }
 
 var domainRe = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)

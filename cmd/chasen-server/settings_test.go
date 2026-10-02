@@ -157,3 +157,17 @@ func TestAppSettings(t *testing.T) {
 		}
 	})
 }
+
+func TestAddonKeepsItsEnvAtAnUpdate(t *testing.T) {
+	had := map[string]string{"FORMLANDER_SESSION_SECRET": "the-secret", "PRIVATE_KEY": "old", "PORT": "9999"}
+	standard := standardEnv([]string{"forms.example.com"}, "latest", "old", shape{Port: 8080, Volumes: []string{"/app/storage"}})
+
+	env := addonEnv(had, standard)
+
+	if env["FORMLANDER_SESSION_SECRET"] != "the-secret" {
+		t.Error("the update took a setting of the app away")
+	}
+	if env["PORT"] != "8080" || env["PRIVATE_KEY"] != "old" || env["BASE_URL"] != "https://forms.example.com" {
+		t.Errorf("the env of the standard is not there: %v", env)
+	}
+}
