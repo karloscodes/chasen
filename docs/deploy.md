@@ -133,8 +133,6 @@ The file is optional for a website, and for an app whose git origin is on GitHub
 name: myapp
 env:
   LOG_LEVEL: info
-secrets: [STRIPE_KEY, SMTP_PASSWORD]
-secrets_command: fnox export
 
 # Overrides of the standard. Leave them out when the defaults fit.
 port: 3000
@@ -145,25 +143,55 @@ volumes: [/app/storage]
 
 ## Secrets
 
-Secret values never go into git or into the image. `secrets:` lists the names. At each deploy, Chasen reads the values on your machine and sends them to the server over HTTPS. A missing secret stops the deploy before it changes anything.
+A secret is a value that must not be in git as plain text, and not in the image: an API key, a password. Chasen keeps the secrets of an app the way Rails keeps its credentials: one encrypted file in the repository, and one key outside it.
 
-Chasen reads each value from the output of `secrets_command`, then from the environment. `secrets_command` is any command that prints `KEY=VALUE` lines:
+```bash
+chasen secrets edit
+```
+
+The command opens the secrets in your editor (`$VISUAL`, then `$EDITOR`). They are lines of `NAME=value`:
+
+```
+STRIPE_KEY=sk_live_...
+SMTP_PASSWORD=...
+```
+
+When you close the editor, Chasen encrypts them into `chasen.secrets.enc`. Commit that file. Every secret in it goes to the app at the next deploy, as an environment variable: there is no list to keep in `chasen.yml`.
+
+The first `chasen secrets edit` makes the key and prints it:
+
+| File | What it is | In git |
+|---|---|---|
+| `chasen.secrets.enc` | the secrets, encrypted | yes |
+| `chasen.key` | the key that opens them | no: Chasen adds it to `.gitignore` |
+
+Save the key in a password manager. If you lose it, nobody can read the secrets. On another computer, put the key back in `chasen.key`. In CI, give it as `CHASEN_KEY`.
+
+One key at the top of a repository opens the secrets of every app in it: Chasen looks for `chasen.key` in the directory of the app, then in each directory above it.
+
+```bash
+chasen secrets         # the names
+chasen secrets show    # the names and the values
+chasen restart         # give the app the secrets of now, with no build
+```
+
+**The secret key of the app.** At the first deploy of a new app that has a secrets file, Chasen makes `SECRET_KEY_BASE` and saves it in that file. So the key that signs the sessions of the app is in your repository too, and a new server gives the app the same one. Commit the file after the first deploy.
+
+Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a new server needs one `chasen deploy` to get the configuration, the secrets, and the data back. On the server, the values are in a database that only root can read.
+
+### Secrets from another tool
+
+You have a secret manager already? Keep it. `secrets:` in `chasen.yml` lists the names, and `secrets_command` is any command that prints `KEY=VALUE` lines:
+
+```yaml
+secrets: [STRIPE_KEY, SMTP_PASSWORD]
+secrets_command: op inject -i .env.tpl
+```
 
 | Tool | `secrets_command` |
 |---|---|
-| fnox | `fnox export` |
 | 1Password | `op inject -i .env.tpl` |
-| sops (encrypted file in git) | `sops -d secrets.enc.env` |
-| A local file | `cat .env.production` |
+| fnox | `fnox export` |
+| sops | `sops -d secrets.enc.env` |
 
-Without `secrets_command`, wrap the deploy: `fnox exec -- chasen deploy` or `op run --env-file=.env.tpl -- chasen deploy`.
-
-On the server, the values are in files that only root can read.
-
-To change a value or rotate a secret without a build:
-
-```bash
-chasen restart       # starts the app again with the env and secrets of chasen.yml
-```
-
-Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a new server needs one `chasen deploy` to get the configuration, the secrets, and the data back.
+Chasen takes each name from the output of the command, then from the environment, then from `chasen.secrets.enc`. So a value in the environment wins over the file: CI can replace one secret without the key. A missing secret stops the deploy before it changes anything.

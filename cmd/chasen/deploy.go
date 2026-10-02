@@ -27,18 +27,23 @@ func deploy(creds credentials, app appFile, command string) error {
 	if err := printReview(os.Stderr, reviewAppFile(app, noDockerfile == nil, tagFlag)); err != nil {
 		return err
 	}
+	if command == "deploy" {
+		var err error
+		if creds, err = placed(creds, app.Name); err != nil {
+			return err
+		}
+		// A new app gets its secret key now, in the secrets of this directory.
+		if err := keepSecretKey(func() bool { return isDeployed(creds, app.Name) }); err != nil {
+			return err
+		}
+	}
 	settings, err := appSettings(app)
 	if err != nil {
 		return err
 	}
 	// The values of the secrets are here now: check the ones that have a rule.
 	if err := settings.Check(); err != nil {
-		return fmt.Errorf("chasen.yml: %w", err)
-	}
-	if command == "deploy" {
-		if creds, err = placed(creds, app.Name); err != nil {
-			return err
-		}
+		return fmt.Errorf("the secrets and the env of the app: %w", err)
 	}
 
 	// An app on GitHub needs no chasen.yml: its image is ghcr.io/<owner>/<repository>.
@@ -66,6 +71,12 @@ func appSettings(app appFile) (protocol.Settings, error) {
 	if env == nil {
 		env = map[string]string{}
 	}
+	// Every secret of chasen.secrets.enc is a secret of the app: no list to keep.
+	stored, err := storedSecrets()
+	if err != nil {
+		return protocol.Settings{}, err
+	}
+	maps.Copy(env, stored)
 	for _, name := range app.Secrets {
 		env[name] = secrets[name]
 	}
@@ -278,8 +289,16 @@ A repository with a git origin on GitHub needs no setting: the image goes to ghc
    It builds the image of the commit here, pushes it, and deploys it.`
 
 // secretValues returns the values of the named secrets. A secret comes from
-// the output of secrets_command, or from the environment.
+// the output of secrets_command, then from the environment, then from the
+// encrypted secrets of this directory.
 func secretValues(app appFile, names []string) (map[string]string, error) {
+	if len(names) == 0 {
+		return map[string]string{}, nil
+	}
+	stored, err := storedSecrets()
+	if err != nil {
+		return nil, err
+	}
 	var fetched map[string]string
 	if app.SecretsCommand != "" && len(names) > 0 {
 		cmd := exec.Command("sh", "-c", app.SecretsCommand)
@@ -300,12 +319,15 @@ func secretValues(app appFile, names []string) (map[string]string, error) {
 			value, ok = os.LookupEnv(name)
 		}
 		if !ok {
+			value, ok = stored[name]
+		}
+		if !ok {
 			missing = append(missing, name)
 		}
 		values[name] = value
 	}
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("missing secrets: %s", strings.Join(missing, ", "))
+		return nil, fmt.Errorf("missing secrets: %s. Add them with: chasen secrets edit", strings.Join(missing, ", "))
 	}
 	return values, nil
 }

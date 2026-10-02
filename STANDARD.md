@@ -107,8 +107,9 @@ In both ways, Chasen makes a checked backup of every database before the migrati
 **The secret key.** `SECRET_KEY_BASE` and `PRIVATE_KEY` are one secret with two names. An app signs its sessions with it, and some apps encrypt data with it.
 
 - By default the server makes the key at the first deploy and keeps it. That is enough for an app that only signs sessions: with a new key, people log in again.
-- When the data of the app cannot be read without the key, keep the key yourself. Add `SECRET_KEY_BASE` to `secrets:` in `chasen.yml` and put the value in your secret store, 32 characters or more (`openssl rand -hex 32`). Then every deploy brings the key, and a new server gets the same one.
-- To take over the key of an app that runs already, read it first: `chasen run printenv SECRET_KEY_BASE`. A different key logs everybody out and can make encrypted data unreadable.
+- A new app with a secrets file (`chasen.secrets.enc`) needs nothing: at its first deploy, Chasen makes the key and saves it in that file. Then every deploy brings the key, and a new server gets the same one.
+- With another secret store, do it by hand when the data of the app cannot be read without the key: add `SECRET_KEY_BASE` to `secrets:` in `chasen.yml` and put a value of 32 characters or more in your store (`openssl rand -hex 32`).
+- To take over the key of an app that runs already, read it first (`chasen run printenv SECRET_KEY_BASE`) and add it with `chasen secrets edit`. A different key logs everybody out and can make encrypted data unreadable.
 
 The engine also sets four variables with the name of the app in front, for an app that was made for matcha: `SHOP_PRIVATE_KEY`, `SHOP_DOMAIN`, `SHOP_APP_PORT`, and `SHOP_ENV`. `chasen check` sets them too.
 
@@ -127,12 +128,13 @@ Chasen removes names it sets today: `APP_HOST` and `APP_URL` (use `BASE_URL`), a
 
 A secret is a variable whose value must not be in git or in the image.
 
-- `chasen.yml` lists the names under `secrets:`. The values come from the output of `secrets_command` (for example `fnox export`, `op inject`, or `sops -d`), or from the environment.
-- Chasen reads the values on your computer at each deploy and sends them with it, over HTTPS. A missing secret stops the deploy before it changes anything.
+- The secrets of an app are in `chasen.secrets.enc`, encrypted, in the repository. `chasen secrets edit` changes them. The key is in `chasen.key`, which git ignores, or in `CHASEN_KEY`.
+- An app that has a secret manager already lists the names under `secrets:` in `chasen.yml`, and the values come from the output of `secrets_command` (for example `op inject`, `fnox export`, or `sops -d`), or from the environment.
+- Chasen reads the values on your computer at each deploy and sends them with it. A missing secret stops the deploy before it changes anything.
 - On the server, the values are in a file that only root can read, and they reach the container as environment variables. Whoever is root on the server can read them.
-- To rotate a secret, change it in your secret store and run `chasen restart`. No build.
+- To rotate a secret, change it (`chasen secrets edit`) and run `chasen restart`. No build.
 
-Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a server that is gone costs you a new server and a `chasen deploy`, not a hunt for lost keys. One key is the exception until you take it: the secret key that the server makes for the app (see "Environment").
+Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a server that is gone costs you a new server and a `chasen deploy`, not a hunt for lost keys. The secret key of the app follows the same rule: an app with a secrets file gets its `SECRET_KEY_BASE` in that file at the first deploy (see "Environment").
 
 ## 6. Logs and signals
 

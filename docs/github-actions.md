@@ -24,7 +24,7 @@ gh secret set CHASEN_URL --body https://api.example.com
 gh secret set CHASEN_TOKEN          # asks for the value, so it stays out of your shell history
 ```
 
-Secrets of the app itself (`secrets:` in `chasen.yml`) work the same way: add each one as a repository secret, and pass it in `env:` of the deploy step.
+The secrets of the app itself are in `chasen.secrets.enc`, in the repository. The job needs their key: add it as the repository secret `CHASEN_KEY` (the content of `chasen.key`), and pass it in `env:` of the deploy step. An app that lists `secrets:` in `chasen.yml` instead passes each one the same way.
 
 ## 3. Add the workflow
 

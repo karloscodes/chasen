@@ -98,6 +98,8 @@ options:
 		return addServer(args[1:])
 	case "servers":
 		return listServers()
+	case "secrets":
+		return secretsCommand(args[1:])
 	case "use":
 		return useServer(args[1:])
 	}

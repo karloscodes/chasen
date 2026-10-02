@@ -35,7 +35,10 @@ Run these in the directory of your app:
                          In the cloud, the first deploy of an app asks for its server:
                          --on <id> uses one of your servers, --new creates one (--new=cx33, --new=@ash)
   check                  Test the current git commit against the standard. Changes nothing live
-  restart                Start the app again with the env and secrets of chasen.yml. Same image
+  restart                Start the app again with the env and the secrets of now. Same image
+  secrets edit           Change the secrets of the app in your editor. They stay in the repository,
+                         encrypted, in chasen.secrets.enc. The key is chasen.key, or CHASEN_KEY in CI
+  secrets                List the names of the secrets. secrets show prints the values too
   status                 Show the version, the URLs, and the last backup
   logs                   Follow the app logs
   run <command>          Run one command in the container of the app: chasen run bin/rails db:migrate
