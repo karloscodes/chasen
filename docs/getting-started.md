@@ -4,7 +4,7 @@ Chasen puts your app on one server that you own. `chasen` is the CLI on your com
 
 ## What you need
 
-- **A server** with Ubuntu or Debian, root access, and ports 80 and 443 open. A small one is enough to start.
+- **A server** with Ubuntu or Debian, root access, and ports 80 and 443 open. A small one is enough to start. If its firewall lets in only the addresses of Cloudflare, that is fine, but then every name of the server must go through Cloudflare: turn the proxy on for the wildcard record too.
 - **A domain** for the apps of the server, with a wildcard DNS record: `*.example.com` points to the address of the server. Each app then gets `<app>.example.com`.
 - **Docker on your computer.** `chasen deploy` builds the image of your app there.
 - **An image registry.** A repository on GitHub already has one, `ghcr.io`. Docker Hub and others work too.

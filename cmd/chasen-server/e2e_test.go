@@ -468,7 +468,7 @@ func TestEndToEnd(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("GET lognorth.localhost/_health = %s, want 200", resp.Status)
 		}
-		if out := must(app, bin, "-a", "lognorth", "status"); !strings.Contains(out, "https://lognorth.localhost") {
+		if out := must(app, bin, "-a", "lognorth", "status"); !strings.Contains(out, "http://lognorth.localhost") {
 			t.Errorf("status of the addon = %q, want its URL", out)
 		}
 		if out := must(app, bin, "-a", "lognorth", "backup"); !strings.Contains(out, "lognorth: backup 2") {

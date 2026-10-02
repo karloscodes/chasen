@@ -17,6 +17,8 @@ jobs:
       - run: bin/public
       - run: go vet ./...
       - run: go test ./...
+        env:
+          CHASEN_TEST_DOCKER: 1 # the runner has Docker: also the tests that start a container or pull an image
 
   # The end-to-end test: real Docker, the proxy on ports 80 and 443, an S3
   # store, and a private registry. A runner is a clean machine, so it always

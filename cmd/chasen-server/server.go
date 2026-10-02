@@ -493,8 +493,10 @@ func serverSetup(args []string) error {
 		return err
 	}
 
-	fmt.Printf("Chasen is ready. Apps get https://<name>.%s\n", cfg.Domain)
-	fmt.Printf("Point a wildcard A record for *.%s to this server.\n", cfg.Domain)
+	fmt.Printf("Chasen is ready. Apps get %s\n", link("<name>."+cfg.Domain))
+	if !isLocal(cfg.Domain) {
+		fmt.Printf("Point a wildcard A record for *.%s to this server.\n", cfg.Domain)
+	}
 	if cfg.Backup.S3 == nil {
 		fmt.Println("Backups stay on this server. For offsite copies too, run: chasen-server bucket --endpoint <url> --name <bucket> --access-key-id <id>")
 	}
@@ -611,6 +613,9 @@ func fetchImage(settings protocol.Settings, files io.Reader, as string) error {
 			return fmt.Errorf("the registry refused the login of %s: %s", r.Username, lastLine(string(out)))
 		}
 	}
+	// The name of the image can be on the server already: another tool runs
+	// its apps from it. Then the name stays, and it keeps the image it had.
+	before, missing := docker("image", "inspect", "--format", "{{.Id}}", settings.Image)
 	fmt.Println("Pulling", settings.Image)
 	pull := exec.Command("docker", "--config", config, "pull", "-q", settings.Image)
 	if out, err := pull.CombinedOutput(); err != nil {
@@ -620,8 +625,21 @@ func fetchImage(settings protocol.Settings, files io.Reader, as string) error {
 	if out, err := docker("tag", settings.Image, as); err != nil {
 		return errors.New(out)
 	}
-	docker("rmi", settings.Image) // only the name: `as` keeps the image
+	if missing != nil {
+		docker("rmi", settings.Image) // only the name: `as` keeps the image
+	} else {
+		docker("tag", before, settings.Image)
+	}
 	return nil
+}
+
+// link is the address of a domain for a person: https, or http for a domain
+// that only resolves on one machine and gets no certificate.
+func link(domain string) string {
+	if isLocal(domain) {
+		return "http://" + domain
+	}
+	return "https://" + domain
 }
 
 func lastLine(s string) string {
@@ -700,7 +718,7 @@ func serverDeploy(name, version string) error {
 
 	fmt.Printf("\nDeployed %s %s\n", name, version)
 	for _, d := range domains {
-		fmt.Println("  https://" + d)
+		fmt.Println("  " + link(d))
 	}
 	return nil
 }
@@ -851,7 +869,7 @@ type addon struct {
 
 var addons = map[string]addon{
 	"fusionaly":  {"karloscodes/fusionaly:latest", "/_health", []string{"/app/storage", "/app/logs"}, "privacy-first web analytics"},
-	"formlander": {"karloscodes/formlander-beta:latest", "/_health", []string{"/app/storage"}, "form backend for static sites"},
+	"formlander": {"karloscodes/formlander:latest", "/_health", []string{"/app/storage", "/app/logs"}, "form backend for static sites"},
 	"lognorth":   {"karloscodes/lognorth:latest", "/_health", []string{"/app/storage"}, "logs, errors, alerts, and uptime"},
 }
 
@@ -915,7 +933,7 @@ func serverEnable(name string, args []string) error {
 	if err := apply(name, app); err != nil {
 		return err
 	}
-	fmt.Printf("\nEnabled %s\n  https://%s\n", name, domain)
+	fmt.Printf("\nEnabled %s\n  %s\n", name, link(domain))
 	return nil
 }
 
@@ -1003,7 +1021,7 @@ func serverStatus(name string) error {
 	fmt.Printf("Version:  %s\n", version)
 	fmt.Printf("State:    %s\n", state)
 	for _, d := range strings.Split(app.Domain, ",") {
-		fmt.Printf("URL:      https://%s\n", d)
+		fmt.Printf("URL:      %s\n", link(d))
 	}
 	last := "none"
 	if stamps := localBackups(name); len(stamps) > 0 {
