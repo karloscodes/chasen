@@ -148,8 +148,8 @@ func inspectImage(image string) (imageFacts, error) {
 }
 
 // reviewImage reviews the image that the build made, against what the server
-// does with it.
-func reviewImage(app appFile, image imageFacts) []finding {
+// does with it. deployed says that the server runs the app already.
+func reviewImage(app appFile, image imageFacts, deployed bool) []finding {
 	var found []finding
 	settings := protocol.Settings{Port: app.Port, Volumes: app.Volumes}
 	if _, err := protocol.ShapeOf(settings, image.Ports, image.Volumes); err != nil {
@@ -162,12 +162,20 @@ func reviewImage(app appFile, image imageFacts) []finding {
 		found = append(found, finding{false, "the Dockerfile has no EXPOSE, and chasen.yml has no port",
 			fmt.Sprintf("Chasen sends the traffic to port %d and sets PORT=%d. An app that listens on another port never gets healthy, and the deploy fails. Say the port of the app in the Dockerfile: EXPOSE 3000.", protocol.DefaultPort, protocol.DefaultPort), docsDockerfile})
 	}
-	// A Rails image keeps its files in /rails/storage, which is the default.
-	if len(app.Volumes) == 0 && len(image.Volumes) == 0 && image.WorkingDir != "/rails" {
+	// Only at the first deploy: an app with no data, like a website, is right
+	// without a VOLUME, and a warning at every deploy teaches people not to
+	// read warnings. A Rails image keeps its files in /rails/storage, which
+	// is the default.
+	if !deployed && needsStorageAdvice(app, image) {
 		found = append(found, finding{false, "the Dockerfile has no VOLUME, and chasen.yml has no volumes",
 			fmt.Sprintf("Chasen keeps %s across deploys, and backs up the SQLite databases in it. A file that the app writes anywhere else is gone at the next deploy. Say where the app keeps its data in the Dockerfile: VOLUME /app/storage.", protocol.DefaultVolumes[0]), docsStorage})
 	}
 	return found
+}
+
+// needsStorageAdvice reports an image that does not say where its data is.
+func needsStorageAdvice(app appFile, image imageFacts) bool {
+	return len(app.Volumes) == 0 && len(image.Volumes) == 0 && image.WorkingDir != "/rails"
 }
 
 // printReview prints the findings, the errors first. With an error, it

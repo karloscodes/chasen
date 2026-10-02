@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"os/exec"
@@ -130,7 +132,10 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 		if err != nil {
 			return err
 		}
-		if err := printReview(os.Stderr, reviewImage(app, facts)); err != nil {
+		// The advice about the storage is for the first deploy. Ask the server
+		// only when the image needs that advice.
+		deployed := needsStorageAdvice(app, facts) && isDeployed(creds, app.Name)
+		if err := printReview(os.Stderr, reviewImage(app, facts, deployed)); err != nil {
 			return err
 		}
 		if err := pushImage(settings.Image, registry); err != nil {
@@ -138,6 +143,13 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 		}
 	}
 	return remote(creds, settings.Body(nil), os.Stdout, command, app.Name, version)
+}
+
+// isDeployed reports that the server runs the app. A server that does not
+// answer counts as no.
+func isDeployed(creds credentials, name string) bool {
+	code, err := protocol.Client(creds).Run(context.Background(), "status", []string{name}, nil, io.Discard)
+	return err == nil && code == 0
 }
 
 // deployWebsite sends the files of the current commit. The server puts them

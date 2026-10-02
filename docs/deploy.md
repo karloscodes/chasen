@@ -110,7 +110,7 @@ Each finding says what is wrong, what to write, and which page explains it.
 | The image declares several ports, none is 80, and `chasen.yml` has no `port:` | error |
 | The image has no command (`CMD` or `ENTRYPOINT`) | error |
 | The `Dockerfile` has no `EXPOSE`, and `chasen.yml` has no `port:` | warning |
-| The `Dockerfile` has no `VOLUME`, and `chasen.yml` has no `volumes:` | warning |
+| The `Dockerfile` has no `VOLUME`, and `chasen.yml` has no `volumes:` | warning, at the first deploy of the app |
 | A value in `env:` has the name of a secret (`…_TOKEN`, `…_PASSWORD`) | warning |
 | A name is in `env:` and in `secrets:` | warning |
 | `image:` has a tag and the directory has a `Dockerfile`: nothing is built | warning |

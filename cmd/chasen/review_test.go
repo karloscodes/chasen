@@ -150,7 +150,7 @@ func TestReviewOfTheImage(t *testing.T) {
 	t.Run("an image that says its port, its storage, and its command gets no word", func(t *testing.T) {
 		image := imageFacts{Ports: []int{3000}, Volumes: []string{"/app/storage"}, Command: true}
 
-		output, stopped := review(reviewImage(appFile{}, image))
+		output, stopped := review(reviewImage(appFile{}, image, false))
 
 		if output != "" || stopped {
 			t.Errorf("stopped = %v, output:\n%s", stopped, output)
@@ -160,7 +160,7 @@ func TestReviewOfTheImage(t *testing.T) {
 	t.Run("no EXPOSE and no VOLUME are warnings that say what Chasen does and what to write", func(t *testing.T) {
 		image := imageFacts{Command: true, WorkingDir: "/app"}
 
-		output, stopped := review(reviewImage(appFile{}, image))
+		output, stopped := review(reviewImage(appFile{}, image, false))
 
 		want := `Warning: the Dockerfile has no EXPOSE, and chasen.yml has no port
   Chasen sends the traffic to port 8080 and sets PORT=8080. An app that listens on another port never gets healthy, and the deploy fails. Say the port of the app in the Dockerfile: EXPOSE 3000.
@@ -178,11 +178,22 @@ Warning: the Dockerfile has no VOLUME, and chasen.yml has no volumes
 		}
 	})
 
+	t.Run("an app that runs already gets the advice about the storage no more", func(t *testing.T) {
+		image := imageFacts{Command: true, Ports: []int{8080}, WorkingDir: "/app"}
+
+		first, _ := review(reviewImage(appFile{}, image, false))
+		later, stopped := review(reviewImage(appFile{}, image, true))
+
+		if !strings.Contains(first, "Warning: the Dockerfile has no VOLUME") || later != "" || stopped {
+			t.Errorf("first deploy:\n%s\na later deploy (stopped = %v):\n%s", first, stopped, later)
+		}
+	})
+
 	t.Run("chasen.yml answers for the image", func(t *testing.T) {
 		image := imageFacts{Command: true, Ports: []int{3000, 9090}}
 		app := appFile{Port: 3000, Volumes: []string{"/data"}}
 
-		output, stopped := review(reviewImage(app, image))
+		output, stopped := review(reviewImage(app, image, false))
 
 		if output != "" || stopped {
 			t.Errorf("stopped = %v, output:\n%s", stopped, output)
@@ -192,7 +203,7 @@ Warning: the Dockerfile has no VOLUME, and chasen.yml has no volumes
 	t.Run("a default Rails image keeps its files where Chasen keeps them", func(t *testing.T) {
 		image := imageFacts{Command: true, Ports: []int{80}, WorkingDir: "/rails"}
 
-		output, stopped := review(reviewImage(appFile{}, image))
+		output, stopped := review(reviewImage(appFile{}, image, false))
 
 		if output != "" || stopped {
 			t.Errorf("stopped = %v, output:\n%s", stopped, output)
@@ -202,7 +213,7 @@ Warning: the Dockerfile has no VOLUME, and chasen.yml has no volumes
 	t.Run("several ports and none is 80 is an error: Chasen cannot pick", func(t *testing.T) {
 		image := imageFacts{Command: true, Ports: []int{3000, 9090}, Volumes: []string{"/data"}}
 
-		output, stopped := review(reviewImage(appFile{}, image))
+		output, stopped := review(reviewImage(appFile{}, image, false))
 
 		want := "Error: the image declares the ports [3000 9090]\n" +
 			"  Say which one serves HTTP: add `port:` to chasen.yml\n" +
@@ -215,7 +226,7 @@ Warning: the Dockerfile has no VOLUME, and chasen.yml has no volumes
 	t.Run("an image with no command is an error", func(t *testing.T) {
 		image := imageFacts{Ports: []int{8080}, Volumes: []string{"/data"}}
 
-		output, stopped := review(reviewImage(appFile{}, image))
+		output, stopped := review(reviewImage(appFile{}, image, false))
 
 		if !stopped || !strings.Contains(output, "Error: the image has no command to start the app") {
 			t.Errorf("stopped = %v, output:\n%s", stopped, output)
