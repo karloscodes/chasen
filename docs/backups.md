@@ -24,15 +24,31 @@ The server creates the bucket when it does not exist, then writes and deletes a 
 
 For a monitor that alerts when backups stop, run `chasen-server settings heartbeat_url <url>` on the server. The server calls the URL after each hourly backup that worked.
 
+## Prove that the copies restore
+
+A copy that nobody restored is a hope. This command restores the copies of an app, checks them, and removes them. It changes nothing: the app keeps running on its own databases.
+
+```bash
+chasen verify
+# Checking the copies of shop. Nothing changes.
+#   ok    the live replica restores storage/db.sqlite3 (112.4 MB), and it passes the integrity check
+#   ok    the snapshot 20261002T190000Z restores storage/db.sqlite3 (112.4 MB), and it passes the integrity check
+# The copies restore.
+```
+
+Run it after you set a bucket, and now and then after that. It downloads the whole replica of the app.
+
+The server also checks by itself. Each hour, after the snapshots, it compares each database with its replica in the bucket. A replica that is more than 10 minutes behind a database that changed makes the hourly run fail: a wrong key, a full bucket, a store that refuses. Then the server does not call `heartbeat_url`, and your monitor tells you.
+
 ## What the bucket holds, and how it grows
 
 ```bash
 chasen bucket
 # Bucket chasen-backups at https://fsn1.your-objectstorage.com (region fsn1)
 #
-# APP   SNAPSHOTS             LIVE REPLICA  TOTAL
-# blog  2.1 MB in 4 backups   3.0 MB        5.1 MB
-# shop  40.0 MB in 2 backups  90.0 MB       130.0 MB
+# APP   SNAPSHOTS             LIVE REPLICA  LAST COPIED CHANGE  TOTAL
+# blog  2.1 MB in 4 backups   3.0 MB        2 hours ago         5.1 MB
+# shop  40.0 MB in 2 backups  90.0 MB       1 second ago        130.0 MB
 # Total: 135.1 MB in 310 objects
 #
 # The live replica is files of changes. What it holds now:

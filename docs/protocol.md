@@ -58,6 +58,7 @@ A command that fails still answers `200`: the server already sent the output whe
 | `domains` | `<app> [add\|rm <domain>]` | | List or change the domains |
 | `backup` | `<app>` | | Make a snapshot now |
 | `backups` | `<app>` | | List the backups |
+| `verify` | `<app>` | | Restore the live replica and the newest snapshot next to the real databases, check them, and remove them |
 | `restore` | `<app> [backup\|live]` | | Restore a backup |
 | `remove` | `<app>` | | Stop the app. The data stays |
 | `logout` | | | Make the API forget the token of the request |

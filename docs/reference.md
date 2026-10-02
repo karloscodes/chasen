@@ -28,6 +28,7 @@
 | `chasen domains [add\|rm <domain>]` | List or change the domains |
 | `chasen backup` | Make a snapshot now |
 | `chasen backups` | List the backups |
+| `chasen verify` | Prove that the copies restore: the live replica and the newest snapshot are restored next to the real databases, checked, and removed |
 | `chasen download [backup]` | Save the databases of a backup in the current directory, as a `tar.gz` file. The default is the newest backup |
 | `chasen restore [backup\|live]` | Restore a backup |
 | `chasen remove` | Stop the app. Keeps the data and the backups |

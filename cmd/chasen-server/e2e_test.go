@@ -446,6 +446,20 @@ func TestEndToEnd(t *testing.T) {
 			if !strings.Contains(replica, "Replica:  live") {
 				t.Errorf("status = %q, want the replica live again with no restart of the API", replica)
 			}
+			// The proof of a copy is a restore: verify restores the replica and the snapshot next to the real database.
+			verified := ""
+			for range 20 {
+				if verified, _ = run(app, bin, "verify"); strings.Contains(verified, "The copies restore.") {
+					break
+				}
+				time.Sleep(time.Second)
+			}
+			if !strings.Contains(verified, "ok    the live replica restores") || !strings.Contains(verified, "ok    the snapshot") {
+				t.Errorf("verify = %q, want the live replica and the snapshot restored and checked", verified)
+			}
+			if out := must(app, bin, "bucket"); !strings.Contains(out, "example") || !strings.Contains(out, "LAST COPIED CHANGE") {
+				t.Errorf("bucket = %q, want what the bucket holds for the app", out)
+			}
 		})
 	}
 

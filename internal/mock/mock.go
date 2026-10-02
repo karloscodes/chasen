@@ -314,6 +314,17 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 			fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", i+1, e.at.UTC().Format("2006-01-02 15:04:05"), e.action, e.result)
 		}
 		w.Flush()
+	case "verify":
+		defer s.mu.Unlock()
+		fmt.Fprintf(out, "Checking the copies of %s. Nothing changes.\n", a.name)
+		if len(a.backups) == 0 {
+			fmt.Fprintln(out, "  skip  the live replica (this server has no bucket)")
+			fmt.Fprintln(out, "  skip  the newest snapshot (the app has none yet)")
+		} else {
+			fmt.Fprintln(out, "  ok    the live replica restores storage/db.sqlite3 (1.2 MB), and it passes the integrity check")
+			fmt.Fprintf(out, "  ok    the snapshot %s restores storage/db.sqlite3 (1.2 MB), and it passes the integrity check\n", a.backups[0])
+		}
+		fmt.Fprintln(out, "The copies restore.")
 	case "backups":
 		defer s.mu.Unlock()
 		if len(a.backups) == 0 {

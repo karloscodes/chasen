@@ -30,6 +30,7 @@ func bucketUsage(objects []s3Object, now time.Time) string {
 	type app struct {
 		snapshots, live int64
 		stamps          map[string]bool
+		newest          time.Time // the newest file of its live replica
 	}
 	apps := map[string]*app{}
 	levelFiles, levelSize := map[string]int{}, map[string]int64{}
@@ -53,6 +54,9 @@ func bucketUsage(objects []s3Object, now time.Time) string {
 			continue
 		}
 		a.live += object.Size
+		if object.LastModified.After(a.newest) {
+			a.newest = object.LastModified
+		}
 		level := parts[len(parts)-2]
 		levelFiles[level]++
 		levelSize[level] += object.Size
@@ -66,7 +70,7 @@ func bucketUsage(objects []s3Object, now time.Time) string {
 
 	var out strings.Builder
 	w := tabwriter.NewWriter(&out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "APP\tSNAPSHOTS\tLIVE REPLICA\tTOTAL")
+	fmt.Fprintln(w, "APP\tSNAPSHOTS\tLIVE REPLICA\tLAST COPIED CHANGE\tTOTAL")
 	names := make([]string, 0, len(apps))
 	for name := range apps {
 		names = append(names, name)
@@ -78,7 +82,11 @@ func bucketUsage(objects []s3Object, now time.Time) string {
 		if len(a.stamps) > 0 {
 			snapshots = fmt.Sprintf("%s in %s", megabytes(a.snapshots), count(len(a.stamps), "backup"))
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", name, snapshots, megabytes(a.live), megabytes(a.snapshots+a.live))
+		copied := "-"
+		if !a.newest.IsZero() {
+			copied = age(now.Sub(a.newest)) + " ago"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", name, snapshots, megabytes(a.live), copied, megabytes(a.snapshots+a.live))
 	}
 	w.Flush()
 	fmt.Fprintf(&out, "Total: %s in %s", megabytes(total), count(len(objects), "object"))
@@ -96,7 +104,7 @@ func bucketUsage(objects []s3Object, now time.Time) string {
 		fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n", l.what, count(levelFiles[l.level], "file"), megabytes(levelSize[l.level]), l.kept)
 	}
 	w.Flush()
-	fmt.Fprintf(&out, "Its oldest file is %s old. After each daily full copy, the files from before the oldest full copy are deleted: the replica holds one full copy and the changes of one day, not more.\n", age(now.Sub(oldest)))
+	fmt.Fprintf(&out, "Its oldest file is %s old. After each daily full copy, the files from before the oldest full copy are deleted: the replica holds one full copy and the changes of one day, not more.\nLAST COPIED CHANGE is the newest file of the replica. An app that writes all the time shows seconds. To prove that a replica restores: chasen verify\n", age(now.Sub(oldest)))
 	return trimLines(out.String())
 }
 
@@ -131,9 +139,11 @@ func count(n int, thing string) string {
 	return fmt.Sprintf("%d %ss", n, thing)
 }
 
-// age says a duration for a person: "18 minutes", "5 hours", "2 days".
+// age says a duration for a person: "12 seconds", "18 minutes", "5 hours", "2 days".
 func age(d time.Duration) string {
 	switch {
+	case d < time.Minute:
+		return count(int(d.Seconds()), "second")
 	case d < time.Hour:
 		return count(int(d.Minutes()), "minute")
 	case d < 48*time.Hour:

@@ -303,6 +303,24 @@ func backupAll() error {
 		fmt.Fprintln(os.Stderr, "the live replica does not run. Check: docker logs chasen-server")
 		failed = append(failed, "live replica")
 	}
+	// A replica that runs and does not get its files into the bucket must not
+	// stay silent either: a wrong key, a full bucket, a store that refuses.
+	if cfg.Backup.S3 != nil {
+		for _, name := range matcha.ListAppsSorted(apps) {
+			if !backedUp(name) {
+				continue
+			}
+			behind, err := replicaBehind(name, cfg.Backup.S3)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s: cannot read its live replica in the bucket: %v\n", name, err)
+				failed = append(failed, "live replica of "+name)
+			}
+			for _, line := range behind {
+				fmt.Fprintf(os.Stderr, "the live replica of %s. Check: docker logs chasen-server\n", line)
+				failed = append(failed, "live replica of "+name)
+			}
+		}
+	}
 	if len(failed) > 0 {
 		return fmt.Errorf("backup failed for: %s", strings.Join(failed, ", "))
 	}

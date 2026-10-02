@@ -26,9 +26,9 @@ func TestBucketUsage(t *testing.T) {
 
 		got := bucketUsage(objects, now)
 
-		want := `APP   SNAPSHOTS             LIVE REPLICA  TOTAL
-blog  none                  2.0 MB        2.0 MB
-shop  40.0 MB in 2 backups  90.0 MB       130.0 MB
+		want := `APP   SNAPSHOTS             LIVE REPLICA  LAST COPIED CHANGE  TOTAL
+blog  none                  2.0 MB        5 hours ago         2.0 MB
+shop  40.0 MB in 2 backups  90.0 MB       1 minute ago        130.0 MB
 Total: 132.0 MB in 7 objects
 
 The live replica is files of changes. What it holds now:
@@ -38,6 +38,7 @@ The live replica is files of changes. What it holds now:
   merged each hour           0 files  0
   full copies, one each day  1 file   2.0 MB   kept 1 day
 Its oldest file is 5 hours old. After each daily full copy, the files from before the oldest full copy are deleted: the replica holds one full copy and the changes of one day, not more.
+LAST COPIED CHANGE is the newest file of the replica. An app that writes all the time shows seconds. To prove that a replica restores: chasen verify
 `
 		if got != want {
 			t.Errorf("got:\n%s\nwant:\n%s", got, want)
@@ -47,7 +48,7 @@ Its oldest file is 5 hours old. After each daily full copy, the files from befor
 	t.Run("a bucket with snapshots only has no part about the replica", func(t *testing.T) {
 		got := bucketUsage([]s3Object{{"shop/snapshots/20261002T190000Z/storage/db.sqlite3.gz", 3 * mb, at(time.Minute)}}, now)
 
-		want := "APP   SNAPSHOTS           LIVE REPLICA  TOTAL\nshop  3.0 MB in 1 backup  0             3.0 MB\nTotal: 3.0 MB in 1 object\n"
+		want := "APP   SNAPSHOTS           LIVE REPLICA  LAST COPIED CHANGE  TOTAL\nshop  3.0 MB in 1 backup  0             -                   3.0 MB\nTotal: 3.0 MB in 1 object\n"
 		if got != want {
 			t.Errorf("got:\n%q\nwant:\n%q", got, want)
 		}
@@ -56,7 +57,7 @@ Its oldest file is 5 hours old. After each daily full copy, the files from befor
 	t.Run("files that are not from Chasen count in the total, and it says so", func(t *testing.T) {
 		got := bucketUsage([]s3Object{{"photos/cat.jpg", 5 * mb, at(time.Hour)}}, now)
 
-		want := "APP  SNAPSHOTS  LIVE REPLICA  TOTAL\nTotal: 5.0 MB in 1 object. 5.0 MB of it is not from Chasen\n"
+		want := "APP  SNAPSHOTS  LIVE REPLICA  LAST COPIED CHANGE  TOTAL\nTotal: 5.0 MB in 1 object. 5.0 MB of it is not from Chasen\n"
 		if got != want {
 			t.Errorf("got:\n%q\nwant:\n%q", got, want)
 		}

@@ -150,6 +150,8 @@ func runServer(args []string) error {
 		return printBackup(name, cfg)
 	case "history":
 		return serverHistory(name, args)
+	case "verify":
+		return serverVerify(name)
 	case "backups":
 		return serverBackups(name)
 	case "restore":

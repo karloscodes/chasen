@@ -34,7 +34,7 @@ const ExitMarker = "\x00chasen-exit "
 
 // Commands are the commands a client can run. The first argument of each one
 // is the app, except for list. For enable, the app is the name of the addon.
-var Commands = []string{"list", "load", "deploy", "check", "enable", "restart", "status", "logs", "run", "history", "domains", "backup", "backups", "restore", "remove"}
+var Commands = []string{"list", "load", "deploy", "check", "enable", "restart", "status", "logs", "run", "history", "domains", "backup", "backups", "verify", "restore", "remove"}
 
 // ServerCommands are the commands about the server itself, for its owner:
 // `bucket` shows or sets where the backups go. Their first argument is not

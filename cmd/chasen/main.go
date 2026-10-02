@@ -56,6 +56,8 @@ Run these in the directory of your app:
   domains rm <domain>    Remove a custom domain
   backup                 Back up the SQLite databases now
   backups                List the backups
+  verify                 Prove that the copies restore: the live replica and the newest snapshot
+                         are restored next to the real databases, checked, and removed
   download [backup]      Save the databases of a backup here, as a tar.gz file (default: the newest one)
   restore [backup]       Restore a backup (default: the newest one)
   restore live           Restore the newest state from the live replica
