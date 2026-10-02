@@ -74,14 +74,33 @@ func serverServe() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /up", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
-	mux.HandleFunc("POST /v1/{command}", func(w http.ResponseWriter, r *http.Request) {
+	// allowed reports a request with the token of the server, or of a login.
+	allowed := func(w http.ResponseWriter, r *http.Request) bool {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		var login int
 		db.QueryRow("SELECT count(*) FROM logins WHERE token_sha256 = ?", hashToken(token)).Scan(&login)
 		if !isOwner(cfg, token) && login == 0 {
 			http.Error(w, "not authorized", http.StatusUnauthorized)
+			return false
+		}
+		return true
+	}
+	// The two requests that are not a command with a text output.
+	mux.HandleFunc("GET "+protocol.ShellPath, func(w http.ResponseWriter, r *http.Request) {
+		if allowed(w, r) {
+			serveShell(w, r, db)
+		}
+	})
+	mux.HandleFunc("GET "+protocol.DownloadPath, func(w http.ResponseWriter, r *http.Request) {
+		if allowed(w, r) {
+			serveDownload(w, r)
+		}
+	})
+	mux.HandleFunc("POST /v1/{command}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowed(w, r) {
 			return
 		}
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if r.PathValue("command") == protocol.Logout {
 			db.Exec("DELETE FROM logins WHERE token_sha256 = ?", hashToken(token))
 			fmt.Fprintf(w, "%s0\n", protocol.ExitMarker)

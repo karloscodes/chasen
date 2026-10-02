@@ -1089,14 +1089,13 @@ func serverRun(name string, words []string) error {
 	if _, err := loadApp(name); err != nil {
 		return err
 	}
-	// The container that has the traffic: <app>, or <app>-next after a swap.
-	container, _ := docker("ps", "--filter", "name=^"+name+"(-next)?$", "--format", "{{.Names}}")
-	if container, _, _ = strings.Cut(container, "\n"); container == "" {
-		return fmt.Errorf("%s does not run now, so there is no container for the command. See: chasen status", name)
+	container, err := activeContainer(name)
+	if err != nil {
+		return err
 	}
 	cmd := exec.Command("docker", append([]string{"exec", container}, words...)...)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	err := cmd.Run()
+	err = cmd.Run()
 	var failed *exec.ExitError
 	if errors.As(err, &failed) {
 		os.Exit(failed.ExitCode())

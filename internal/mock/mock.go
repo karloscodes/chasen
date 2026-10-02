@@ -151,6 +151,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the token is not valid", http.StatusUnauthorized)
 		return
 	}
+	// The two requests that are not a command with a text output.
+	if r.Method == http.MethodGet && r.URL.Path == protocol.ShellPath {
+		s.shell(w, r)
+		return
+	}
+	if r.Method == http.MethodGet && r.URL.Path == protocol.DownloadPath {
+		s.download(w, r)
+		return
+	}
 	command, ok := strings.CutPrefix(r.URL.Path, "/v1/")
 	if !ok || r.Method != http.MethodPost {
 		http.NotFound(w, r)

@@ -59,6 +59,17 @@ A command that fails still answers `200`: the server already sent the output whe
 
 Every command except `logs` runs to its end on the server, also when the client goes away. So a lost connection never leaves a deploy half done.
 
+## Two requests that are not commands
+
+A shell and a file do not fit "text out, exit code last". They are `GET` requests with the same token.
+
+| Request | What it is |
+|---|---|
+| `GET /v1/ssh?arg=<app>&cols=80&rows=24` | A WebSocket: a shell in the container of the app. A binary message carries the bytes of the terminal, in both directions. A text message is `resize <cols> <rows>` from the client, or `exit <code>` or `error <message>` from the server, which is then the last message |
+| `GET /v1/download?arg=<app>&arg=<backup>` | The databases of one backup, as a `tar.gz` file. Without a backup: the newest one. The `Content-Disposition` header has the name of the file: `<app>-<backup>.tar.gz` |
+
+The shell is a WebSocket because a WebSocket passes every proxy that can be in front of a server. A status that is not `101` means no shell: an older server, or a token it refuses.
+
 ## The body of a deploy
 
 `deploy`, `check`, and `restart` take the settings of the app in the request body: one line of JSON.

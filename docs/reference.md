@@ -19,10 +19,12 @@
 | `chasen enable <addon> [domain]` | Run fusionaly, formlander, or lognorth from its image |
 | `chasen -a <app> <command>` | Run a command for an addon, or for an app of another directory |
 | `chasen run <command>` | Run one command in the container of the app, with its env and its storage: `chasen run bin/rails db:migrate`. The output comes back as it is written, and the exit code is the one of the command. The history keeps it. See "Run a command in the app" below |
+| `chasen ssh` | Open a shell in the container of the app. See "A shell in the app" below |
 | `chasen history [id]` | Show the deploys and changes of the app, or the output of one |
 | `chasen domains [add\|rm <domain>]` | List or change the domains |
 | `chasen backup` | Make a snapshot now |
 | `chasen backups` | List the backups |
+| `chasen download [backup]` | Save the databases of a backup in the current directory, as a `tar.gz` file. The default is the newest backup |
 | `chasen restore [backup\|live]` | Restore a backup |
 | `chasen remove` | Stop the app. Keeps the data and the backups |
 | `chasen list` | List all apps on the server |
@@ -52,10 +54,25 @@ chasen run sh -c "ls -la /storage | head"
 The command runs in the container that has the traffic, so it has the env, the secrets, and the storage of the app.
 
 - **No shell on the way.** Chasen passes the words to the container as they are. For a pipe, a redirect, or a variable, call the shell yourself: `chasen run sh -c "..."`.
-- **No input.** A program that waits for lines, like a console, gets none and ends or hangs. Use `run` for a command that has an end.
+- **No input.** A program that waits for lines, like a console, gets none and ends or hangs. Use `run` for a command that has an end, and `chasen ssh` for a console.
 - **It runs to its end.** If you press Ctrl-C, your terminal stops listening, and the command goes on in the container.
 - **The history has it.** `chasen history` lists each run with its output.
 - **The app must run.** A stopped app has no container for the command.
+
+## A shell in the app
+
+```bash
+chasen ssh
+```
+
+You get a shell in the container that has the traffic, with the env, the secrets, and the storage of the app. It is `bash` when the image has it, and `sh` when it does not. Use it for a console (`bin/rails console`, `sqlite3 /storage/db.sqlite3`), or to look around.
+
+- **It is not SSH.** The name is the one people look for. Nobody logs in to the server: your keys go to the same HTTPS API as every command, with the same login, and the server opens the shell in the container. No port 22, no key to manage.
+- **It is the container, not the server.** You see the files of the app. You do not see the other apps or the server itself.
+- **What you change outside the storage is gone at the next deploy.** A deploy starts a new container from the image.
+- **The history has it:** when the shell opened and for how long, not what you typed.
+- **It needs a shell in the image.** An image with no `sh` (distroless, scratch) has nothing to open.
+- **A pipe works too:** `echo "bin/rails runner 'puts User.count'" | chasen ssh` runs the lines and ends with the exit code of the shell.
 
 ## The screen
 

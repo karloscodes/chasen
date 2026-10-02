@@ -38,13 +38,16 @@ Run these in the directory of your app:
   status                 Show the version, the URLs, and the last backup
   logs                   Follow the app logs
   run <command>          Run one command in the container of the app: chasen run bin/rails db:migrate
-                         No input: a console that waits for lines does not work
+                         No input: for a console that waits for lines, use ssh
+  ssh                    Open a shell in the container of the app. It is not SSH: nobody logs in
+                         to the server
   history [id]           Show the deploys and changes of the app, or the output of one
   domains                List the domains
   domains add <domain>   Add a custom domain
   domains rm <domain>    Remove a custom domain
   backup                 Back up the SQLite databases now
   backups                List the backups
+  download [backup]      Save the databases of a backup here, as a tar.gz file (default: the newest one)
   restore [backup]       Restore a backup (default: the newest one)
   restore live           Restore the newest state from the live replica
   remove                 Stop the app. Keeps the data and the backups

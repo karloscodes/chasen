@@ -841,6 +841,9 @@ func (t *tui) runLine(line string) {
 	}
 	command := words[0]
 	switch {
+	case command == "ssh" || command == "download":
+		t.message = "Run it in a terminal of its own: chasen -a " + t.app() + " " + command
+		return
 	case !slices.Contains(protocol.Commands, command):
 		t.message = "chasen has no command " + command + ". The commands: " + strings.Join(protocol.Commands, ", ")
 		return

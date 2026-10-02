@@ -170,6 +170,20 @@ func runCommand(creds credentials, args []string) error {
 		fmt.Println("Logged out of", creds.URL)
 		return saved.save()
 	}
+	switch args[0] {
+	case "ssh", "download":
+		app, err := loadAppFile()
+		if err != nil {
+			return err
+		}
+		if args[0] == "ssh" && len(args) == 1 {
+			return shell(creds, app.Name)
+		}
+		if args[0] == "download" && len(args) <= 2 {
+			return downloadBackup(creds, app.Name, strings.Join(args[1:], ""))
+		}
+		return errors.New("usage: chasen ssh, or chasen download [backup]")
+	}
 	// Every other command of the protocol runs on the server, for the app of this directory.
 	if !slices.Contains(protocol.Commands, args[0]) {
 		return fmt.Errorf("unknown command %q\n\n%s", args[0], usage)

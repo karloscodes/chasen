@@ -1,7 +1,10 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -358,6 +361,56 @@ func TestEndToEnd(t *testing.T) {
 
 		if got := get("example.localhost"); !strings.HasPrefix(got, "hits=4 ") {
 			t.Errorf("GET after restore = %q, want hits=4: the 3 in the backup and this request", got)
+		}
+	})
+
+	t.Run("ssh opens a shell in the container of the app, through the proxy, and gives its exit code back", func(t *testing.T) {
+		shell := exec.Command(bin, "ssh")
+		shell.Dir = app
+		shell.Stdin = strings.NewReader("echo in-the-shell-$((40+2)); test -f \"$DATABASE_PATH\" && echo has-the-database\nexit 3\n")
+
+		out, err := shell.CombinedOutput()
+
+		t.Logf("$ chasen ssh\n%s", out)
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) || exit.ExitCode() != 3 {
+			t.Errorf("ssh ended with %v, want the exit code 3 of the shell", err)
+		}
+		if !strings.Contains(string(out), "in-the-shell-42") || !strings.Contains(string(out), "has-the-database") {
+			t.Errorf("ssh = %q, want the output of the commands, with the env and the storage of the app", out)
+		}
+		if out := must(app, bin, "history"); !strings.Contains(out, "ssh") {
+			t.Errorf("history = %q, want the shell in it", out)
+		}
+	})
+
+	t.Run("download saves the databases of the newest backup, ready to open", func(t *testing.T) {
+		here := t.TempDir()
+
+		must(here, bin, "-a", "example", "download")
+
+		files, _ := filepath.Glob(filepath.Join(here, "example-*.tar.gz"))
+		if len(files) != 1 {
+			t.Fatalf("the directory has %v, want one example-<backup>.tar.gz", files)
+		}
+		file, err := os.Open(files[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer file.Close()
+		unzipped, err := gzip.NewReader(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		archive := tar.NewReader(unzipped)
+		entry, err := archive.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		start := make([]byte, 15)
+		io.ReadFull(archive, start)
+		if string(start) != "SQLite format 3" {
+			t.Errorf("%s starts with %q, want a SQLite database that is not compressed", entry.Name, start)
 		}
 	})
 

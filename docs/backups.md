@@ -39,6 +39,23 @@ chasen restore live               # the newest state in the live replica
 
 A restore checks the backup first, stops the app, swaps the databases, and starts the app. It moves the previous databases to `/var/matcha/<app>/pre-restore-<time>/`. It deletes nothing.
 
+## Take a backup with you
+
+```bash
+chasen backup                      # first, when you want the state of this moment
+chasen download                    # the newest backup
+chasen download 20261001T120000Z   # one backup
+```
+
+`chasen download` saves one file in the current directory: `shop-20261001T120000Z.tar.gz`. It holds each SQLite database of the backup, ready to open, with its path in the app: `storage/db.sqlite3`.
+
+```bash
+tar -xzf shop-20261001T120000Z.tar.gz
+sqlite3 storage/db.sqlite3
+```
+
+The data is yours. This is how you look at it on your computer, keep a copy of your own, or move to another server. It does not replace a file that exists.
+
 ## A new server
 
 When a server is gone, these steps bring everything back:
