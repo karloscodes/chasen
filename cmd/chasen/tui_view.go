@@ -261,12 +261,12 @@ func (t *tui) body(width, height int) []string {
 	case t.overlay != nil:
 		lines = t.overlayLines(t.overlay, width, height)
 	case !t.appsLoaded && t.appsErr == "":
-		// The first moment: the whisk stirs while the server answers.
+		// The first moment: the mark, while the server answers.
 		lines = []string{"", ""}
-		for _, line := range whisk(1, t.frame) {
+		for _, line := range whisk {
 			lines = append(lines, "   "+paint(line, colorAccent))
 		}
-		lines = append(lines, "", "   "+paint("chasen", colorBold)+paint("  asks "+t.server+" for its apps", colorDim))
+		lines = append(lines, "", "   "+paint(spinner[t.frame%len(spinner)], colorAccent)+paint(" Asking "+t.server+" for its apps", colorDim))
 	case t.appsErr != "":
 		lines = []string{""}
 		for _, line := range wrap(t.appsErr, width-4) {
@@ -570,10 +570,8 @@ func (t *tui) overlayLines(o *overlay, width, height int) []string {
 
 // --- the corner: the server and the whisk -------------------------------------
 
-const (
-	graphWidth = 8 // the width of a line of the server
-	stirFrames = 9 // how long the whisk stirs, in ticks of the clock
-)
+// graphWidth is the width of a line of the server.
+const graphWidth = 8
 
 // cornerFits reports if the window has room under the apps for the numbers
 // of the server. Without it, the first line has them.
@@ -581,23 +579,18 @@ func (t *tui) cornerFits() bool {
 	return len(t.stats) > 0 && len(t.apps) > 0 && t.overlay == nil && t.height-4-2-len(t.apps)-1 >= 4 && t.width >= 60
 }
 
-// corner draws what goes under the apps, from the bottom: the whisk when
-// there is room for it, and above it the load, the memory, and the disk of
-// the server.
+// corner draws what goes under the apps: the load, the memory, and the disk
+// of the server, and under them the whisk when there is room for it.
 func (t *tui) corner(width, room int) []string {
 	var lines []string
 	if t.cornerFits() {
 		lines = t.gauges(width)
 	}
-	if room >= len(lines)+len(whiskShape)/2+2 {
-		force := 0.0
-		if left := t.stirUntil - t.frame; left > 0 && left <= stirFrames {
-			force = math.Sin(math.Pi * float64(left) / stirFrames)
-		}
+	if room >= len(lines)+len(whisk)+2 {
 		if len(lines) > 0 {
 			lines = append(lines, strings.Repeat(" ", width))
 		}
-		for _, line := range whisk(force, t.frame) {
+		for _, line := range whisk {
 			lines = append(lines, paint(fit("   "+line, width), colorAccent))
 		}
 	}
@@ -641,11 +634,20 @@ func (t *tui) gauges(width int) []string {
 	return lines
 }
 
-// whiskShape is the Chasen mark: a bamboo whisk of seven tines, a binding,
-// and a handle, on a grid of 15 by 14 pixels. Two pixels make one character,
-// one above the other.
-var whiskShape = func() [14][15]bool {
+// whisk is the Chasen mark: a bamboo whisk of seven tines, a binding, and a
+// handle. It is drawn on a grid of 15 by 14 pixels, the same as the logo of
+// the site, and two pixels make one character, one above the other. It does
+// not move: a screen you leave open should be calm.
+var whisk = func() []string {
 	var grid [14][15]bool
+	for tine := range 7 {
+		for row := range 9 {
+			// The outer tines lean out, more at the tip than at the binding.
+			lean := math.Pow(float64(8-row)/8, 1.5)
+			col := 1 + tine*2 + int(math.Round(float64(tine-3)*0.4*lean))
+			grid[row][col] = true
+		}
+	}
 	for row := 9; row <= 13; row++ {
 		from, to := 6, 8 // the handle
 		switch row {
@@ -656,23 +658,6 @@ var whiskShape = func() [14][15]bool {
 		}
 		for col := from; col <= to; col++ {
 			grid[row][col] = true
-		}
-	}
-	return grid
-}()
-
-// whisk draws the mark. force is how hard it stirs, from 0 to 1: the tines
-// bend from their base, and the wave runs across them.
-func whisk(force float64, frame int) []string {
-	grid := whiskShape
-	for tine := range 7 {
-		for row := range 9 {
-			up := float64(8-row) / 8 // 1 at the tip, 0 at the binding
-			lean := math.Pow(up, 1.5)
-			flare := float64(tine-3) * 0.4 * lean // at rest the outer tines lean out
-			bend := force * 1.25 * lean * math.Sin(float64(frame)*1.9-float64(tine)*0.45)
-			col := 1 + tine*2 + int(math.Round(flare+bend))
-			grid[row][max(0, min(col, 14))] = true
 		}
 	}
 	lines := make([]string, 7)
@@ -692,4 +677,4 @@ func whisk(force float64, frame int) []string {
 		}
 	}
 	return lines
-}
+}()

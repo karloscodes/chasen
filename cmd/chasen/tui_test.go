@@ -429,7 +429,7 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		sc := open(t)
 
 		sc.shows("server", " load ", " mem  ", " disk ", "━━━─────   41%", "3 apps")
-		if whisk := strings.Join(whisk(0, 0), "\n"); !strings.Contains(sc.text(), strings.Split(whisk, "\n")[5]) {
+		if !strings.Contains(sc.text(), whisk[5]) {
 			t.Errorf("the whisk is not under the apps:\n%s", sc.text())
 		}
 
@@ -456,16 +456,26 @@ func TestScreenOnTheMockServer(t *testing.T) {
 }
 
 func TestWhisk(t *testing.T) {
-	still, stirring := whisk(0, 0), whisk(1, 2)
+	if len(whisk) != 7 {
+		t.Fatalf("the whisk is %d lines, want 7", len(whisk))
+	}
+	for _, line := range whisk {
+		if utf8.RuneCountInString(line) != 15 {
+			t.Errorf("a line of the whisk is %d columns, want 15: %q", utf8.RuneCountInString(line), line)
+		}
+	}
+}
 
-	if len(still) != 7 || utf8.RuneCountInString(still[0]) != 15 {
-		t.Fatalf("the whisk is %d lines of %d columns, want 7 of 15", len(still), utf8.RuneCountInString(still[0]))
+func TestScreenIsStillWhenNothingChanges(t *testing.T) {
+	sc := openScreen(t, newTestServer(t), "shop")
+	before := sc.tui.view()
+
+	// Three seconds of the clock, with no key and no answer from the server.
+	for range 24 {
+		sc.tui.frame++
 	}
-	if slices.Equal(still, stirring) {
-		t.Error("the whisk does not move when it stirs")
-	}
-	// The binding and the handle do not move: only the tines bend.
-	if !slices.Equal(still[5:], stirring[5:]) {
-		t.Errorf("the handle moved:\n%s\n%s", strings.Join(still[5:], "\n"), strings.Join(stirring[5:], "\n"))
+
+	if sc.tui.view() != before {
+		t.Error("the screen changed with nothing to show: something moves by itself")
 	}
 }

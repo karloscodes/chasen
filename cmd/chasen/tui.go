@@ -110,12 +110,11 @@ type tui struct {
 	message       string // one line of news, until the next key
 	update        string // a newer release of chasen, or ""
 	// stats is the output of `chasen load`: how busy the server is.
-	stats     []string
-	noStats   bool // the server is older than the load command: do not ask again
-	stirUntil int  // the frame at which the whisk is still again
-	frame     int  // for the spinner
-	events    chan any
-	now       func() time.Time
+	stats   []string
+	noStats bool // the server is older than the load command: do not ask again
+	frame   int  // for the spinner
+	events  chan any
+	now     func() time.Time
 }
 
 // The events of the loop.
@@ -297,8 +296,6 @@ func (t *tui) rows() []string {
 }
 
 func (t *tui) loadApps() {
-	// The whisk stirs for a moment each time the screen asks the server.
-	t.stirUntil = t.frame + stirFrames
 	run := t.run
 	go func() {
 		var out strings.Builder
