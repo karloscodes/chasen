@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -140,11 +142,50 @@ func (t *tui) firstLine(width int) string {
 	case t.appsLoaded:
 		count = itoa(len(t.apps)) + " apps "
 	}
+	left := []cell{{" chasen", colorAccent + ";" + colorBold}, {"  " + t.server, ""}}
+	// In the corner: how busy the server is, then the count of the apps. A
+	// narrow window drops the notice of a new release first, then the numbers.
 	right := []cell{{count, colorDim}}
-	if t.update != "" {
-		right = []cell{{t.update + " is out: chasen update   ", colorAccent}, {count, colorDim}}
+	if stats := t.statCells(); utf8.RuneCountInString(t.server)+60 < width {
+		right = append(stats, right...)
 	}
-	return spread(width, []cell{{" chasen", colorAccent + ";" + colorBold}, {"  " + t.server, ""}}, right)
+	if t.update != "" && utf8.RuneCountInString(t.server)+100 < width {
+		right = append([]cell{{t.update + " is out: chasen update    ", colorAccent}}, right...)
+	}
+	return spread(width, left, right)
+}
+
+var (
+	percent  = regexp.MustCompile(`\((\d+)%\)`)
+	loadLine = regexp.MustCompile(`^([0-9.]+) .*\((\d+) cores\)`)
+)
+
+// statCells shows the load, the memory, and the disk of the server in a few
+// characters: "load 0.42  mem 31%  disk 41%". A number that needs attention
+// is red: a load above the count of the cores, or 90% and more in use.
+func (t *tui) statCells() []cell {
+	var cells []cell
+	if parts := loadLine.FindStringSubmatch(strings.Join(statusValues(t.stats, "Load"), "")); parts != nil {
+		color := colorDim
+		load, _ := strconv.ParseFloat(parts[1], 64)
+		if cores, _ := strconv.Atoi(parts[2]); cores > 0 && load > float64(cores) {
+			color = colorBad
+		}
+		cells = append(cells, cell{"load ", colorDim}, cell{parts[1] + "  ", color})
+	}
+	for _, name := range []string{"Memory", "Disk"} {
+		parts := percent.FindStringSubmatch(strings.Join(statusValues(t.stats, name), ""))
+		if parts == nil {
+			continue
+		}
+		color := colorDim
+		if used, _ := strconv.Atoi(parts[1]); used >= 90 {
+			color = colorBad
+		}
+		label := map[string]string{"Memory": "mem ", "Disk": "disk "}[name]
+		cells = append(cells, cell{label, colorDim}, cell{parts[1] + "%  ", color})
+	}
+	return cells
 }
 
 func itoa(n int) string {

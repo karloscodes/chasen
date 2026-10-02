@@ -208,6 +208,16 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("load shows the load, the memory, and the disk of the machine, through the API", func(t *testing.T) {
+		out := must(app, bin, "load")
+
+		for _, want := range []string{"Load:", "cores)", "Memory:", "Disk:", "%)"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("load = %q, want %q in it", out, want)
+			}
+		}
+	})
+
 	t.Run("a private image needs the login of its registry", func(t *testing.T) {
 		t.Setenv("REGISTRY_PASSWORD", "wrong")
 

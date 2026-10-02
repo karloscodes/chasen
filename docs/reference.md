@@ -25,6 +25,7 @@
 | `chasen restore [backup\|live]` | Restore a backup |
 | `chasen remove` | Stop the app. Keeps the data and the backups |
 | `chasen list` | List all apps on the server |
+| `chasen load` | Show how busy the server is: the load, the memory in use, and the disk of the apps |
 
 On the server, as root:
 
@@ -60,8 +61,6 @@ Run `chasen` with no command, in a terminal, to open the screen of your apps. It
 A restart, a restore, a deploy, and the removal of a domain ask first. Each action is a command of this page, so the screen can do nothing that the commands cannot. Without a terminal, or without a login, `chasen` prints its usage.
 
 The screen has no color when `NO_COLOR` is set.
-
-To try the screen without a server, run `chasen demo`. It has three made-up apps and a server that lives inside the program: a deploy, a backup, and a restore all work, and nothing is real.
 
 ## Several servers
 

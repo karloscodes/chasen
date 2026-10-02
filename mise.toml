@@ -15,5 +15,5 @@ description = "How often each file of each release was downloaded, from GitHub"
 run = """gh api repos/karloscodes/chasen/releases --jq '.[] | "\\(.tag_name)  \\(.published_at[:10])", (.assets[] | select(.download_count > 0) | "  \\(.download_count)\\t\\(.name)")'"""
 
 [tasks.dev]
-description = "The screen of chasen, from source, with made-up apps: no server, no login"
-run = "go run ./cmd/chasen demo"
+description = "chasen from source against a mock server: the screen, or one command (mise run dev -- status)"
+run = "bin/dev"

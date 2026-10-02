@@ -24,6 +24,7 @@ Run these on the server, as root:
   update                         Install the newest release now. A timer does this each night
   check                          Check the security of the server (with no arguments)
   list                           List all apps
+  load                           Show the load, the memory, and the disk of the server
   backup                         Back up every app now
 
 The API runs these for the chasen client:

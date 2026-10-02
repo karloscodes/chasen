@@ -122,8 +122,8 @@ func runClient(args []string) error {
 
 func runCommand(creds credentials, args []string) error {
 	switch cmd := args[0]; cmd {
-	case "list":
-		return remote(creds, nil, os.Stdout, "list")
+	case "list", "load":
+		return remote(creds, nil, os.Stdout, cmd)
 	case "deploy", "check":
 		app, err := loadAppFile()
 		if err != nil {

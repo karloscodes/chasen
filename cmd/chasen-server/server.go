@@ -82,6 +82,8 @@ func runServer(args []string) error {
 		return serverServe()
 	case "list":
 		return serverList()
+	case "load":
+		return serverLoad()
 	case "backup":
 		if len(args) == 0 {
 			return backupAll()

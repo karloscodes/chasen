@@ -34,7 +34,7 @@ const ExitMarker = "\x00chasen-exit "
 
 // Commands are the commands a client can run. The first argument of each one
 // is the app, except for list. For enable, the app is the name of the addon.
-var Commands = []string{"list", "deploy", "check", "enable", "restart", "status", "logs", "history", "domains", "backup", "backups", "restore", "remove"}
+var Commands = []string{"list", "load", "deploy", "check", "enable", "restart", "status", "logs", "history", "domains", "backup", "backups", "restore", "remove"}
 
 // Settings is what the client sends with `deploy`, `check`, and `restart`:
 // the image, the env and the secrets of the app, and the overrides of the

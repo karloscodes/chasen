@@ -3,7 +3,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -19,7 +18,6 @@ const usage = `Usage: chasen <command>
 
   chasen                 With no command: the screen of your apps. Their state, history,
                          backups, domains, and logs, with keys to deploy, restart, and restore
-  demo                   Try that screen with made-up apps. No server, no login, nothing real
 
   add server <domain>    Log in to your own server, with a browser
   login                  Log in to the Chasen cloud instead
@@ -49,6 +47,7 @@ Run these in the directory of your app:
   restore live           Restore the newest state from the live replica
   remove                 Stop the app. Keeps the data and the backups
   list                   List all apps on the server
+  load                   Show the load, the memory, and the disk of the server
 
 Addons run from a ready image, with the same backups:
   enable <addon> [domain]   Run fusionaly, formlander, or lognorth. Run it again to update
@@ -78,13 +77,6 @@ func main() {
 
 	var err error
 	switch os.Args[1] {
-	case "demo":
-		// The screen with made-up apps: no server and no login.
-		if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
-			err = errors.New("chasen demo needs a terminal")
-			break
-		}
-		err = runScreen(demoScreen())
 	case "report":
 		err = report()
 	case "update":

@@ -16,7 +16,7 @@ Authorization: Bearer <token>
 ```
 
 - **The command** is one word from the list below.
-- **The arguments** are `arg` query parameters, in order. The first one is the app, for every command except `list`.
+- **The arguments** are `arg` query parameters, in order. The first one is the app, for every command except `list` and `load`.
 - **The request body** is the input of the command. Most commands have none.
 - **The response** is `text/plain`. It is the output of the command, sent line by line as the command runs.
 - **The last line** is a zero byte, then `chasen-exit `, then the exit code of the command: `\x00chasen-exit 0`. A response that ends without this line means the connection broke.
@@ -41,6 +41,7 @@ A command that fails still answers `200`: the server already sent the output whe
 | Command | Arguments | Body | What it does |
 |---|---|---|---|
 | `list` | | | The apps of the server |
+| `load` | | | The load, the memory, and the disk of the server |
 | `deploy` | `<app> <version>` | The settings. For a website: then its files | Pull the image of the settings (or wrap the files of a website), back up, start, and swap |
 | `check` | `<app> <version>` | Like `deploy` | Run the image next to the live app and test it against the standard. It keeps nothing |
 | `enable` | `<addon> [domain]` | | Run an addon from its image |

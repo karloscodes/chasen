@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Development of the CLI and its screen, with no real server.
+#
+# It starts the mock server (tools/mock): a process that answers the protocol
+# over HTTP with made-up apps, and runs no Docker. Then it runs chasen, built
+# from this source, against it.
+#
+#   bin/dev              the screen
+#   bin/dev status       one command, for the app of the directory: shop
+#   bin/dev history 3
+#
+# chasen runs in tmp/dev/shop, a small website with one commit, so a deploy
+# (the key d, or bin/dev deploy) goes through the real CLI to the mock server.
+# To see a deploy fail, add this to tmp/dev/shop/chasen.yml:  env: {FAIL: "1"}
+#
+# The log of the mock server is tmp/dev/mock.log.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+dir="$PWD/tmp/dev"
+port="${CHASEN_DEV_PORT:-4777}"
+mkdir -p "$dir/shop"
+go build -o "$dir/chasen" ./cmd/chasen
+go build -o "$dir/mock" ./tools/mock
+
+if [ ! -d "$dir/shop/.git" ]; then
+  echo '<h1>The shop</h1>' > "$dir/shop/index.html"
+  git -C "$dir/shop" init -q
+  git -C "$dir/shop" add index.html
+  git -C "$dir/shop" -c user.name=dev -c user.email=dev@example.com commit -q -m "The shop"
+fi
+
+# A mock server that runs already keeps its state: start one yourself in
+# another pane (tmp/dev/mock) to keep what your commands changed.
+if ! curl -fs "http://127.0.0.1:$port/up" > /dev/null 2>&1; then
+  "$dir/mock" "127.0.0.1:$port" > "$dir/mock.log" 2>&1 &
+  mock=$!
+  trap 'kill $mock 2>/dev/null || true' EXIT INT TERM HUP PIPE
+  for _ in $(seq 50); do
+    curl -fs "http://127.0.0.1:$port/up" > /dev/null 2>&1 && break
+    sleep 0.1
+  done
+fi
+if ! curl -fs "http://127.0.0.1:$port/up" > /dev/null 2>&1; then
+  echo "The mock server did not start. Is the port $port in use? See $dir/mock.log" >&2
+  exit 1
+fi
+
+cd "$dir/shop"
+CHASEN_URL="http://127.0.0.1:$port" CHASEN_TOKEN=dev CHASEN_NO_UPDATE_CHECK=1 "$dir/chasen" "$@"

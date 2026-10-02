@@ -108,7 +108,10 @@ type tui struct {
 	prompt        *prompt
 	message       string // one line of news, until the next key
 	update        string // a newer release of chasen, or ""
-	frame         int    // for the spinner
+	// stats is the output of `chasen load`: how busy the server is.
+	stats         []string
+	noStats       bool // the server is older than the load command: do not ask again
+	frame         int  // for the spinner
 	events        chan any
 	now           func() time.Time
 	deployCommand func(ctx context.Context, out io.Writer) error
@@ -122,6 +125,10 @@ type (
 	appsEvent struct {
 		output string
 		err    error
+	}
+	statsEvent struct {
+		output string
+		failed bool
 	}
 	paneEvent struct {
 		app    string
@@ -295,6 +302,14 @@ func (t *tui) loadApps() {
 		_, err := run(context.Background(), &out, "list")
 		t.events <- appsEvent{out.String(), err}
 	}()
+	if t.noStats {
+		return
+	}
+	go func() {
+		var out strings.Builder
+		code, err := run(context.Background(), &out, "load")
+		t.events <- statsEvent{out.String(), err != nil || code != 0}
+	}()
 }
 
 // load asks the server for one tab of one app. The logs are a stream, and
@@ -450,6 +465,13 @@ func (t *tui) handle(event any) bool {
 			for _, app := range t.apps {
 				t.load(app.Name, tabOverview) // the state of each app, for its dot
 			}
+		}
+	case statsEvent:
+		// A server from before the load command answers with an error.
+		t.noStats = e.failed
+		t.stats = nil
+		if !e.failed {
+			t.stats = cleanLines(e.output)
 		}
 	case paneEvent:
 		p := t.pane(e.app, e.tab)
@@ -687,6 +709,7 @@ func (t *tui) chooseServer() {
 		t.stopLogs()
 		t.run, t.server = run, name
 		t.apps, t.appsLoaded, t.selected, t.panes = nil, false, 0, map[string]*pane{}
+		t.stats, t.noStats = nil, false
 		t.loadApps()
 	}
 	t.overlay = o
