@@ -129,7 +129,7 @@ systemctl list-timers chasen-update.timer # when the next run is
 
 To turn the nightly update off, run `chasen-server settings auto_update off`. `chasen-server settings` shows what is set.
 
-**The CLI does not update itself.** Run its install line again: `curl -fsSL https://chasenhq.com/cli | sh`.
+**The CLI tells you, and you update it.** Once a day `chasen` looks for a newer release. When there is one, it says so in one line after your command. Then run `chasen update`: it downloads the release, checks its checksum, and replaces itself. It does not change by itself, because it also runs in CI, where a program that changes between two commands is a surprise. In CI it does not look at all.
 
 **The operating system is yours.** Chasen does not change how your server installs its own updates. On Ubuntu, turn on automatic security updates, and let the server reboot at night when an update needs it:
 

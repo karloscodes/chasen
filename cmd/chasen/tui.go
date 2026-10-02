@@ -107,6 +107,7 @@ type tui struct {
 	overlay       *overlay
 	prompt        *prompt
 	message       string // one line of news, until the next key
+	update        string // a newer release of chasen, or ""
 	frame         int    // for the spinner
 	events        chan any
 	now           func() time.Time

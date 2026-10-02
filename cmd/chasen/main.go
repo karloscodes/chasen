@@ -27,6 +27,7 @@ const usage = `Usage: chasen <command>
   use <server>           Make another server the current one: a name from the list
   logout                 Forget the login, here and on the server
   report                 Something is wrong with Chasen? Open an issue, with your version filled in
+  update                 Install the newest chasen. chasen tells you when there is one
 
 Run these in the directory of your app:
   deploy                 Build the image of the current git commit, push it, and deploy it.
@@ -61,7 +62,9 @@ func main() {
 		if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 			if app, err := loadAppFile(); err == nil {
 				if creds, err := loadCredentials(app.Server); err == nil {
-					if err := runScreen(serverScreen(creds, directoryApp(app))); err != nil {
+					screen := serverScreen(creds, directoryApp(app))
+					screen.update = newerRelease()
+					if err := runScreen(screen); err != nil {
 						fmt.Fprintln(os.Stderr, "Error:", err)
 						os.Exit(1)
 					}
@@ -84,12 +87,17 @@ func main() {
 		err = runScreen(demoScreen())
 	case "report":
 		err = report()
+	case "update":
+		err = update()
 	case "version":
 		fmt.Println("chasen " + version)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:
 		err = runClient(os.Args[1:])
+		if latest := newerRelease(); err == nil && latest != "" {
+			fmt.Fprintf(os.Stderr, "\nchasen %s is out. You have %s. Run: chasen update\n", latest, version)
+		}
 	}
 
 	if err != nil {

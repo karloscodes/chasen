@@ -140,9 +140,11 @@ func (t *tui) firstLine(width int) string {
 	case t.appsLoaded:
 		count = itoa(len(t.apps)) + " apps "
 	}
-	return spread(width,
-		[]cell{{" chasen", colorAccent + ";" + colorBold}, {"  " + t.server, ""}},
-		[]cell{{count, colorDim}})
+	right := []cell{{count, colorDim}}
+	if t.update != "" {
+		right = []cell{{t.update + " is out: chasen update   ", colorAccent}, {count, colorDim}}
+	}
+	return spread(width, []cell{{" chasen", colorAccent + ";" + colorBold}, {"  " + t.server, ""}}, right)
 }
 
 func itoa(n int) string {
