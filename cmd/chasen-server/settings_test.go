@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -154,6 +155,32 @@ func TestAppSettings(t *testing.T) {
 
 		if got, _ := loadSettings("shop"); len(got.Env) != 0 {
 			t.Fatalf("got %+v", got)
+		}
+	})
+}
+
+func TestServerBehindAProxy(t *testing.T) {
+	t.Run("a server does HTTPS itself: the API gets a certificate", func(t *testing.T) {
+		route := agentRoute(serverConfig{Domain: "example.com"})
+
+		if !slices.Contains(route, "--tls") {
+			t.Fatalf("no --tls in %v", route)
+		}
+	})
+
+	t.Run("with https off, the API and the apps get no certificate", func(t *testing.T) {
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		if err := saveServerConfig(serverConfig{Domain: "example.com", Token: "secret", PlainHTTP: true}); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := loadServerConfig()
+
+		if err != nil || !cfg.PlainHTTP {
+			t.Fatalf("the setting did not come back: %+v, %v", cfg, err)
+		}
+		if route := agentRoute(cfg); slices.Contains(route, "--tls") || !slices.Contains(route, "api.example.com") {
+			t.Fatalf("got %v, want the host of the API and no --tls", route)
 		}
 	})
 }

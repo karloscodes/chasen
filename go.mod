@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/benbjohnson/litestream v0.5.17
-	github.com/karloscodes/matcha v0.13.2
+	github.com/karloscodes/matcha v0.13.3-0.20261002120318-cfd1756b2d65
 	golang.org/x/term v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.49.1

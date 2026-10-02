@@ -37,6 +37,7 @@ Run `mise run e2e` after a change to the protocol, the deploy, the backups, or t
 - The deploy is imperative. No desired-state file, no reconcile loop.
 - A server updates itself: `setup` installs a systemd timer that runs `chasen-server update` each night (`update.go`). It takes the newest GitHub release, checks the checksum, and goes back to the previous binary when the API does not answer. So a tag `v*` reaches every server within a day: tag only what passed the end-to-end test. `chasen-server settings auto_update off` turns it off.
 - `chasen.yml` is not a docker-compose file. An unknown key is an error.
+- `chasen-server settings https off` is for a server behind another proxy that does HTTPS (the edge of the cloud, a load balancer). The API and the apps then get no `--tls` at the proxy (`agentRoute`, and `PlainHTTP` in matcha). An app changes at its next deploy or restart.
 - Holding requests while a server reboots is a feature of the cloud, not of the open source version. Nothing on the server can do it, because the proxy reboots too. Do not put a recipe for it in these docs.
 - `chasen run <command>` runs one command in the container of the app (`serverRun`): the words go to `docker exec` as they are, with no shell and no input, and the history keeps the run. It is not a console.
 - The CLI does not update itself. Once a day, for a person at a terminal, it looks for a newer release and prints one line (`update.go`). `chasen update` installs it, with the checksum check. Never in CI, never for a `dev` build.

@@ -39,6 +39,9 @@ type serverConfig struct {
 	// AutoUpdate turns the nightly update off when it is false. Without the
 	// setting, the server updates itself.
 	AutoUpdate *bool `yaml:"auto_update,omitempty"`
+	// PlainHTTP is true when another proxy in front of this server does
+	// HTTPS. The server then gets no certificates and redirects nothing.
+	PlainHTTP bool `yaml:"-"`
 }
 
 // CHASEN_ROOT moves all server state under one directory. Tests use it.
@@ -217,6 +220,7 @@ func readServerConfig() (cfg serverConfig, found bool, err error) {
 
 	cfg.Domain, cfg.Token = saved["domain"], saved["token"]
 	cfg.Backup.HeartbeatURL = saved["heartbeat_url"]
+	cfg.PlainHTTP = saved["https"] == "off"
 	if value, ok := saved["auto_update"]; ok {
 		on := value == "true"
 		cfg.AutoUpdate = &on
@@ -239,6 +243,9 @@ func saveServerConfig(cfg serverConfig) error {
 	values := map[string]string{"domain": cfg.Domain, "token": cfg.Token, "heartbeat_url": cfg.Backup.HeartbeatURL}
 	if cfg.AutoUpdate != nil {
 		values["auto_update"] = strconv.FormatBool(*cfg.AutoUpdate)
+	}
+	if cfg.PlainHTTP {
+		values["https"] = "off"
 	}
 	if s3 := cfg.Backup.S3; s3 != nil {
 		values["s3_endpoint"], values["s3_region"], values["s3_bucket"] = s3.Endpoint, s3.Region, s3.Bucket
@@ -269,8 +276,8 @@ func saveServerConfig(cfg serverConfig) error {
 	return tx.Commit()
 }
 
-// serverSettings shows the settings of the server, or changes one of the two
-// that have no other command: auto_update and heartbeat_url.
+// serverSettings shows the settings of the server, or changes one of those
+// that have no other command: auto_update, heartbeat_url, and https.
 func serverSettings(args []string) error {
 	cfg, err := loadServerConfig()
 	if err != nil {
@@ -278,9 +285,12 @@ func serverSettings(args []string) error {
 	}
 	switch {
 	case len(args) == 0:
-		update, bucket, heartbeat := "on", "none: the backups stay on this server", "none"
+		update, bucket, heartbeat, https := "on", "none: the backups stay on this server", "none", "on"
 		if cfg.AutoUpdate != nil && !*cfg.AutoUpdate {
 			update = "off"
+		}
+		if cfg.PlainHTTP {
+			https = "off: another proxy in front of this server does HTTPS"
 		}
 		if s3 := cfg.Backup.S3; s3 != nil {
 			bucket = fmt.Sprintf("%s at %s (region %s)", s3.Bucket, s3.Endpoint, s3.Region)
@@ -288,7 +298,7 @@ func serverSettings(args []string) error {
 		if cfg.Backup.HeartbeatURL != "" {
 			heartbeat = cfg.Backup.HeartbeatURL
 		}
-		fmt.Printf("domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\n", cfg.Domain, update, heartbeat, bucket)
+		fmt.Printf("domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\nhttps          %s\n", cfg.Domain, update, heartbeat, bucket, https)
 		fmt.Println("\nThe token: chasen-server token. The bucket: chasen-server bucket.")
 		return nil
 	case len(args) == 2 && args[0] == "auto_update" && (args[1] == "on" || args[1] == "off"):
@@ -317,8 +327,23 @@ func serverSettings(args []string) error {
 			fmt.Println("The server calls the URL after each hourly backup that worked.")
 		}
 		return nil
+	case len(args) == 2 && args[0] == "https" && (args[1] == "on" || args[1] == "off"):
+		cfg.PlainHTTP = args[1] == "off"
+		if err := saveServerConfig(cfg); err != nil {
+			return err
+		}
+		if _, err := routeAgent(cfg); err != nil {
+			return err
+		}
+		if cfg.PlainHTTP {
+			fmt.Println("This server now answers plain HTTP: the proxy in front of it does HTTPS.")
+		} else {
+			fmt.Println("This server now does HTTPS itself, with its own certificates.")
+		}
+		fmt.Println("The API changed now. Each app changes at its next deploy or restart.")
+		return nil
 	}
-	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url>]")
+	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url> | https on|off]")
 }
 
 // serverBucket sets the S3 bucket for the offsite backups and the live
@@ -389,7 +414,7 @@ func serverBucket(args []string) error {
 	if err := startAgent(self); err != nil {
 		return err
 	}
-	_, err = routeAgent(cfg.Domain)
+	_, err = routeAgent(cfg)
 	return err
 }
 
@@ -405,10 +430,12 @@ func loadApp(name string) (matcha.AppConfig, error) {
 // own file, so the nightly `matcha update-all` does not touch them. The proxy
 // and the network are the same as matcha uses.
 func engine(name string, app matcha.AppConfig) *matcha.Matcha {
+	cfg, _ := loadServerConfig()
 	return matcha.NewFromApp(name, app, matcha.Config{
 		ConfigPath:  appsPath(),
 		DataDirBase: root() + "/var/matcha",
-		SkipPull:    true, // chasen pulls the image itself, with the login of the deploy
+		SkipPull:    true,          // chasen pulls the image itself, with the login of the deploy
+		PlainHTTP:   cfg.PlainHTTP, // `chasen-server settings https off`
 	})
 }
 
@@ -482,7 +509,7 @@ func serverSetup(args []string) error {
 	if err := installTimer(self, cfg.AutoUpdate == nil || *cfg.AutoUpdate); err != nil {
 		return err
 	}
-	routed, err := routeAgent(cfg.Domain)
+	routed, err := routeAgent(cfg)
 	if err != nil {
 		return err
 	}
