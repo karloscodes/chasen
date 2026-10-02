@@ -208,9 +208,9 @@ func (t *tui) keys() [][2]string {
 	case t.overlay != nil:
 		return [][2]string{{"↑↓", "scroll"}, {"esc", "close"}}
 	case len(t.apps) == 0:
-		return [][2]string{{"d", "deploy this directory"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
+		return [][2]string{{"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
 	case !t.inPane:
-		return [][2]string{{"↑↓", "app"}, {"→", "its " + tabNames[t.tab]}, {"tab", "next tab"}, {"d", "deploy"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"?", "keys"}, {"q", "close"}}
+		return [][2]string{{"↑↓", "app"}, {"→", "its " + tabNames[t.tab]}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"?", "keys"}, {"q", "close"}}
 	}
 	switch t.tab {
 	case tabHistory:
@@ -270,11 +270,7 @@ func (t *tui) body(width, height int) []string {
 		lines = append(lines, "", paint("  g  ", colorAccent)+"try again")
 	case len(t.apps) == 0:
 		lines = []string{"", "  " + paint("No apps on "+t.server+" yet.", colorBold), ""}
-		if t.cwdApp != "" && t.deployCommand != nil {
-			lines = append(lines, "  This directory is the app "+paint(t.cwdApp, colorAccent)+".", "  Press "+paint("d", colorAccent)+" to deploy it.")
-		} else {
-			lines = append(lines, "  Go to the directory of an app, one with a Dockerfile, and run:", "", "    "+paint("chasen deploy", colorAccent))
-		}
+		lines = append(lines, "  Go to the directory of an app, one with a Dockerfile, and run:", "", "    "+paint("chasen deploy", colorAccent), "", "  It shows up here when it is live.")
 	default:
 		lines = t.columns(width, height)
 	}
@@ -392,7 +388,7 @@ func (t *tui) tabLines(width, height int) []string {
 	case tabOverview:
 		return t.overviewLines(app, p.lines, width)
 	case tabHistory:
-		return t.rowLines(width, height, t.historyCells)
+		return t.rowLines(width, height, func(row string) []cell { return t.historyCells(row, width) })
 	case tabBackups:
 		if len(t.rows()) == 0 {
 			return []string{paint("No backups yet.", colorDim), "", "Press " + paint("b", colorAccent) + " to make one now. The server also makes one each hour, and before each deploy."}
@@ -441,14 +437,18 @@ func (t *tui) overviewLines(app string, status []string, width int) []string {
 	if len(history) > 1 {
 		lines = append(lines, "", paint("Last changes", colorDim))
 		for _, row := range history[1:min(len(history), 6)] {
-			lines = append(lines, spread(width, t.historyCells(row), nil))
+			lines = append(lines, spread(width, t.historyCells(row, width), nil))
 		}
 	}
 	return lines
 }
 
+// actionWidth is the room for the action of a history row: what the id, the
+// time, and the result leave.
+func actionWidth(width int) int { return max(12, min(30, width-5-28-12)) }
+
 // historyCells draws one row of `chasen history`: ID, WHEN, ACTION, RESULT.
-func (t *tui) historyCells(row string) []cell {
+func (t *tui) historyCells(row string, width int) []cell {
 	parts := columns.Split(strings.TrimSpace(row), 4)
 	if len(parts) < 4 {
 		return []cell{{row, ""}}
@@ -464,7 +464,7 @@ func (t *tui) historyCells(row string) []cell {
 	if at, err := time.Parse("2006-01-02 15:04:05", when); err == nil {
 		when = at.Format("Jan 2 15:04") + " · " + ago(t.now(), at)
 	}
-	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, 28), colorDim}, {fit(parts[2], 30), ""}, result}
+	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, 28), colorDim}, {fit(parts[2], actionWidth(width)), ""}, result}
 }
 
 // backupCells draws one row of `chasen backups`: the name of the backup, and
@@ -485,7 +485,7 @@ func (t *tui) backupCells(row string) []cell {
 func (t *tui) rowLines(width, height int, cells func(row string) []cell) []string {
 	var lines []string
 	if t.tab == tabHistory {
-		lines = append(lines, spread(width, []cell{{fit("ID", 5) + fit("WHEN (UTC)", 28) + fit("ACTION", 30) + "RESULT", colorDim}}, nil))
+		lines = append(lines, spread(width, []cell{{fit("ID", 5) + fit("WHEN (UTC)", 28) + fit("ACTION", actionWidth(width)) + "RESULT", colorDim}}, nil))
 		height--
 	}
 	rows := t.rows()
@@ -566,7 +566,7 @@ func (t *tui) overlayLines(o *overlay, width, height int) []string {
 // --- the corner: the server and the whisk -------------------------------------
 
 const (
-	graphWidth = 8 // how many loads the small graph shows
+	graphWidth = 8 // the width of a line of the server
 	stirFrames = 9 // how long the whisk stirs, in ticks of the clock
 )
 
@@ -599,47 +599,39 @@ func (t *tui) corner(width, room int) []string {
 	return lines
 }
 
-var (
-	sparks = []rune("▁▂▃▄▅▆▇█")
-	bars   = []rune(" ▏▎▍▌▋▊▉█")
-)
-
-// gauges draws the server in three lines: the load as a small graph of the
-// last minute, and the memory and the disk as bars.
+// gauges draws the server in three lines: how much of the cores, of the
+// memory, and of the disk is in use. Each line is thin, so the three do not
+// run into each other in a terminal with tight lines.
 func (t *tui) gauges(width int) []string {
 	lines := []string{paint(fit(" server", width), colorDim)}
-
-	if parts := loadLine.FindStringSubmatch(strings.Join(statusValues(t.stats, "Load"), "")); parts != nil {
-		cores, _ := strconv.Atoi(parts[2])
-		color, graph := colorAccent, ""
-		for _, load := range t.loads {
-			// The top of the graph is a load equal to the count of the cores.
-			level := int(load / float64(max(cores, 1)) * float64(len(sparks)-1))
-			graph += string(sparks[max(0, min(level, len(sparks)-1))])
-			if load > float64(cores) {
-				color = colorBad
-			}
-		}
-		lines = append(lines, spread(width, []cell{{" load ", colorDim}, {fit(graph, graphWidth), color}, {" " + parts[1], ""}}, nil))
-	}
-	for _, name := range []string{"Memory", "Disk"} {
-		parts := percent.FindStringSubmatch(strings.Join(statusValues(t.stats, name), ""))
-		if parts == nil {
-			continue
-		}
-		used, _ := strconv.Atoi(parts[1])
+	line := func(label string, used int, value string, bad bool) {
 		color := colorAccent
-		if used >= 90 {
+		if bad {
 			color = colorBad
 		}
-		// Eight cells, and each cell has eight steps.
-		steps := used * graphWidth * 8 / 100
-		bar := strings.Repeat("█", steps/8)
-		if steps%8 > 0 {
-			bar += string(bars[steps%8])
+		filled := max(0, min(used*graphWidth/100, graphWidth))
+		if used > 0 && filled == 0 {
+			filled = 1
 		}
-		label := map[string]string{"Memory": " mem  ", "Disk": " disk "}[name]
-		lines = append(lines, spread(width, []cell{{label, colorDim}, {bar, color}, {strings.Repeat("░", graphWidth-utf8.RuneCountInString(bar)), colorDim}, {fmt.Sprintf(" %3d%%", used), ""}}, nil))
+		lines = append(lines, spread(width, []cell{
+			{label, colorDim},
+			{strings.Repeat("━", filled), color},
+			{strings.Repeat("─", graphWidth-filled), colorDim},
+			{value, ""},
+		}, nil))
+	}
+
+	if parts := loadLine.FindStringSubmatch(strings.Join(statusValues(t.stats, "Load"), "")); parts != nil {
+		// A load equal to the count of the cores is a full line.
+		load, _ := strconv.ParseFloat(parts[1], 64)
+		cores, _ := strconv.Atoi(parts[2])
+		line(" load ", int(load*100/float64(max(cores, 1))), fmt.Sprintf(" %5s", parts[1]), load > float64(cores))
+	}
+	for _, name := range []string{"Memory", "Disk"} {
+		if parts := percent.FindStringSubmatch(strings.Join(statusValues(t.stats, name), "")); parts != nil {
+			used, _ := strconv.Atoi(parts[1])
+			line(map[string]string{"Memory": " mem  ", "Disk": " disk "}[name], used, fmt.Sprintf(" %4d%%", used), used >= 90)
+		}
 	}
 	return lines
 }

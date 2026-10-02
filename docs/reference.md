@@ -40,7 +40,9 @@ On the server, as root:
 
 ## The screen
 
-Run `chasen` with no command, in a terminal, to open the screen of your apps. It shows the apps of the current server on the left. On the right it shows one app: its state, its history, its backups, its domains, and its logs.
+Run `chasen` with no command, in a terminal, to open the screen of your apps. It is for watching and running a server: it shows the apps of the current server on the left, and under them how busy the server is. On the right it shows one app: its state, its history, its backups, its domains, and its logs.
+
+The screen does not deploy. A deploy needs the directory of an app, and the screen is about the whole server. Run `chasen deploy` in the directory, or in CI, and the new version shows up on the screen.
 
 | Key | What it does |
 |---|---|
@@ -48,7 +50,6 @@ Run `chasen` with no command, in a terminal, to open the screen of your apps. It
 | up, down (or `k`, `j`) | Move in the side you are on: the next app, the next row, or the next lines |
 | tab, shift+tab | The next tab, the tab before. `1` to `5` go to a tab |
 | enter | Open the row: the output of a history entry, or the restore of a backup |
-| `d` | Deploy the app of the current directory |
 | `r` | Restart the app, from the same image |
 | `b` | Back up the app now |
 | `a`, `x` | On the domains tab: add a domain, remove the chosen domain |
@@ -58,7 +59,7 @@ Run `chasen` with no command, in a terminal, to open the screen of your apps. It
 | `?` | Show the keys |
 | `q` | Close |
 
-A restart, a restore, a deploy, and the removal of a domain ask first. Each action is a command of this page, so the screen can do nothing that the commands cannot. Without a terminal, or without a login, `chasen` prints its usage.
+A restart, a restore, and the removal of a domain ask first. Each action is a command of this page, so the screen can do nothing that the commands cannot. Without a terminal, or without a login, `chasen` prints its usage.
 
 The screen has no color when `NO_COLOR` is set.
 

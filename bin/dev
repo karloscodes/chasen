@@ -10,7 +10,7 @@
 #   bin/dev history 3
 #
 # chasen runs in tmp/dev/shop, a small website with one commit, so a deploy
-# (the key d, or bin/dev deploy) goes through the real CLI to the mock server.
+# (bin/dev deploy) goes through the real CLI to the mock server.
 # To see a deploy fail, add this to tmp/dev/shop/chasen.yml:  env: {FAIL: "1"}
 #
 # The log of the mock server is tmp/dev/mock.log.

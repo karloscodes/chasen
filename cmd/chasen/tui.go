@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -21,9 +20,10 @@ import (
 	"golang.org/x/term"
 )
 
-// The screen of `chasen` with no command: the apps of the server on the left,
-// and one app on the right, with its state, its history, its backups, its
-// domains, and its logs. Every part is the output of a protocol command, so
+// The screen of `chasen` with no command. It is for watching and running a
+// server: the apps on the left, and one app on the right, with its state, its
+// history, its backups, its domains, and its logs. It does not deploy: a
+// deploy needs the directory of the app, and the screen is about the server. Every part is the output of a protocol command, so
 // the screen needs nothing from the server that the commands do not have.
 //
 // One loop owns all the state. Keys, the size of the window, and the answers
@@ -110,14 +110,12 @@ type tui struct {
 	message       string // one line of news, until the next key
 	update        string // a newer release of chasen, or ""
 	// stats is the output of `chasen load`: how busy the server is.
-	stats         []string
-	noStats       bool      // the server is older than the load command: do not ask again
-	loads         []float64 // the last loads of the server, for the small graph
-	stirUntil     int       // the frame at which the whisk is still again
-	frame         int       // for the spinner
-	events        chan any
-	now           func() time.Time
-	deployCommand func(ctx context.Context, out io.Writer) error
+	stats     []string
+	noStats   bool // the server is older than the load command: do not ask again
+	stirUntil int  // the frame at which the whisk is still again
+	frame     int  // for the spinner
+	events    chan any
+	now       func() time.Time
 }
 
 // The events of the loop.
@@ -477,11 +475,6 @@ func (t *tui) handle(event any) bool {
 		t.stats = nil
 		if !e.failed {
 			t.stats = cleanLines(e.output)
-			if parts := loadLine.FindStringSubmatch(strings.Join(statusValues(t.stats, "Load"), "")); parts != nil {
-				load, _ := strconv.ParseFloat(parts[1], 64)
-				t.loads = append(t.loads, load)
-				t.loads = t.loads[max(0, len(t.loads)-graphWidth):]
-			}
 		}
 	case paneEvent:
 		p := t.pane(e.app, e.tab)
@@ -570,8 +563,6 @@ func (t *tui) key(key string) bool {
 		t.move(1 << 30)
 	case "enter":
 		t.open()
-	case "d":
-		t.deploy()
 	}
 	if t.app() == "" {
 		return true
@@ -676,20 +667,6 @@ func (t *tui) open() {
 	}
 }
 
-// deploy runs `chasen deploy` for the app of this directory.
-func (t *tui) deploy() {
-	switch {
-	case t.cwdApp == "" || t.deployCommand == nil:
-		t.message = "A deploy runs in the directory of an app. This directory has no Dockerfile and no index.html."
-	case t.app() != "" && t.app() != t.cwdApp:
-		t.message = "This directory is the app " + t.cwdApp + ". To deploy " + t.app() + ", open chasen in its directory."
-	default:
-		t.confirm("Deploy "+t.cwdApp+" from this directory?", func() {
-			t.act("deploy "+t.cwdApp, t.deployCommand)
-		})
-	}
-}
-
 func (t *tui) openInBrowser() {
 	urls := statusValues(t.pane(t.app(), tabOverview).lines, "URL")
 	if len(urls) == 0 {
@@ -723,7 +700,7 @@ func (t *tui) chooseServer() {
 		t.stopLogs()
 		t.run, t.server = run, name
 		t.apps, t.appsLoaded, t.selected, t.panes = nil, false, 0, map[string]*pane{}
-		t.stats, t.noStats, t.loads = nil, false, nil
+		t.stats, t.noStats = nil, false
 		t.loadApps()
 	}
 	t.overlay = o
@@ -754,7 +731,7 @@ func (t *tui) overlayKey(o *overlay, key string) {
 	switch key {
 	case "esc", "q":
 		if o.running && o.cancel != nil {
-			t.message = "It still runs on the server. A deploy runs to its end there."
+			t.message = "It still runs on the server, to its end."
 			o.cancel()
 		}
 		t.overlay = nil
@@ -794,7 +771,6 @@ Move
   enter               open the row: the output of a history entry, or the restore of a backup
 
 Change the app
-  d    deploy the app of this directory
   r    restart the app, from the same image
   b    back up the app now
   a    add a domain (on the domains tab)
@@ -806,8 +782,9 @@ The screen
   s    go to another server
   q    close
 
-Each action is a command of the CLI: chasen deploy, chasen restart,
-chasen backup, chasen restore, chasen domains. Run chasen help for all of them.
+Each action is a command of the CLI: chasen restart, chasen backup,
+chasen restore, chasen domains. A deploy is not here: it belongs to the
+directory of the app. Run chasen deploy there, and watch it arrive here.
 
 Something is wrong with Chasen? Close the screen and run: chasen report
 `), "\n")
@@ -887,15 +864,6 @@ func serverScreen(creds credentials, cwdApp string) *tui {
 			}
 		}
 		return nil, "", errors.New("no login for " + server)
-	}
-	// A deploy is the same program, so it builds and pushes as `chasen deploy` does.
-	if self, err := os.Executable(); err == nil && cwdApp != "" {
-		t.deployCommand = func(ctx context.Context, out io.Writer) error {
-			cmd := exec.CommandContext(ctx, self, "deploy")
-			cmd.Stdout, cmd.Stderr = out, out
-			cmd.Env = append(os.Environ(), "CHASEN_URL="+creds.URL, "CHASEN_TOKEN="+creds.Token)
-			return cmd.Run()
-		}
 	}
 	return t
 }

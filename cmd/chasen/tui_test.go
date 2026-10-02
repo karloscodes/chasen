@@ -275,6 +275,22 @@ func TestScreen(t *testing.T) {
 		}
 	})
 
+	t.Run("the screen does not deploy: d does nothing, in the directory of an app too", func(t *testing.T) {
+		s := newTestServer(t)
+		sc := openScreen(t, s, "shop")
+
+		sc.press("d", "y")
+
+		for _, command := range s.commands {
+			if strings.HasPrefix(command, "deploy") {
+				t.Errorf("the screen sent %q", command)
+			}
+		}
+		if sc.tui.overlay != nil || sc.tui.prompt != nil {
+			t.Error("d opened something")
+		}
+	})
+
 	t.Run("a server with no apps says how to deploy the first one", func(t *testing.T) {
 		s := newTestServer(t)
 		s.apps = "NAME  VERSION  DOMAINS\n"
@@ -389,7 +405,7 @@ func TestScreenOnTheMockServer(t *testing.T) {
 	t.Run("the corner shows the load, the memory, and the disk of the server", func(t *testing.T) {
 		sc := open(t)
 
-		sc.shows("server", " load ", " mem  ", " disk ", " 41%", "░", "3 apps")
+		sc.shows("server", " load ", " mem  ", " disk ", "━━━─────   41%", "3 apps")
 		if whisk := strings.Join(whisk(0, 0), "\n"); !strings.Contains(sc.text(), strings.Split(whisk, "\n")[5]) {
 			t.Errorf("the whisk is not under the apps:\n%s", sc.text())
 		}
@@ -397,7 +413,7 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		// A low window has no room under the apps: the first line has the numbers.
 		sc.tui.height = 12
 		sc.shows("mem ", "disk 41%  3 apps")
-		if strings.Contains(sc.text(), "░") {
+		if strings.Contains(sc.text(), "━") {
 			t.Errorf("a low window still draws the bars:\n%s", sc.text())
 		}
 	})

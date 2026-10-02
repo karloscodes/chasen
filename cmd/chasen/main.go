@@ -16,8 +16,8 @@ var version = "dev"
 
 const usage = `Usage: chasen <command>
 
-  chasen                 With no command: the screen of your apps. Their state, history,
-                         backups, domains, and logs, with keys to deploy, restart, and restore
+  chasen                 With no command: the screen of your server. Its load, and the state,
+                         history, backups, domains, and logs of each app. Keys restart and restore
 
   add server <domain>    Log in to your own server, with a browser
   login                  Log in to the Chasen cloud instead
