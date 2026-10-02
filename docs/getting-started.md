@@ -156,4 +156,4 @@ cat /var/run/reboot-required   # the file exists when a reboot is waiting
 reboot
 ```
 
-To move the reboot to another hour, keep `"true"` and change `Automatic-Reboot-Time`. A server from the Chasen cloud has the reboot on at 04:00; the same file turns it off.
+To move the reboot to another hour, keep `"true"` and change `Automatic-Reboot-Time`. A server from the Chasen cloud has the reboot on, at about 04:00 in its own region; the same file turns it off.
