@@ -194,6 +194,10 @@ func (c Client) Run(ctx context.Context, command string, args []string, stdin io
 	for {
 		line, err := lines.ReadString('\n')
 		if code, ok := strings.CutPrefix(line, ExitMarker); ok {
+			// Read the response to its end. A response that is closed before
+			// its end takes its connection with it, and the next command
+			// then opens a new one: through SSH, a new login for each command.
+			io.Copy(io.Discard, lines)
 			return strconv.Atoi(strings.TrimSpace(code))
 		}
 		io.WriteString(out, line)

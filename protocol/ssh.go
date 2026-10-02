@@ -133,6 +133,11 @@ func (c Client) api() (*http.Client, string) {
 		// The connection outlives the request that opened it: no context here.
 		DialContext:     func(context.Context, string, string) (net.Conn, error) { return dialSSH(address) },
 		IdleConnTimeout: 90 * time.Second,
+		// The screen asks about ten things at the same moment, every few
+		// seconds. They wait for one of four connections: each connection is
+		// a login to the server, and they stay open for the next round.
+		MaxConnsPerHost:     4,
+		MaxIdleConnsPerHost: 4,
 	}})
 	return client.(*http.Client), sshAPI
 }

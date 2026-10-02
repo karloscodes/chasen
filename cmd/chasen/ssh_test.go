@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/karloscodes/chasen/protocol"
@@ -86,6 +87,23 @@ func TestServerThroughSSH(t *testing.T) {
 
 		if ran, _ := os.ReadFile(calls); err != nil || strings.Count(string(ran), "\n") != 1 {
 			t.Errorf("ssh ran %d times (%v), want one time for two commands", strings.Count(string(ran), "\n"), err)
+		}
+	})
+
+	t.Run("commands at the same moment share a few connections, round after round", func(t *testing.T) {
+		creds, calls := sshServer(t)
+
+		for range 3 {
+			var round sync.WaitGroup
+			for range 10 {
+				round.Go(func() { remote(creds, nil, io.Discard, "list") })
+			}
+			round.Wait()
+		}
+
+		ran, _ := os.ReadFile(calls)
+		if n := strings.Count(string(ran), "\n"); n < 1 || n > 4 {
+			t.Errorf("ssh ran %d times for 30 commands, want 4 at most", n)
 		}
 	})
 

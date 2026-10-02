@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestClientRun(t *testing.T) {
@@ -51,4 +54,35 @@ func TestClientRun(t *testing.T) {
 			t.Error("Run returned no error for a response that stops halfway")
 		}
 	})
+}
+
+// A connection to a server can be expensive: through SSH it is a login. The
+// screen sends a command every second, so the commands must share one.
+func TestClientRunKeepsItsConnection(t *testing.T) {
+	var connections atomic.Int32
+	api := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "shop\n%s0\n", ExitMarker)
+		// The server sends the exit line at once, and the end of the response
+		// a moment later, as a real server does.
+		w.(http.Flusher).Flush()
+		time.Sleep(20 * time.Millisecond)
+	}))
+	api.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			connections.Add(1)
+		}
+	}
+	api.Start()
+	defer api.Close()
+	client := Client{URL: api.URL, Token: "good"}
+
+	for range 3 {
+		if _, err := client.Run(context.Background(), "list", nil, nil, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if n := connections.Load(); n != 1 {
+		t.Errorf("3 commands opened %d connections, want 1", n)
+	}
 }
