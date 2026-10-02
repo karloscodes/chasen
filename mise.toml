@@ -9,3 +9,7 @@ run = "bin/e2e"
 [tasks.smol]
 description = "A disposable Chasen server in a smolvm machine, for local tests. No sudo, no port 80"
 run = "bin/smol"
+
+[tasks.downloads]
+description = "How often each file of each release was downloaded, from GitHub"
+run = """gh api repos/karloscodes/chasen/releases --jq '.[] | "\\(.tag_name)  \\(.published_at[:10])", (.assets[] | select(.download_count > 0) | "  \\(.download_count)\\t\\(.name)")'"""
