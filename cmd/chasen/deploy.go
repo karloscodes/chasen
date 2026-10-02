@@ -44,7 +44,7 @@ func deploy(creds credentials, app appFile, command string) error {
 	settings.Domain = domainFlag
 	// The values of the secrets are here now: check the ones that have a rule.
 	if err := settings.Check(); err != nil {
-		return fmt.Errorf("the secrets and the env of the app: %w", err)
+		return fmt.Errorf("the settings of the deploy: %w", err)
 	}
 
 	// An app on GitHub needs no chasen.yml: its image is ghcr.io/<owner>/<repository>.
