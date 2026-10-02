@@ -464,7 +464,7 @@ func (t *tui) historyCells(row string, width int) []cell {
 	if at, err := time.Parse("2006-01-02 15:04:05", when); err == nil {
 		when = at.Format("Jan 2 15:04") + " · " + ago(t.now(), at)
 	}
-	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, 28), colorDim}, {fit(parts[2], actionWidth(width)), ""}, result}
+	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, 28), colorDim}, {fit(clip(parts[2], actionWidth(width)-1), actionWidth(width)), ""}, result}
 }
 
 // backupCells draws one row of `chasen backups`: the name of the backup, and
