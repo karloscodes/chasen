@@ -291,6 +291,29 @@ func TestScreen(t *testing.T) {
 		}
 	})
 
+	t.Run("s goes to another server that the user is logged in to", func(t *testing.T) {
+		one, two := newTestServer(t), newTestServer(t)
+		two.apps = "NAME   VERSION  DOMAINS\nwiki   9d8c7b6  wiki.example.org\n"
+		sc := openScreen(t, one, "shop")
+		sc.tui.servers = []string{"example.com", "example.org"}
+		sc.tui.change = func(server string) (runner, string, error) {
+			client := protocol.Client{URL: two.URL, Token: "token"}
+			return func(ctx context.Context, out io.Writer, args ...string) (int, error) {
+				return client.Run(ctx, args[0], args[1:], nil, out)
+			}, server, nil
+		}
+		sc.shows("s servers")
+
+		sc.press("s")
+		sc.shows("servers", "▸ example.com", "example.org")
+		sc.press("down", "enter")
+
+		sc.shows("chasen  example.org", "1 app", "▸ ● wiki")
+		if text := sc.text(); strings.Contains(text, "● blog") || strings.Contains(text, "● lognorth") {
+			t.Errorf("the apps of the first server are still on the screen:\n%s", text)
+		}
+	})
+
 	t.Run("a server with no apps says how to deploy the first one", func(t *testing.T) {
 		s := newTestServer(t)
 		s.apps = "NAME  VERSION  DOMAINS\n"

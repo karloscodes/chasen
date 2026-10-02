@@ -210,7 +210,12 @@ func (t *tui) keys() [][2]string {
 	case len(t.apps) == 0:
 		return [][2]string{{"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
 	case !t.inPane:
-		return [][2]string{{"↑↓", "app"}, {"→", "its " + tabNames[t.tab]}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"?", "keys"}, {"q", "close"}}
+		keys := [][2]string{{"↑↓", "app"}, {"→", "its " + tabNames[t.tab]}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}}
+		// With more than one login, the way to the other servers is in view.
+		if len(t.servers) > 1 {
+			keys = append(keys, [2]string{"s", "servers"})
+		}
+		return append(keys, [2]string{"?", "keys"}, [2]string{"q", "close"})
 	}
 	switch t.tab {
 	case tabHistory:
