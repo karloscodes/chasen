@@ -225,7 +225,10 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 			if s.bucket == "" {
 				fmt.Fprintln(out, "No bucket. The backups stay on this server.")
 			} else {
-				fmt.Fprintf(out, "Bucket %s at https://s3.example.com (region auto)\n", s.bucket)
+				fmt.Fprintf(out, "Bucket %s at https://s3.example.com (region auto)\n\n", s.bucket)
+				fmt.Fprintln(out, "APP   SNAPSHOTS             LIVE REPLICA  TOTAL")
+				fmt.Fprintln(out, "shop  40.0 MB in 2 backups  90.0 MB       130.0 MB")
+				fmt.Fprintln(out, "Total: 130.0 MB in 6 objects")
 			}
 			return 0
 		}

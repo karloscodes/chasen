@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 	"text/tabwriter"
+	"time"
 
 	"github.com/karloscodes/chasen/protocol"
 	"github.com/karloscodes/matcha"
@@ -349,7 +350,13 @@ func serverBucket(args []string) error {
 			fmt.Println("No bucket. The backups stay on this server.")
 			return nil
 		}
-		fmt.Printf("Bucket %s at %s (region %s)\n", cfg.Backup.S3.Bucket, cfg.Backup.S3.Endpoint, cfg.Backup.S3.Region)
+		fmt.Printf("Bucket %s at %s (region %s)\n\n", cfg.Backup.S3.Bucket, cfg.Backup.S3.Endpoint, cfg.Backup.S3.Region)
+		// What it holds, so its size and its growth are not a guess.
+		objects, err := cfg.Backup.S3.objects("")
+		if err != nil {
+			return fmt.Errorf("cannot list the bucket: %w", err)
+		}
+		fmt.Print(bucketUsage(objects, time.Now()))
 		return nil
 	}
 

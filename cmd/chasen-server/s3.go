@@ -167,7 +167,24 @@ func (c *s3Config) delete(key string) error {
 
 // list returns every object key that starts with prefix.
 func (c *s3Config) list(prefix string) ([]string, error) {
-	var keys []string
+	objects, err := c.objects(prefix)
+	keys := make([]string, len(objects))
+	for i, object := range objects {
+		keys[i] = object.Key
+	}
+	return keys, err
+}
+
+// s3Object is one object of the bucket.
+type s3Object struct {
+	Key          string
+	Size         int64
+	LastModified time.Time
+}
+
+// objects returns the objects of the bucket whose key starts with the prefix.
+func (c *s3Config) objects(prefix string) ([]s3Object, error) {
+	var objects []s3Object
 	query := url.Values{"list-type": {"2"}, "prefix": {prefix}}
 	for {
 		resp, err := c.do("GET", "", query, nil, 0)
@@ -175,9 +192,7 @@ func (c *s3Config) list(prefix string) ([]string, error) {
 			return nil, err
 		}
 		var page struct {
-			Contents []struct {
-				Key string
-			}
+			Contents              []s3Object
 			IsTruncated           bool
 			NextContinuationToken string
 		}
@@ -186,11 +201,9 @@ func (c *s3Config) list(prefix string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		for _, object := range page.Contents {
-			keys = append(keys, object.Key)
-		}
+		objects = append(objects, page.Contents...)
 		if !page.IsTruncated {
-			return keys, nil
+			return objects, nil
 		}
 		query.Set("continuation-token", page.NextContinuationToken)
 	}
