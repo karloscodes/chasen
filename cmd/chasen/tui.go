@@ -826,8 +826,8 @@ func decodeKeys(input []byte) []string {
 	return keys
 }
 
-// runTUI opens the screen and stays until the user closes it.
-func runTUI(creds credentials, cwdApp string) error {
+// serverScreen makes the screen for a server and the app of this directory.
+func serverScreen(creds credentials, cwdApp string) *tui {
 	client := func(creds credentials) runner {
 		return func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 			return protocol.Client(creds).Run(ctx, args[0], args[1:], nil, out)
@@ -857,7 +857,11 @@ func runTUI(creds credentials, cwdApp string) error {
 			return cmd.Run()
 		}
 	}
+	return t
+}
 
+// runScreen opens the screen in the terminal and stays until the user closes it.
+func runScreen(t *tui) error {
 	fd := int(os.Stdin.Fd())
 	before, err := term.MakeRaw(fd)
 	if err != nil {

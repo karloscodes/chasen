@@ -103,11 +103,15 @@ func openScreen(t *testing.T, s *testServer, cwdApp string) *screen {
 
 // settle handles the events until the server has answered everything.
 func (sc *screen) settle() {
+	// Logs never stop arriving, so there is also a limit.
+	limit := time.After(400 * time.Millisecond)
 	for {
 		select {
 		case event := <-sc.tui.events:
 			sc.tui.handle(event)
 		case <-time.After(60 * time.Millisecond):
+			return
+		case <-limit:
 			return
 		}
 	}
@@ -278,4 +282,61 @@ func TestParseApps(t *testing.T) {
 	if !slices.Equal(apps, want) {
 		t.Errorf("parseApps = %+v, want %+v", apps, want)
 	}
+}
+
+func TestDemo(t *testing.T) {
+	// The demo server with steps that take no time.
+	open := func(t *testing.T) *screen {
+		server := newDemoServer(time.Now())
+		server.wait = func(ctx context.Context, d time.Duration) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case <-time.After(time.Millisecond):
+				return true
+			}
+		}
+		ui := newTUI(server.run, "demo", "shop")
+		ui.deployCommand = server.deploy
+		ui.width, ui.height = 100, 30
+		sc := &screen{t, ui}
+		ui.loadApps()
+		sc.settle()
+		return sc
+	}
+
+	t.Run("opens on the shop, with its failed deploy in the history", func(t *testing.T) {
+		sc := open(t)
+
+		sc.shows("3 apps", "▸ ● shop", "Up 3 hours (healthy)", "https://shop.com", "✗ failed", "deploy 3f9a2c1")
+	})
+
+	t.Run("a deploy makes a new version, and the history has it", func(t *testing.T) {
+		sc := open(t)
+
+		sc.press("d")
+		sc.shows("Deploy shop from this directory?")
+		sc.press("y")
+		sc.shows("deploy shop", "✓ done", "Building ghcr.io/you/shop:", "Deployed shop")
+		sc.press("esc")
+		sc.shows("Up 1 second (healthy)")
+		sc.press("2")
+
+		if rows := sc.tui.rows(); len(rows) != 5 || !strings.Contains(rows[0], "deploy") || !strings.Contains(rows[0], "succeeded") {
+			t.Errorf("the history is %q", rows)
+		}
+	})
+
+	t.Run("a backup, a new domain, and the logs all answer", func(t *testing.T) {
+		sc := open(t)
+
+		sc.press("b", "esc", "3")
+		if rows := sc.tui.rows(); len(rows) != 8 {
+			t.Errorf("want 7 backups and the live replica, got %q", rows)
+		}
+		sc.press("4", "a", "x", ".", "i", "o", "enter", "esc")
+		sc.shows("x.io")
+		sc.press("5")
+		sc.shows("shop GET /up 200")
+	})
 }

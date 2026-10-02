@@ -59,6 +59,8 @@ A restart, a restore, a deploy, and the removal of a domain ask first. Each acti
 
 The screen has no color when `NO_COLOR` is set.
 
+To try the screen without a server, run `chasen demo`. It has three made-up apps and a server that lives inside the program: a deploy, a backup, and a restore all work, and nothing is real.
+
 ## Several servers
 
 You can be logged in to several servers and to the cloud at the same time.

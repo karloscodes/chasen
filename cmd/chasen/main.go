@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -15,6 +16,7 @@ const usage = `Usage: chasen <command>
 
   chasen                 With no command: the screen of your apps. Their state, history,
                          backups, domains, and logs, with keys to deploy, restart, and restore
+  demo                   Try that screen with made-up apps. No server, no login, nothing real
 
   add server <domain>    Log in to your own server, with a browser
   login                  Log in to the Chasen cloud instead
@@ -55,7 +57,7 @@ func main() {
 		if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 			if app, err := loadAppFile(); err == nil {
 				if creds, err := loadCredentials(app.Server); err == nil {
-					if err := runTUI(creds, directoryApp(app)); err != nil {
+					if err := runScreen(serverScreen(creds, directoryApp(app))); err != nil {
 						fmt.Fprintln(os.Stderr, "Error:", err)
 						os.Exit(1)
 					}
@@ -69,6 +71,13 @@ func main() {
 
 	var err error
 	switch os.Args[1] {
+	case "demo":
+		// The screen with made-up apps: no server and no login.
+		if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+			err = errors.New("chasen demo needs a terminal")
+			break
+		}
+		err = runScreen(demoScreen())
 	case "version":
 		fmt.Println("chasen " + version)
 	case "help", "-h", "--help":

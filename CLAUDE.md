@@ -37,7 +37,7 @@ Run `mise run e2e` after a change to the protocol, the deploy, the backups, or t
 - The deploy is imperative. No desired-state file, no reconcile loop.
 - A server updates itself: `setup` installs a systemd timer that runs `chasen-server update` each night (`update.go`). It takes the newest GitHub release, checks the checksum, and goes back to the previous binary when the API does not answer. So a tag `v*` reaches every server within a day: tag only what passed the end-to-end test. `chasen-server settings auto_update off` turns it off.
 - `chasen.yml` is not a docker-compose file. An unknown key is an error.
-- The screen (`chasen` with no command) uses no TUI library: `golang.org/x/term` and escape codes. It shows the output of protocol commands and runs protocol commands, nothing else. A new thing on the screen needs its command first. It cleans every line of server output before it draws it (`clean`), so a server cannot send escape codes to the terminal.
+- The screen (`chasen` with no command) uses no TUI library: `golang.org/x/term` and escape codes. It shows the output of protocol commands and runs protocol commands, nothing else. A new thing on the screen needs its command first. It cleans every line of server output before it draws it (`clean`), so a server cannot send escape codes to the terminal. `chasen demo` (`demo.go`) is the same screen on a made-up server inside the program: use it to work on the screen with no server and no login (`mise run demo`). When a command changes its output, change the demo too.
 - Addons (`chasen enable fusionaly|formlander|lognorth`) run products from their images.
 - Backups cover every volume of an app (`/var/matcha/<app>/*`).
 
