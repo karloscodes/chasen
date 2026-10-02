@@ -69,4 +69,6 @@ Run `mise run e2e` after a change to the protocol, the deploy, the backups, or t
 
 ## Releases
 
+Never tag a commit that has `[ci skip]` in its message: GitHub then skips the release workflow too, and the tag makes no release. That happened to `v0.6.1`, which is a tag with no release; `v0.6.2` is the same code.
+
 A tag `v*` runs `.github/workflows/release.yml`: it builds the CLI (macOS and Linux) and the server (Linux), and attaches them to a GitHub release with `checksums.txt`. The install scripts `chasenhq.com/cli` and `chasenhq.com/server` download the newest release.
