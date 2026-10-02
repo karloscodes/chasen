@@ -1,0 +1,501 @@
+package main
+
+import (
+	"os"
+	"strings"
+	"time"
+	"unicode/utf8"
+)
+
+// The drawing of the screen. Every line is built from cells of plain text
+// that are cut to their width first and get their color after, so the escape
+// codes never count as width.
+
+// The colors: one accent, the amber of the Chasen mark, one red for what is
+// wrong, and one gray for what matters less. NO_COLOR turns them off.
+var (
+	colorAccent = "38;5;214"
+	colorDim    = "38;5;245"
+	colorBad    = "38;5;203"
+	colorBold   = "1"
+	colorChosen = "7" // the chosen row: the colors change places
+)
+
+var colorsOn = os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb"
+
+func init() {
+	if c := os.Getenv("COLORTERM"); c == "truecolor" || c == "24bit" {
+		colorAccent = "38;2;245;184;61"
+	}
+}
+
+func paint(text, color string) string {
+	if !colorsOn || color == "" || text == "" {
+		return text
+	}
+	return "\x1b[" + color + "m" + text + "\x1b[0m"
+}
+
+// clip cuts text to a width, with an ellipsis when something is left out.
+func clip(text string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if utf8.RuneCountInString(text) <= width {
+		return text
+	}
+	runes := []rune(text)
+	return string(runes[:width-1]) + "…"
+}
+
+// fit cuts text to a width and fills the rest with spaces.
+func fit(text string, width int) string {
+	text = clip(text, width)
+	return text + strings.Repeat(" ", max(0, width-utf8.RuneCountInString(text)))
+}
+
+// cell is a piece of a line with one color.
+type cell struct{ text, color string }
+
+// spread puts the left cells at the start of a line and the right cells at
+// its end. When the line is too short, the left side is cut.
+func spread(width int, left, right []cell) string {
+	rightWidth := 0
+	for _, c := range right {
+		rightWidth += utf8.RuneCountInString(c.text)
+	}
+	if rightWidth > width {
+		right, rightWidth = nil, 0
+	}
+	var line strings.Builder
+	room := width - rightWidth
+	for _, c := range left {
+		text := clip(c.text, room)
+		room -= utf8.RuneCountInString(text)
+		line.WriteString(paint(text, c.color))
+	}
+	line.WriteString(strings.Repeat(" ", max(0, room)))
+	for _, c := range right {
+		line.WriteString(paint(c.text, c.color))
+	}
+	return line.String()
+}
+
+// wrap breaks a text into lines of a width, at the spaces.
+func wrap(text string, width int) []string {
+	var lines []string
+	line := ""
+	for _, word := range strings.Fields(text) {
+		if line != "" && utf8.RuneCountInString(line)+1+utf8.RuneCountInString(word) > width {
+			lines, line = append(lines, line), ""
+		}
+		if line != "" {
+			line += " "
+		}
+		line += word
+	}
+	return append(lines, line)
+}
+
+// window returns the part of the lines that a height shows, with the chosen
+// line in view.
+func window(count, height, chosen int) (start, end int) {
+	start = max(0, min(chosen-height/2, count-height))
+	return start, min(count, start+height)
+}
+
+var spinner = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+// view draws the whole screen: a first line, the body, and a last line with
+// the keys.
+func (t *tui) view() string {
+	width, height := t.width, t.height
+	var lines []string
+	if width < 60 || height < 12 {
+		lines = []string{"", " chasen needs a window of 60 columns and 12 lines.", " Make the window larger, or press q."}
+	} else {
+		rule := paint(strings.Repeat("─", width), colorDim)
+		lines = append(lines, t.firstLine(width), rule)
+		lines = append(lines, t.body(width, height-4)...)
+		lines = append(lines, rule, t.lastLine(width))
+	}
+
+	var screen strings.Builder
+	screen.WriteString("\x1b[H")
+	for i, line := range lines {
+		if i > 0 {
+			screen.WriteString("\r\n")
+		}
+		screen.WriteString(line + "\x1b[K")
+	}
+	screen.WriteString("\x1b[J")
+	return screen.String()
+}
+
+func (t *tui) firstLine(width int) string {
+	count := ""
+	switch {
+	case t.appsLoaded && len(t.apps) == 1:
+		count = "1 app "
+	case t.appsLoaded:
+		count = itoa(len(t.apps)) + " apps "
+	}
+	return spread(width,
+		[]cell{{" chasen", colorAccent + ";" + colorBold}, {"  " + t.server, ""}},
+		[]cell{{count, colorDim}})
+}
+
+func itoa(n int) string {
+	digits := ""
+	for {
+		digits = string(rune('0'+n%10)) + digits
+		if n /= 10; n == 0 {
+			return digits
+		}
+	}
+}
+
+// keys returns the keys that work now, most useful first.
+func (t *tui) keys() [][2]string {
+	switch {
+	case t.overlay != nil && t.overlay.pick != nil:
+		return [][2]string{{"↑↓", "choose"}, {"enter", "go"}, {"esc", "back"}}
+	case t.overlay != nil:
+		return [][2]string{{"↑↓", "scroll"}, {"esc", "close"}}
+	case len(t.apps) == 0:
+		return [][2]string{{"d", "deploy this directory"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
+	case !t.inPane:
+		return [][2]string{{"↑↓", "app"}, {"←→", "tab"}, {"enter", "go in"}, {"d", "deploy"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"?", "keys"}, {"q", "close"}}
+	}
+	switch t.tab {
+	case tabHistory:
+		return [][2]string{{"↑↓", "entry"}, {"enter", "its output"}, {"←→", "tab"}, {"esc", "apps"}, {"?", "keys"}}
+	case tabBackups:
+		return [][2]string{{"↑↓", "backup"}, {"enter", "restore"}, {"b", "back up now"}, {"←→", "tab"}, {"esc", "apps"}}
+	case tabDomains:
+		return [][2]string{{"↑↓", "domain"}, {"a", "add"}, {"x", "remove"}, {"←→", "tab"}, {"esc", "apps"}}
+	case tabLogs:
+		return [][2]string{{"↑↓", "scroll"}, {"end", "follow"}, {"←→", "tab"}, {"esc", "apps"}}
+	}
+	return [][2]string{{"↑↓", "scroll"}, {"←→", "tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"esc", "apps"}}
+}
+
+func (t *tui) lastLine(width int) string {
+	if p := t.prompt; p != nil {
+		cells := []cell{{" " + p.label, colorAccent}}
+		if p.text {
+			cells = append(cells, cell{" " + p.value, ""}, cell{"▏", colorAccent})
+		}
+		return spread(width, cells, nil)
+	}
+	if t.message != "" {
+		return spread(width, []cell{{" " + t.message, ""}}, nil)
+	}
+	var cells []cell
+	used := 0
+	for _, key := range t.keys() {
+		size := utf8.RuneCountInString(key[0]) + utf8.RuneCountInString(key[1]) + 4
+		if used+size > width {
+			break
+		}
+		used += size
+		cells = append(cells, cell{" " + key[0], colorAccent}, cell{" " + key[1] + "  ", colorDim})
+	}
+	return spread(width, cells, nil)
+}
+
+// body is everything between the two rules.
+func (t *tui) body(width, height int) []string {
+	var lines []string
+	switch {
+	case t.overlay != nil:
+		lines = t.overlayLines(t.overlay, width, height)
+	case !t.appsLoaded && t.appsErr == "":
+		lines = []string{"", paint(" "+spinner[t.frame%len(spinner)], colorAccent) + " Asking " + t.server + " for its apps"}
+	case t.appsErr != "":
+		lines = []string{""}
+		for _, line := range wrap(t.appsErr, width-4) {
+			lines = append(lines, "  "+paint(line, colorBad))
+		}
+		lines = append(lines, "", paint("  g  ", colorAccent)+"try again")
+	case len(t.apps) == 0:
+		lines = []string{"", "  " + paint("No apps on "+t.server+" yet.", colorBold), ""}
+		if t.cwdApp != "" && t.deployCommand != nil {
+			lines = append(lines, "  This directory is the app "+paint(t.cwdApp, colorAccent)+".", "  Press "+paint("d", colorAccent)+" to deploy it.")
+		} else {
+			lines = append(lines, "  Go to the directory of an app, one with a Dockerfile, and run:", "", "    "+paint("chasen deploy", colorAccent))
+		}
+	default:
+		lines = t.columns(width, height)
+	}
+	for len(lines) < height {
+		lines = append(lines, "")
+	}
+	return lines[:height]
+}
+
+// columns draws the apps on the left and the chosen app on the right.
+func (t *tui) columns(width, height int) []string {
+	left := 18
+	for _, app := range t.apps {
+		left = max(left, utf8.RuneCountInString(app.Name)+7)
+	}
+	left = min(left, 30, width/3)
+	right := width - left - 3
+
+	label := colorDim
+	if !t.inPane {
+		label = colorAccent
+	}
+	leftLines := []string{paint(fit(" apps", left), label), strings.Repeat(" ", left)}
+	start, end := window(len(t.apps), height-2, t.selected)
+	for i := start; i < end; i++ {
+		leftLines = append(leftLines, t.appLine(i, left))
+	}
+
+	rightLines := []string{t.tabLine(right), ""}
+	rightLines = append(rightLines, t.tabLines(right, height-2)...)
+
+	lines := make([]string, height)
+	for i := range lines {
+		l, r := strings.Repeat(" ", left), ""
+		if i < len(leftLines) {
+			l = leftLines[i]
+		}
+		if i < len(rightLines) {
+			r = rightLines[i]
+		}
+		lines[i] = l + paint(" │ ", colorDim) + r
+	}
+	return lines
+}
+
+// stateColor is the color for the state of a container.
+func stateColor(state string) string {
+	switch {
+	case state == "":
+		return colorDim
+	case strings.HasPrefix(state, "Up") && !strings.Contains(state, "unhealthy"):
+		return colorAccent
+	}
+	return colorBad
+}
+
+func (t *tui) appLine(i, width int) string {
+	app := t.apps[i]
+	state := strings.Join(statusValues(t.pane(app.Name, tabOverview).lines, "State"), "")
+	dot := cell{"● ", stateColor(state)}
+	if state == "" {
+		dot.text = "○ "
+	}
+	if i == t.selected {
+		return spread(width, []cell{{" ▸ ", colorAccent}, dot, {app.Name, colorBold}}, nil)
+	}
+	return spread(width, []cell{{"   ", ""}, dot, {app.Name, ""}}, nil)
+}
+
+func (t *tui) tabLine(width int) string {
+	var cells []cell
+	for i, name := range tabNames {
+		color := colorDim
+		if i == t.tab && t.inPane {
+			color = colorAccent + ";" + colorBold + ";4"
+		} else if i == t.tab {
+			color = colorBold + ";4"
+		}
+		cells = append(cells, cell{name, color}, cell{"   ", ""})
+	}
+	return spread(width, cells, nil)
+}
+
+// tabLines draws the tab of the chosen app.
+func (t *tui) tabLines(width, height int) []string {
+	app := t.app()
+	if t.tab == tabLogs {
+		return t.logLines(width, height)
+	}
+	p := t.pane(app, t.tab)
+	switch {
+	case p.err != "":
+		var lines []string
+		for _, line := range wrap(p.err, width) {
+			lines = append(lines, paint(line, colorBad))
+		}
+		return lines
+	case !p.loaded:
+		return []string{paint(spinner[t.frame%len(spinner)], colorAccent) + paint(" Loading", colorDim)}
+	}
+	switch t.tab {
+	case tabOverview:
+		return t.overviewLines(app, p.lines, width)
+	case tabHistory:
+		return t.rowLines(width, height, t.historyCells)
+	case tabBackups:
+		if len(t.rows()) == 0 {
+			return []string{paint("No backups yet.", colorDim), "", "Press " + paint("b", colorAccent) + " to make one now. The server also makes one each hour, and before each deploy."}
+		}
+		return t.rowLines(width, height, t.backupCells)
+	}
+	if len(t.rows()) == 0 {
+		return []string{paint("No domains.", colorDim)}
+	}
+	return t.rowLines(width, height, func(row string) []cell { return []cell{{row, ""}} })
+}
+
+// overviewLines shows the state of an app, and the last things that happened.
+func (t *tui) overviewLines(app string, status []string, width int) []string {
+	state := strings.Join(statusValues(status, "State"), "")
+	lines := []string{
+		spread(width, []cell{{app, colorBold}}, []cell{{"● ", stateColor(state)}, {state, ""}}),
+		"",
+	}
+	field := func(name string, values ...string) {
+		for i, value := range values {
+			label := fit(name, 10)
+			if i > 0 {
+				label = fit("", 10)
+			}
+			lines = append(lines, spread(width, []cell{{label, colorDim}, {value, ""}}, nil))
+		}
+	}
+	field("Version", statusValues(status, "Version")...)
+	field("URL", statusValues(status, "URL")...)
+	for _, stamp := range statusValues(status, "Backup") {
+		if stamp == "none" {
+			field("Backup", "none yet")
+		} else {
+			field("Backup", t.stampText(stamp))
+		}
+	}
+	for _, replica := range statusValues(status, "Replica") {
+		if replica == "off" {
+			replica = "off: the backups stay on the server"
+		}
+		field("Replica", replica)
+	}
+
+	history := t.pane(app, tabHistory).lines
+	if len(history) > 1 {
+		lines = append(lines, "", paint("Last changes", colorDim))
+		for _, row := range history[1:min(len(history), 6)] {
+			lines = append(lines, spread(width, t.historyCells(row), nil))
+		}
+	}
+	return lines
+}
+
+// historyCells draws one row of `chasen history`: ID, WHEN, ACTION, RESULT.
+func (t *tui) historyCells(row string) []cell {
+	parts := columns.Split(strings.TrimSpace(row), 4)
+	if len(parts) < 4 {
+		return []cell{{row, ""}}
+	}
+	result := cell{"✓ " + parts[3], colorAccent}
+	switch parts[3] {
+	case "failed":
+		result = cell{"✗ failed", colorBad}
+	case "running":
+		result = cell{spinner[t.frame%len(spinner)] + " running", colorAccent}
+	}
+	when := parts[1]
+	if at, err := time.Parse("2006-01-02 15:04:05", when); err == nil {
+		when = at.Format("Jan 2 15:04") + " · " + ago(t.now(), at)
+	}
+	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, 28), colorDim}, {fit(parts[2], 30), ""}, result}
+}
+
+// backupCells draws one row of `chasen backups`: the name of the backup, and
+// where it is.
+func (t *tui) backupCells(row string) []cell {
+	parts := columns.Split(strings.TrimSpace(row), 2)
+	if len(parts) < 2 {
+		return []cell{{row, ""}}
+	}
+	if parts[0] == "live" {
+		return []cell{{fit("live replica", 34), colorAccent}, {parts[1], colorDim}}
+	}
+	return []cell{{fit(t.stampText(parts[0]), 34), ""}, {parts[1], colorDim}}
+}
+
+// rowLines draws rows that the cursor can choose. The first line of the
+// history is its header.
+func (t *tui) rowLines(width, height int, cells func(row string) []cell) []string {
+	var lines []string
+	if t.tab == tabHistory {
+		lines = append(lines, spread(width, []cell{{fit("ID", 5) + fit("WHEN (UTC)", 28) + fit("ACTION", 30) + "RESULT", colorDim}}, nil))
+		height--
+	}
+	rows := t.rows()
+	start, end := window(len(rows), height, t.cursor)
+	for i := start; i < end; i++ {
+		if i == t.cursor && t.inPane {
+			// One color for the whole chosen row.
+			text := ""
+			for _, c := range cells(rows[i]) {
+				text += c.text
+			}
+			lines = append(lines, paint(fit(text, width), colorChosen))
+			continue
+		}
+		lines = append(lines, spread(width, cells(rows[i]), nil))
+	}
+	return lines
+}
+
+func (t *tui) logLines(width, height int) []string {
+	if len(t.logs) == 0 {
+		return []string{paint(spinner[t.frame%len(spinner)], colorAccent) + paint(" Waiting for the logs of "+t.app(), colorDim)}
+	}
+	start := max(0, len(t.logs)-height)
+	if !t.logsFollow {
+		start = min(t.scroll, start)
+	}
+	var lines []string
+	for _, line := range t.logs[start:min(len(t.logs), start+height)] {
+		lines = append(lines, clip(line, width))
+	}
+	return lines
+}
+
+// overlayLines draws the overlay over the whole body.
+func (t *tui) overlayLines(o *overlay, width, height int) []string {
+	state := cell{}
+	switch {
+	case o.pick != nil || (!o.running && len(o.lines) > 0 && o.cancel == nil):
+	case o.running:
+		state = cell{spinner[t.frame%len(spinner)] + " running ", colorAccent}
+	case o.failed:
+		state = cell{"✗ failed ", colorBad}
+	default:
+		state = cell{"✓ done ", colorAccent}
+	}
+	lines := []string{spread(width, []cell{{" " + o.title, colorAccent + ";" + colorBold}}, []cell{state}), ""}
+
+	if o.pick != nil {
+		for i, choice := range o.choices {
+			if i == o.cursor {
+				lines = append(lines, spread(width, []cell{{" ▸ ", colorAccent}, {choice, colorBold}}, nil))
+			} else {
+				lines = append(lines, "   "+clip(choice, width-3))
+			}
+		}
+		return lines
+	}
+
+	room := height - 2
+	start := max(0, len(o.lines)-room)
+	if !o.follow {
+		start = min(o.scroll, start)
+	}
+	for _, line := range o.lines[start:min(len(o.lines), start+room)] {
+		color := ""
+		switch {
+		case strings.HasPrefix(line, "Error:"):
+			color = colorBad
+		case o.headings && line != "" && !strings.HasPrefix(line, " "):
+			color = colorAccent // a heading of the help
+		}
+		lines = append(lines, " "+paint(clip(line, width-2), color))
+	}
+	return lines
+}

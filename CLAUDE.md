@@ -4,7 +4,7 @@ Deploy the Docker image of an app with a SQLite database to one server. Two prog
 
 | Program | Directory | Job |
 |---|---|---|
-| `chasen` | `cmd/chasen` | The CLI on the developer's machine: `client.go` (options, dispatch), `login.go`, `deploy.go`, `registry.go`, `placement.go` |
+| `chasen` | `cmd/chasen` | The CLI on the developer's machine: `client.go` (options, dispatch), `login.go`, `deploy.go`, `registry.go`, `placement.go`, and the screen of `chasen` with no command: `tui.go` (state, keys, loop) and `tui_view.go` (drawing) |
 | `chasen-server` | `cmd/chasen-server` | Runs on each server: API, image pulls, backups, live replica, activity feed |
 
 Shared code:
@@ -37,6 +37,7 @@ Run `mise run e2e` after a change to the protocol, the deploy, the backups, or t
 - The deploy is imperative. No desired-state file, no reconcile loop.
 - A server updates itself: `setup` installs a systemd timer that runs `chasen-server update` each night (`update.go`). It takes the newest GitHub release, checks the checksum, and goes back to the previous binary when the API does not answer. So a tag `v*` reaches every server within a day: tag only what passed the end-to-end test. `chasen-server settings auto_update off` turns it off.
 - `chasen.yml` is not a docker-compose file. An unknown key is an error.
+- The screen (`chasen` with no command) uses no TUI library: `golang.org/x/term` and escape codes. It shows the output of protocol commands and runs protocol commands, nothing else. A new thing on the screen needs its command first. It cleans every line of server output before it draws it (`clean`), so a server cannot send escape codes to the terminal.
 - Addons (`chasen enable fusionaly|formlander|lognorth`) run products from their images.
 - Backups cover every volume of an app (`/var/matcha/<app>/*`).
 

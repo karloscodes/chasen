@@ -5,11 +5,16 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"golang.org/x/term"
 )
 
 var version = "dev"
 
 const usage = `Usage: chasen <command>
+
+  chasen                 With no command: the screen of your apps. Their state, history,
+                         backups, domains, and logs, with keys to deploy, restart, and restore
 
   add server <domain>    Log in to your own server, with a browser
   login                  Log in to the Chasen cloud instead
@@ -45,6 +50,19 @@ Addons run from a ready image, with the same backups:
 
 func main() {
 	if len(os.Args) < 2 {
+		// With no command, a person at a terminal gets the screen of the apps.
+		// Without a login there is nothing to show yet: then it is the usage.
+		if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
+			if app, err := loadAppFile(); err == nil {
+				if creds, err := loadCredentials(app.Server); err == nil {
+					if err := runTUI(creds, directoryApp(app)); err != nil {
+						fmt.Fprintln(os.Stderr, "Error:", err)
+						os.Exit(1)
+					}
+					return
+				}
+			}
+		}
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
 	}
@@ -63,4 +81,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
+}
+
+// directoryApp returns the name of the app of the current directory, or ""
+// when the directory is not an app: it has no Dockerfile, no index.html, and
+// no chasen.yml.
+func directoryApp(app appFile) string {
+	for _, file := range []string{"Dockerfile", "index.html", "chasen.yml"} {
+		if _, err := os.Stat(file); err == nil {
+			return app.Name
+		}
+	}
+	return ""
 }
