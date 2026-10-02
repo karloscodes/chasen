@@ -2,9 +2,12 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
+
+	"github.com/karloscodes/matcha"
 )
 
 // serverConnect joins the input and the output of this command to the API of
@@ -31,4 +34,29 @@ func serverConnect() error {
 	}()
 	_, err = io.Copy(os.Stdout, api)
 	return err
+}
+
+// serverLogin makes a login for the CLI of the person who runs this command,
+// and prints its token. It is the login of the SSH way: who can run commands
+// on the server as root owns it, so no browser asks for a proof. The token is
+// a login like the ones of the browser: `chasen logout` ends it, and the
+// token of the server itself never leaves the server.
+func serverLogin() error {
+	if _, err := loadServerConfig(); err != nil {
+		return err
+	}
+	token, err := matcha.GeneratePrivateKey()
+	if err != nil {
+		return err
+	}
+	db, err := openServerDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if _, err := db.Exec("INSERT INTO logins (token_sha256) VALUES (?)", hashToken(token)); err != nil {
+		return err
+	}
+	fmt.Println(token)
+	return nil
 }

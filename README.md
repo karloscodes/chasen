@@ -4,20 +4,15 @@ Enter your app. Run `chasen deploy`. It is live.
 
 A chasen is the bamboo whisk that prepares matcha. Chasen is the tool you hold; [matcha](https://github.com/karloscodes/matcha) is the engine underneath.
 
-Chasen deploys the Docker image of an app with a SQLite database to one server. You get HTTPS, deploys without downtime, custom domains, and backups you can trust. `chasen deploy` builds the image on your computer or in CI and pushes it to a registry. The server pulls it: nothing builds on the server. There is no YAML pipeline of ours and no SSH in the deploy.
+Chasen deploys the Docker image of an app with a SQLite database to one server. You get HTTPS, deploys without downtime, custom domains, and backups you can trust. `chasen deploy` builds the image on your computer or in CI and pushes it to a registry. The server pulls it: nothing builds on the server. There is no YAML pipeline of ours, and the server needs no name in DNS: the CLI reaches it through SSH.
 
 It is free and open source, and it runs on a server you own. The site is [chasenhq.com](https://chasenhq.com), and [the docs](https://chasenhq.com/docs/) start with a step-by-step guide.
 
 ```bash
-# on the server
-curl -fsSL https://chasenhq.com/server | sh
-chasen-server setup --domain example.com
-
-# on your computer
 curl -fsSL https://chasenhq.com/cli | sh
-chasen add server example.com
+chasen add server root@203.0.113.5     # installs Chasen on the server, through SSH
 cd myapp
-chasen deploy
+chasen deploy --domain myapp.example.com
 # Deployed myapp 3f9a2c1
 #   https://myapp.example.com
 ```

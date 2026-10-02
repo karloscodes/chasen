@@ -115,8 +115,12 @@ func serverServe() error {
 	})
 	// `chasen login`: the user proves they own the server with its token, in a
 	// browser. The client then gets a token of its own.
+	shown := "this server" // a server with no base domain has no address on the web
+	if cfg.Domain != "" {
+		shown = "api." + cfg.Domain
+	}
 	login := &oauth.Server{
-		Name: "api." + cfg.Domain,
+		Name: shown,
 		Authenticate: func(key string) (string, bool) {
 			return "owner", isOwner(cfg, key)
 		},
@@ -268,6 +272,10 @@ func startAgent(self string) error {
 // routeAgent makes the proxy serve the API on api.<base domain>, with a
 // certificate. It reports false when the proxy does not run yet.
 func routeAgent(domain string) (bool, error) {
+	// A server with no base domain has no address on the web for its API: the CLI comes through SSH.
+	if domain == "" {
+		return false, nil
+	}
 	if running, _ := docker("ps", "-q", "--filter", "name=^matcha-proxy$"); running == "" {
 		return false, nil
 	}

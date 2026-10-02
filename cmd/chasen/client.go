@@ -55,6 +55,10 @@ var appFlag string
 // tagFlag is the image tag from `--tag <tag>`. It replaces the git commit.
 var tagFlag string
 
+// domainFlag is the domain from `deploy --domain <domain>`: the domain of an
+// app at its first deploy.
+var domainFlag string
+
 // serverFlag is the cloud server from `--on <id>`, `--new`, or `--new=<type>@<location>`, in the
 // form of protocol.ServerHeader.
 var serverFlag string
@@ -74,6 +78,8 @@ options:
 			serverFlag = args[i+1]
 		case args[i] == "--tag" && hasValue:
 			tagFlag = args[i+1]
+		case args[i] == "--domain" && hasValue:
+			domainFlag = strings.ToLower(args[i+1])
 		case args[i] == "--new" || strings.HasPrefix(args[i], "--new="):
 			serverFlag = strings.Replace(strings.TrimPrefix(args[i], "--"), "=", ":", 1)
 			args = slices.Delete(args, i, i+1)

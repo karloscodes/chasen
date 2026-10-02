@@ -41,6 +41,7 @@ func deploy(creds credentials, app appFile, command string) error {
 	if err != nil {
 		return err
 	}
+	settings.Domain = domainFlag
 	// The values of the secrets are here now: check the ones that have a rule.
 	if err := settings.Check(); err != nil {
 		return fmt.Errorf("the secrets and the env of the app: %w", err)

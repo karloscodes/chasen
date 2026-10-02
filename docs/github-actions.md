@@ -4,6 +4,8 @@ With this setup, a push to `main` deploys your app. The workflow runs the same `
 
 You need a server that runs `chasen-server` (or a Chasen cloud account), and an app that deploys from your computer.
 
+A workflow logs in with a token, so the server needs its address on the web: a base domain, set with `chasen-server setup --domain example.com` ([Get started](getting-started.md) has the steps). A server that you reach only through SSH works too: give the job an SSH key for the server and run `chasen add server <user>@<host>` before the deploy.
+
 ## 1. Nothing to configure for the image
 
 The repository is on GitHub, so the image goes to `ghcr.io/<owner>/<repository>`, and the workflow gives Chasen the token of the job for the registry. You need no `chasen.yml` for this.

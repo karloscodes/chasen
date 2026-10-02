@@ -9,6 +9,18 @@ The deploy pulls the image, makes a backup, starts the new container, and moves 
 
 A deploy runs to its end on the server, also when your connection drops.
 
+## The domain of an app
+
+The first deploy of an app gives it its domain:
+
+```bash
+chasen deploy --domain shop.example.com
+```
+
+Point a DNS record for that name to the server. The certificate comes on the first HTTPS request after DNS resolves. After the first deploy the app keeps its domains, and the command is `chasen deploy`. `chasen domains add` gives it more.
+
+A server with a base domain (`chasen-server setup --domain example.com`, with a wildcard DNS record) needs no flag: a new app gets `<app>.example.com`.
+
 ## The image
 
 An app is an image in a registry.

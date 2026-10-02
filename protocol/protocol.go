@@ -50,6 +50,11 @@ type Settings struct {
 	// Registry is the login for a private image. A public image needs none.
 	Registry *Registry `json:"registry,omitempty"`
 
+	// Domain is the domain of an app at its first deploy: `chasen deploy
+	// --domain shop.example.com`. Without it, the app gets <name>.<base
+	// domain of the server>. An app that runs keeps its domains.
+	Domain string `json:"domain,omitempty"`
+
 	Env           map[string]string `json:"env"`
 	Port          int               `json:"port,omitempty"`
 	Health        string            `json:"health,omitempty"`

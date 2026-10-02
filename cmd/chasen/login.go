@@ -150,7 +150,7 @@ func useServer(args []string) error {
 // another one.
 var cloudURL = "https://cloud.chasenhq.com"
 
-const howToLogin = "Run: chasen login. For your own server, run: chasen add server <domain>"
+const howToLogin = "Run: chasen login. For your own server, run: chasen add server <user>@<host>"
 
 // login logs in to the Chasen cloud.
 func login(args []string) error {
@@ -214,16 +214,10 @@ func connect(target string) error {
 func connectSSH(address string) error {
 	creds := credentials{URL: address, Token: os.Getenv("CHASEN_TOKEN")}
 	if creds.Token == "" {
-		ssh, err := protocol.SSHCommand(address, "chasen-server token")
-		if err != nil {
+		var err error
+		if creds.Token, err = serverToken(address); err != nil {
 			return err
 		}
-		ssh.Stdin, ssh.Stderr = os.Stdin, os.Stderr
-		out, err := ssh.Output()
-		if err != nil {
-			return fmt.Errorf("cannot get the token of the server through SSH (%w). The server needs chasen-server, set up, and the SSH user must be root or have sudo with no password", err)
-		}
-		creds.Token = strings.TrimSpace(string(out))
 	}
 	if err := remote(creds, nil, io.Discard, "list"); err != nil {
 		return err
@@ -236,6 +230,67 @@ func connectSSH(address string) error {
 	}
 	fmt.Println("Logged in to", creds.URL)
 	return nil
+}
+
+// installScript installs chasen-server on a server: the same lines as in
+// the docs, for a person who does it by hand.
+const installScript = "curl -fsSL https://chasenhq.com/server | sh\n"
+
+// serverToken gets a login for a server through SSH: the server makes a
+// token for this CLI. A server that has no chasen-server gets it first, and
+// a server that is not set up is set up: from a new machine to a Chasen
+// server in this one command.
+func serverToken(address string) (string, error) {
+	out, problem, err := onServer(address, "chasen-server login", "")
+	missing := strings.Contains(problem, "chasen-server: not found") || strings.Contains(problem, "chasen-server: command not found")
+	notSetUp := strings.Contains(problem, "is not set up")
+	switch {
+	case err == nil:
+		return strings.TrimSpace(out), nil
+	case !missing && !notSetUp:
+		return "", fmt.Errorf("cannot log in to the server through SSH: %s. The SSH user must be root, or have sudo with no password", cmp.Or(lastLineOf(problem), err.Error()))
+	}
+	// The output of the install and of the setup is for a person on the
+	// server. Here it shows only when a step fails.
+	if missing {
+		fmt.Println("chasen-server is not on this server yet. Installing it.")
+		script := installScript
+		// CHASEN_DOWNLOADS names another place for the release: a test uses it.
+		if from := os.Getenv("CHASEN_DOWNLOADS"); from != "" && !strings.Contains(from, "'") {
+			script = "export CHASEN_DOWNLOADS='" + from + "'\n" + script
+		}
+		if out, problem, err := onServer(address, "sh", script); err != nil {
+			return "", fmt.Errorf("the install of chasen-server failed:\n%s%s\nTo do it by hand, log in to the server and run: %s", out, problem, strings.TrimSpace(installScript))
+		}
+	}
+	fmt.Println("Setting up the server: Docker, the proxy, and the API. This can take a minute.")
+	if out, problem, err := onServer(address, "chasen-server setup", ""); err != nil {
+		return "", fmt.Errorf("the setup of the server failed:\n%s%s\nLog in to the server and run: chasen-server setup", out, problem)
+	}
+	out, problem, err = onServer(address, "chasen-server login", "")
+	if err != nil {
+		return "", fmt.Errorf("cannot log in to the server through SSH: %s", cmp.Or(lastLineOf(problem), err.Error()))
+	}
+	fmt.Println("The server is ready. It has no base domain, so an app gets its domain at its first deploy: chasen deploy --domain shop.example.com")
+	return strings.TrimSpace(out), nil
+}
+
+// onServer runs one command on a server through SSH, as root. input goes to
+// the command. The output and the errors of the command come back.
+func onServer(address, command, input string) (out, problem string, err error) {
+	ssh, err := protocol.SSHCommand(address, command)
+	if err != nil {
+		return "", "", err
+	}
+	var stdout, stderr strings.Builder
+	ssh.Stdin, ssh.Stdout, ssh.Stderr = strings.NewReader(input), &stdout, &stderr
+	err = ssh.Run()
+	return stdout.String(), stderr.String(), err
+}
+
+func lastLineOf(text string) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
 }
 
 // deviceLogin is the OAuth 2.0 device flow: show a page and a code to the

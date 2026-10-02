@@ -83,6 +83,8 @@ func runServer(args []string) error {
 		return serverServe()
 	case "connect":
 		return serverConnect()
+	case "login":
+		return serverLogin()
 	case "list":
 		return serverList()
 	case "load":
@@ -301,7 +303,7 @@ func serverSettings(args []string) error {
 		if cfg.Backup.HeartbeatURL != "" {
 			heartbeat = cfg.Backup.HeartbeatURL
 		}
-		fmt.Printf("domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\n", cfg.Domain, update, heartbeat, bucket)
+		fmt.Printf("domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\n", cmp.Or(cfg.Domain, "none: each app brings its domain"), update, heartbeat, bucket)
 		fmt.Println("\nThe token: chasen-server token. The bucket: chasen-server bucket.")
 		return nil
 	case len(args) == 2 && args[0] == "auto_update" && (args[1] == "on" || args[1] == "off"):
@@ -448,8 +450,11 @@ func serverSetup(args []string) error {
 	if *domain != "" {
 		cfg.Domain = *domain
 	}
-	if !validDomain(cfg.Domain) {
-		return errors.New("usage: chasen-server setup --domain <base domain>")
+	// The base domain is optional. With one, the API is on api.<domain> and a
+	// new app gets <name>.<domain>. Without one, the CLI reaches the server
+	// through SSH, and each app brings its domain at its first deploy.
+	if cfg.Domain != "" && !validDomain(cfg.Domain) {
+		return fmt.Errorf("invalid base domain %q: use a name like example.com", cfg.Domain)
 	}
 
 	// matcha.Setup restarts the proxy, so run it only when the proxy is down.
@@ -492,6 +497,14 @@ func serverSetup(args []string) error {
 		return err
 	}
 
+	if cfg.Domain == "" {
+		fmt.Println("Chasen is ready. This server has no base domain: the CLI reaches it through SSH, and an app gets its domain at its first deploy.")
+		fmt.Println("\nOn your machine, run:\n  chasen add server <user>@<address of this server>\n  chasen deploy --domain shop.example.com     # in the directory of an app")
+		if cfg.Backup.S3 == nil {
+			fmt.Println("\nBackups stay on this server. For offsite copies too, run: chasen-server bucket --endpoint <url> --name <bucket> --access-key-id <id>")
+		}
+		return nil
+	}
 	fmt.Printf("Chasen is ready. Apps get %s\n", link("<name>."+cfg.Domain))
 	if !isLocal(cfg.Domain) {
 		fmt.Printf("Point a wildcard A record for *.%s to this server.\n", cfg.Domain)
@@ -685,12 +698,19 @@ func serverDeploy(name, version string) error {
 	}
 
 	old, oldErr := loadApp(name)
-	domains := []string{name + "." + cfg.Domain}
+	var has []string
+	if oldErr == nil {
+		has = strings.Split(old.Domain, ",")
+	}
+	domains, note, err := protocol.AppDomains(name, cfg.Domain, settings.Domain, has)
+	if err != nil {
+		return err
+	}
+	if note != "" {
+		fmt.Println(note)
+	}
 	// The key that the deploy brings, then the key the app has, then a new one.
 	privateKey := cmp.Or(settings.SecretKey(), old.Env["PRIVATE_KEY"])
-	if oldErr == nil {
-		domains = strings.Split(old.Domain, ",")
-	}
 	if privateKey == "" {
 		if privateKey, err = matcha.GeneratePrivateKey(); err != nil {
 			return err
@@ -923,6 +943,9 @@ func serverEnable(name string, args []string) error {
 			return fmt.Errorf("invalid domain %q", domain)
 		}
 	}
+	if oldErr != nil && len(args) == 0 && cfg.Domain == "" {
+		return fmt.Errorf("this server has no base domain, so it cannot name the addon. Give it its domain: chasen enable %s %s.example.com", name, name)
+	}
 	if privateKey == "" {
 		if privateKey, err = matcha.GeneratePrivateKey(); err != nil {
 			return err
@@ -967,11 +990,7 @@ func addonEnv(had, standard map[string]string) map[string]string {
 	return env
 }
 
-var domainRe = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-
-func validDomain(d string) bool {
-	return len(d) <= 253 && domainRe.MatchString(d)
-}
+func validDomain(d string) bool { return protocol.ValidDomain(d) }
 
 func serverDomains(name string, args []string) error {
 	app, err := loadApp(name)

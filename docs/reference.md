@@ -5,13 +5,14 @@
 | Command | What it does |
 |---|---|
 | `chasen login` | Log in to the Chasen cloud, with a browser |
-| `chasen add server <domain>` | Use your own server instead, and log in to it |
+| `chasen add server <user>@<host>` | Use your own server, through SSH. A new machine gets `chasen-server` and its setup first |
+| `chasen add server <domain>` | Use your own server through its address on the web (`https://api.<domain>`), with a login in the browser |
 | `chasen servers` | List the servers you are logged in to. The star marks the current one |
 | `chasen use <server>` | Make another server the current one: a name from the list, or `cloud` |
 | `chasen logout` | Forget the login, here and on the server |
 | `chasen update` | Install the newest release of the CLI, after a check of its checksum. `chasen` tells you when there is one |
 | `chasen report` | Something is wrong with Chasen? Open a new issue on GitHub, with your version and your system filled in. It sends nothing by itself |
-| `chasen deploy` | Build the image of the current git commit, push it, and deploy it. Or deploy a static website. In a folder with an `image:` in `chasen.yml` and no `Dockerfile`: deploy the newest image, with no build. `--tag <tag>` deploys an image that is already in the registry. In the cloud: `--on <id>` or `--new[=type@location]` picks the server of a new app |
+| `chasen deploy` | Build the image of the current git commit, push it, and deploy it. Or deploy a static website. In a folder with an `image:` in `chasen.yml` and no `Dockerfile`: deploy the newest image, with no build. `--tag <tag>` deploys an image that is already in the registry. `--domain <domain>` gives a new app its domain. In the cloud: `--on <id>` or `--new[=type@location]` picks the server of a new app |
 | `chasen check` | Test the current git commit against the standard. Changes nothing live |
 | `chasen restart` | Start the app again with the env and secrets of `chasen.yml`, from the image it has |
 | `chasen secrets edit` | Change the secrets of the app in your editor. They stay in the repository, encrypted |
@@ -133,21 +134,34 @@ The screen has no color when `NO_COLOR` is set.
 You can be logged in to several servers and to the cloud at the same time.
 
 ```bash
-chasen add server example.com
-chasen add server example.org
-chasen servers                # the star marks where commands go
-chasen use example.com   # change it
+chasen add server root@203.0.113.5   # through SSH
+chasen add server example.org        # through its address on the web
+chasen servers                       # the star marks where commands go
+chasen use root@203.0.113.5          # change it
 ```
 
 An app can name its server in `chasen.yml`, so `chasen deploy` always goes to the right one:
 
 ```yaml
 name: shop
-server: example.com      # or: cloud
+server: root@203.0.113.5   # or a base domain like example.org, or: cloud
 ```
 
 - `chasen logout` makes the server forget the login.
 - In CI, set `CHASEN_URL` and `CHASEN_TOKEN` (the server token) instead.
+
+### The two ways to a server
+
+| | Through SSH | On the web |
+|---|---|---|
+| You type | `chasen add server root@203.0.113.5` | `chasen add server example.com` |
+| The server needs | SSH, as root or with `sudo` and no password | a base domain, a DNS record for `api.<domain>`, and a certificate, which it gets by itself |
+| The login | who can log in with SSH owns the server | the token of the server, typed in a browser |
+| Good for | your own computers. No DNS, no open port but SSH | CI with a token, and people with no SSH access |
+
+Both are the same API with the same commands. SSH is only the way in: the CLI runs `ssh`, which runs `chasen-server connect` on the server, and that joins the connection to the API. The CLI never runs other commands on your server. A server can have both ways at the same time.
+
+The SSH way uses the `ssh` program of your computer. A key with a password, an agent, another port (`chasen add server root@203.0.113.5:2222`), a jump host in `~/.ssh/config`, a private network: what works with `ssh` works here.
 
 ## Files on the server
 

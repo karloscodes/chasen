@@ -1,6 +1,11 @@
 # The server protocol
 
-`chasen` talks to `chasen-server` over HTTPS. The cloud answers the same protocol and passes each request on to the server of the app, so a client does not know which one it talks to.
+`chasen` talks to `chasen-server` over HTTP. The cloud answers the same protocol and passes each request on to the server of the app, so a client does not know which one it talks to.
+
+The requests reach the API of a server in one of two ways, and they are the same in both:
+
+- **On the web:** `https://api.<base domain>`, through the proxy of the server.
+- **Through SSH:** the client runs `ssh <server> chasen-server connect`. That command joins its input and its output to the API, so the client writes the same HTTP requests into `ssh` and reads the answers from it. Nothing else runs on the server. The login is `chasen-server login`, which makes a token for the client and prints it: who can run a command on the server as root owns it.
 
 The whole contract is in one Go file: [`protocol/protocol.go`](../protocol/protocol.go). The three programs import it. This document describes version 1 of it.
 

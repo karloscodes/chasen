@@ -46,10 +46,34 @@ func (s Settings) SecretKey() string {
 var (
 	appNameRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 	envKeyRe  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	domainRe  = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 	healthRe  = regexp.MustCompile(`^/[A-Za-z0-9._~/-]*$`)
 	// An image with its tag or digest: ghcr.io/you/app:3f9a2c1.
 	imageRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*(:[0-9]+)?(/[a-z0-9._/-]+)*[:@][A-Za-z0-9._:-]{1,128}$`)
 )
+
+// ValidDomain reports a host name that an app or a server can have.
+func ValidDomain(d string) bool { return len(d) <= 253 && domainRe.MatchString(d) }
+
+// AppDomains decides the domains of an app at a deploy. An app that runs
+// keeps the domains it has. A new app gets the domain that the deploy
+// brings, or <name>.<base domain of the server>. A server with no base
+// domain cannot make up a name, so there the first deploy must bring one.
+// note is a line for the user, or "".
+func AppDomains(name, base, sent string, has []string) (domains []string, note string, err error) {
+	switch {
+	case len(has) > 0:
+		if sent != "" && !slices.Contains(has, sent) {
+			note = fmt.Sprintf("The app keeps its domains (%s). To add %s, run: chasen domains add %s", strings.Join(has, ", "), sent, sent)
+		}
+		return has, note, nil
+	case sent != "":
+		return []string{sent}, "", nil
+	case base != "":
+		return []string{name + "." + base}, "", nil
+	}
+	return nil, "", fmt.Errorf("this server has no base domain, so it cannot name a new app. Give the app its domain: chasen deploy --domain %s.example.com", name)
+}
 
 // CheckAppName refuses a name that cannot be an app: it is a part of the
 // domain of the app and the name of its container.
@@ -105,6 +129,9 @@ func (s Settings) Check() error {
 	}
 	if s.Image != "" && !imageRe.MatchString(s.Image) {
 		problems = append(problems, fmt.Errorf("invalid image %q: use the form ghcr.io/you/app:tag, in lowercase", s.Image))
+	}
+	if s.Domain != "" && !ValidDomain(s.Domain) {
+		problems = append(problems, fmt.Errorf("invalid domain %q: use a name like shop.example.com, in lowercase, with no https://", s.Domain))
 	}
 	if s.Port < 0 || s.Port > 65535 {
 		problems = append(problems, fmt.Errorf("invalid port %d: use 1 to 65535", s.Port))

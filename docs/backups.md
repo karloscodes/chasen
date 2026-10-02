@@ -60,10 +60,10 @@ The data is yours. This is how you look at it on your computer, keep a copy of y
 
 When a server is gone, these steps bring everything back:
 
-1. Set up the new server with the same domain and the same bucket (`setup`, then `bucket`).
-2. Point the wildcard DNS record at the new server.
-3. Run `chasen add server <domain>` again: the new server has a new token.
-4. Run `chasen deploy` for each app, and `chasen enable` for each addon. When the server has no data for the app and the bucket has a copy, the deploy restores it first: the live replica, or the newest snapshot if the replica fails.
+1. Add the new server: `chasen add server root@<its address>`. With a base domain, run `chasen-server setup --domain <domain>` on it too.
+2. Give it the same bucket: `chasen-server bucket`, on the server.
+3. Point the DNS records of your apps at the new server.
+4. Run `chasen deploy --domain <domain of the app>` for each app, and `chasen enable` for each addon. When the server has no data for the app and the bucket has a copy, the deploy restores it first: the live replica, or the newest snapshot if the replica fails.
 5. Add the custom domains again (`chasen domains add`). They were on the old server.
 
 The new server makes a new secret key for each app, unless the deploy brings one: an app with `SECRET_KEY_BASE` in its `secrets:` gets its old key back. Without it, people log in again, and data that the app encrypted with the old key stays unreadable. See [the standard](../STANDARD.md#4-environment).

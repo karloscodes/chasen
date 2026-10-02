@@ -431,7 +431,11 @@ func TestEndToEnd(t *testing.T) {
 		out := must(app, bin, "add", "server", strings.TrimPrefix(address, "ssh://"))
 
 		if !strings.Contains(out, "Logged in to "+address) {
-			t.Errorf("add server = %q, want a login through SSH, with the token that the server gave", out)
+			t.Errorf("add server = %q, want a login through SSH, with a token that the server made for it", out)
+		}
+		saved, _ := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".config/chasen/credentials.json"))
+		if strings.Contains(string(saved), token) {
+			t.Error("the CLI has the token of the server itself: an SSH login must get a token of its own")
 		}
 		if out := must(app, bin, "list"); !strings.Contains(out, "example") {
 			t.Errorf("list through SSH = %q, want the app", out)
@@ -442,7 +446,8 @@ func TestEndToEnd(t *testing.T) {
 		if out := must(app, bin, "history"); !strings.Contains(out, "run sh -c echo through-ssh") {
 			t.Errorf("history = %q, want the run: a command through SSH is a command of the API", out)
 		}
-		// The tests after this one use the address on the web again.
+		// The tests after this one use the address on the web again, and they count the logins.
+		must(app, bin, "logout")
 		must(app, bin, "use", api)
 	})
 
@@ -506,10 +511,18 @@ func TestEndToEnd(t *testing.T) {
 		must(site, "git", "add", "-A")
 		must(site, "git", "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-qm", "site")
 
-		must(site, bin, "deploy")
+		// The first deploy brings the domain of the app: the app gets that one, and no name under the base domain.
+		must(site, bin, "deploy", "--domain", "www.site.localhost")
 
-		if got := get("site.localhost"); got != "<h1>hello site</h1>" {
-			t.Errorf("GET site.localhost = %q, want the index.html", got)
+		if got := get("www.site.localhost"); got != "<h1>hello site</h1>" {
+			t.Errorf("GET www.site.localhost = %q, want the index.html", got)
+		}
+		if out := must(site, bin, "domains"); out != "www.site.localhost\n" {
+			t.Errorf("domains = %q, want only the domain of the deploy", out)
+		}
+		// A later deploy with another domain does not move the app.
+		if out := must(site, bin, "deploy", "--domain", "other.localhost"); !strings.Contains(out, "chasen domains add other.localhost") {
+			t.Errorf("deploy with another domain = %q, want the app to keep its domain and a line that says how to add one", out)
 		}
 	})
 

@@ -1,37 +1,46 @@
 # Get started
 
-Chasen puts your app on one server that you own. `chasen` is the CLI on your computer. `chasen-server` is one binary on the server. This page takes you from an empty server to a live app.
+Chasen puts your app on one server that you own. `chasen` is the CLI on your computer, and it is all you run. This page takes you from an empty server to a live app.
 
 ## What you need
 
-- **A server** with Ubuntu or Debian, root access, and ports 80 and 443 open. A small one is enough to start. If its firewall lets in only the addresses of Cloudflare, that is fine, but then every name of the server must go through Cloudflare: turn the proxy on for the wildcard record too.
-- **A domain** for the apps of the server, with a wildcard DNS record: `*.example.com` points to the address of the server. Each app then gets `<app>.example.com`.
+- **A server** with Ubuntu or Debian that you can log in to with SSH, as root or as a user that runs `sudo` with no password. Ports 80 and 443 are open for your apps. A small server is enough to start.
+- **A domain for your app**, with a DNS record that points to the server: `shop.example.com`. The server itself needs no name.
 - **Docker on your computer.** `chasen deploy` builds the image of your app there.
 - **An image registry.** A repository on GitHub already has one, `ghcr.io`. Docker Hub and others work too.
 - **An app with a `Dockerfile`**, in a git repository. A plain website with an `index.html` needs no Dockerfile, no Docker, and no registry.
 
-## 1. Set up the server
+## 1. Install the CLI
 
-Run this on the server, as root:
+On your computer (macOS or Linux):
 
 ```bash
-curl -fsSL https://chasenhq.com/server | sh
-chasen-server setup --domain example.com
+curl -fsSL https://chasenhq.com/cli | sh
 ```
 
-The first line downloads one binary and checks its checksum. The second line installs Docker when it is missing, starts the proxy and the API, and prints the token of the server:
+## 2. Add the server
 
+```bash
+chasen add server root@203.0.113.5
+# chasen-server is not on this server yet. Installing it.
+# Setting up the server: Docker, the proxy, and the API. This can take a minute.
+# The server is ready. ...
+# Logged in to ssh://root@203.0.113.5
 ```
-On your machine, run:
-  chasen add server example.com
-Server token (the login page asks for it): 3f9a...
-```
 
-Keep the token. To see it again, run `chasen-server token` on the server.
+This one command makes the machine a Chasen server. It logs in with your `ssh`, the same way you do: your keys, your `~/.ssh/config`, and your known hosts apply. Then it:
 
-## 2. Add a backup bucket (optional)
+1. downloads `chasen-server`, one binary, and checks its checksum,
+2. installs Docker when the server has none, and starts the proxy and the API,
+3. gets a login for this computer.
 
-A server works without a bucket: the backups then stay on its disk, and a dead server takes them with it. Add a bucket when the data matters. Any S3-compatible store works: Cloudflare R2, Backblaze B2, Hetzner, or S3.
+From now on, every command of `chasen` goes to the server through SSH. So the server needs no name in DNS and no certificate of its own, and the only open ports are SSH and the ports 80 and 443 of your apps.
+
+On a second computer, run the same line: a server that is set up already only gives a login.
+
+## 3. Add a backup bucket (optional)
+
+A server works without a bucket: the backups then stay on its disk, and a dead server takes them with it. Add a bucket when the data matters. Any S3-compatible store works: Cloudflare R2, Backblaze B2, Hetzner, or S3. Run this on the server, as root:
 
 ```bash
 chasen-server bucket --endpoint https://<your-store> --name chasen-backups --access-key-id <id>
@@ -39,19 +48,6 @@ chasen-server bucket --endpoint https://<your-store> --name chasen-backups --acc
 ```
 
 The command creates the bucket when it does not exist, and tests it before it saves the settings.
-
-## 3. Install the CLI and log in
-
-On your computer (macOS or Linux):
-
-```bash
-curl -fsSL https://chasenhq.com/cli | sh
-chasen add server example.com
-# Open this page to log in:
-#   https://api.example.com/oauth/device?user_code=BCDF-GHJK
-```
-
-Open the page, check the code, and type the token of the server. The CLI then has a token of its own.
 
 ## 4. Log in to the registry
 
@@ -79,7 +75,7 @@ Your app also follows [the standard](../STANDARD.md): it listens on the port of 
 
 ```bash
 cd shop
-chasen deploy
+chasen deploy --domain shop.example.com
 # Building ghcr.io/you/shop:3f9a2c1d...
 # Pushing ghcr.io/you/shop:3f9a2c1d...
 # Pulling ghcr.io/you/shop:3f9a2c1d...
@@ -91,6 +87,8 @@ chasen deploy
 #   https://shop.example.com
 ```
 
+The first deploy of an app says its domain. After that the app has it, and the command is `chasen deploy`.
+
 `chasen deploy` builds the image of the current git commit, pushes it, and tells the server to pull it. The server backs up the databases, starts the new version next to the old one, and moves the traffic when `/up` answers. If the new version does not answer in 30 seconds, the old one keeps the traffic.
 
 To test an app before it gets traffic, run `chasen check`.
@@ -99,12 +97,38 @@ To test an app before it gets traffic, run `chasen check`.
 
 | You want | Command |
 |---|---|
-| Your own domain | `chasen domains add shop.com` |
+| One more domain for the app | `chasen domains add shop.com` |
 | See what runs | `chasen status`, `chasen logs`, `chasen history` |
-| Change a setting or a secret | Edit `chasen.yml`, then `chasen restart` |
+| Give the app a secret | `chasen secrets edit`, then `chasen restart` |
+| Change a setting | Edit `chasen.yml`, then `chasen restart` |
 | Go back to an older version | `chasen deploy --tag <the full hash of the older commit>` |
 | Restore the data | `chasen backups`, then `chasen restore` |
 | Deploy on every `git push` | [Deploy from GitHub Actions](github-actions.md) |
+
+## A base domain, and an address on the web (optional)
+
+Give the server a base domain when you want two more things:
+
+- **A name for each new app with no flag.** With the base domain `example.com` and a wildcard DNS record (`*.example.com` points to the server), a new app gets `<app>.example.com`.
+- **The API on the web**, at `https://api.example.com`. Then a computer needs no SSH access to the server: it logs in with a browser, and CI deploys with a token.
+
+Run this on the server, as root:
+
+```bash
+chasen-server setup --domain example.com
+```
+
+Then, on a computer:
+
+```bash
+chasen add server example.com
+# Open this page to log in:
+#   https://api.example.com/oauth/device?user_code=BCDF-GHJK
+```
+
+Open the page, check the code, and type the token of the server (`chasen-server token` prints it). The CLI then has a token of its own. The SSH way keeps working next to it.
+
+If the firewall of the server lets in only the addresses of Cloudflare, every name of the server must go through Cloudflare: turn the proxy on for the wildcard record too.
 
 ## Limits to know
 
