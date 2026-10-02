@@ -9,11 +9,25 @@ import (
 	"text/tabwriter"
 )
 
-// The database of the server. It holds everything that is the server's own:
-// its settings (the domain, the token, the bucket), the settings of each app,
-// the logins of `chasen login`, and the activity feed. The apps themselves
-// stay in apps.yml, the file that the matcha engine reads.
+// The database of the server. It holds all the state of the server: its
+// settings (the domain, the token, the bucket), the apps, the settings that
+// the client sent for each app, the logins of `chasen login`, and the
+// activity feed. The server has no config file.
 const serverSchema = `
+CREATE TABLE IF NOT EXISTS apps (
+	name           TEXT PRIMARY KEY,
+	image          TEXT NOT NULL,
+	domain         TEXT NOT NULL,
+	port           INTEGER NOT NULL,
+	health_path    TEXT NOT NULL,
+	health_timeout INTEGER NOT NULL,
+	volumes        TEXT NOT NULL,
+	env            TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS imported_files (
+	file     TEXT PRIMARY KEY,
+	modified TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
 	name  TEXT PRIMARY KEY,
 	value TEXT NOT NULL
@@ -50,6 +64,10 @@ func openServerDB() (*sql.DB, error) {
 	// the secrets of the apps, the logins, and the output of deploys.
 	os.Chmod(path, 0600)
 	if _, err := db.Exec("PRAGMA journal_mode = WAL;" + serverSchema); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := importApps(db); err != nil {
 		db.Close()
 		return nil, err
 	}

@@ -247,7 +247,7 @@ func backupAll() error {
 	if err != nil {
 		return err
 	}
-	apps, err := matcha.ListAppsFrom(appsPath())
+	apps, err := listApps()
 	if err != nil {
 		return err
 	}
@@ -435,13 +435,13 @@ func serverRestore(name, source string) error {
 		return err
 	}
 
-	m := engine(name, app)
+	m := engine(name)
 	if err := pauseReplica(); err != nil {
 		return err
 	}
 	m.StopApp()
 	aside, swapErr := swap(name, staged)
-	if err := m.Deploy(); err != nil {
+	if err := m.DeployApp(app); err != nil {
 		return fmt.Errorf("the app did not start after the restore: %w", err)
 	}
 	if swapErr != nil {

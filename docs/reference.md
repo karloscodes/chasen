@@ -152,13 +152,15 @@ server: example.com      # or: cloud
 ```
 /usr/local/bin/chasen-server         the binary; the API container runs it
 /usr/local/bin/chasen-server.previous  the binary before the last update
-/etc/chasen/server.sqlite3           the database of the server: its settings (domain, token, bucket),
-                                     the env and secrets of each app, the logins, and the activity feed
-/etc/chasen/apps.yml                 the apps (matcha format)
+/etc/chasen/server.sqlite3           the database of the server, and all its state: its settings (domain,
+                                     token, bucket), the apps, the env and secrets of each app, the
+                                     logins, and the activity feed
 /var/matcha/<app>/storage/           the storage of the app, /storage in the container
 /var/matcha/<app>/backups/<time>/    snapshots
 /var/matcha/proxy/                   certificates
 ```
+
+The server has no config file: the database is all of it. An older version kept the apps in `/etc/chasen/apps.yml`. A server that has that file copies it into the database after the update, one time. The file stays, so an update that fails can go back to the older version. After that you can delete it.
 
 `docker logs chasen-server` shows the API, the hourly backups, and the live replica.
 

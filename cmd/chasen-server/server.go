@@ -44,7 +44,7 @@ type serverConfig struct {
 // CHASEN_ROOT moves all server state under one directory. Tests use it.
 func root() string            { return os.Getenv("CHASEN_ROOT") }
 func configPath() string      { return root() + "/etc/chasen/config.yml" }
-func appsPath() string        { return root() + "/etc/chasen/apps.yml" }
+func appsPath() string        { return root() + "/etc/chasen/apps.yml" } // a server from before: importApps
 func envPath(n string) string { return root() + "/etc/chasen/env/" + n + ".json" }
 func appDir(n string) string  { return root() + "/var/matcha/" + n }
 func dataDir(n string) string { return appDir(n) + "/storage" }
@@ -131,11 +131,10 @@ func runServer(args []string) error {
 	case "run":
 		return serverRun(name, args)
 	case "logs":
-		app, err := loadApp(name)
-		if err != nil {
+		if _, err := loadApp(name); err != nil {
 			return err
 		}
-		return engine(name, app).Logs()
+		return engine(name).Logs()
 	case "backup":
 		cfg, err := loadServerConfig()
 		if err != nil {
@@ -404,20 +403,12 @@ func serverBucket(args []string) error {
 	return err
 }
 
-func loadApp(name string) (matcha.AppConfig, error) {
-	app, err := matcha.LoadAppFrom(appsPath(), name)
-	if err != nil {
-		return app, fmt.Errorf("app %q is not deployed", name)
-	}
-	return app, nil
-}
-
 // engine returns the matcha deployer for an app. Chasen keeps its apps in its
-// own file, so the nightly `matcha update-all` does not touch them. The proxy
-// and the network are the same as matcha uses.
-func engine(name string, app matcha.AppConfig) *matcha.Matcha {
-	return matcha.NewFromApp(name, app, matcha.Config{
-		ConfigPath:  appsPath(),
+// own database, so the nightly `matcha update-all` does not touch them. The
+// proxy and the network are the same as matcha uses.
+func engine(name string) *matcha.Matcha {
+	return matcha.New(matcha.Config{
+		Name:        name,
 		DataDirBase: root() + "/var/matcha",
 		SkipPull:    true, // chasen pulls the image itself, with the login of the deploy
 	})
@@ -704,7 +695,7 @@ func serverDeploy(name, version string) error {
 		}
 	}
 
-	old, oldErr := matcha.LoadAppFrom(appsPath(), name)
+	old, oldErr := loadApp(name)
 	domains := []string{name + "." + cfg.Domain}
 	privateKey := old.Env["PRIVATE_KEY"]
 	if oldErr == nil {
@@ -800,15 +791,15 @@ func serverRestart(name string) error {
 // apply saves the app and deploys it. When the deploy fails, the previous
 // container keeps the traffic and apply puts the previous record back.
 func apply(name string, app matcha.AppConfig) error {
-	old, oldErr := matcha.LoadAppFrom(appsPath(), name)
-	if err := matcha.SaveAppTo(appsPath(), name, app); err != nil {
+	old, oldErr := loadApp(name)
+	if err := saveApp(name, app); err != nil {
 		return err
 	}
-	if err := engine(name, app).Deploy(); err != nil {
+	if err := engine(name).DeployApp(app); err != nil {
 		if oldErr == nil {
-			matcha.SaveAppTo(appsPath(), name, old)
+			saveApp(name, old)
 		} else {
-			matcha.RemoveAppFrom(appsPath(), name)
+			forgetApp(name)
 		}
 		return fmt.Errorf("%w\nThe app must listen on port %d and answer 200 on %s", err, app.Port, app.HealthPath)
 	}
@@ -926,7 +917,7 @@ func serverEnable(name string, args []string) error {
 		return err
 	}
 
-	old, oldErr := matcha.LoadAppFrom(appsPath(), name)
+	old, oldErr := loadApp(name)
 	if oldErr == nil && isBuilt(name, old.Image) {
 		return fmt.Errorf("an app named %s runs on this server. Remove it first, or keep it", name)
 	}
@@ -1084,7 +1075,7 @@ func serverStatus(name string) error {
 }
 
 func serverList() error {
-	apps, err := matcha.ListAppsFrom(appsPath())
+	apps, err := listApps()
 	if err != nil {
 		return err
 	}
@@ -1098,16 +1089,15 @@ func serverList() error {
 }
 
 func serverRemove(name string) error {
-	app, err := loadApp(name)
-	if err != nil {
+	if _, err := loadApp(name); err != nil {
 		return err
 	}
-	m := engine(name, app)
+	m := engine(name)
 	if err := m.RemoveFromProxy(); err != nil {
 		fmt.Printf("Warning: %v\n", err)
 	}
 	m.StopApp()
-	if err := matcha.RemoveAppFrom(appsPath(), name); err != nil {
+	if err := forgetApp(name); err != nil {
 		return err
 	}
 	forgetSettings(name)

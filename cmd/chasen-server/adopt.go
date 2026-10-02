@@ -15,7 +15,7 @@ import (
 //
 // Chasen is built on matcha: the same proxy, the same names of containers,
 // the same directories for the data. So an app does not move at all. Only its
-// record moves, from the file of matcha to the file of Chasen. The container
+// record moves, from the file of matcha to the database of Chasen. The container
 // keeps running, with its env, its domains, and its databases, and no
 // visitor notices. After that the commands of Chasen work on the app, and
 // matcha does not know it any more.
@@ -43,20 +43,26 @@ func serverAdopt(args []string) error {
 		return err
 	}
 
-	// The record moves from one file to the other.
-	source, target, owner := *from, appsPath(), "matcha"
+	// The record moves from the file of matcha to the database of Chasen, or back.
+	var app matcha.AppConfig
+	var err error
 	if *undo {
-		source, target, owner = appsPath(), *from, "Chasen"
-	}
-	app, err := matcha.LoadAppFrom(source, name)
-	if err != nil {
-		return fmt.Errorf("%s has no app %q in %s", owner, name, source)
-	}
-	if _, err := matcha.LoadAppFrom(target, name); err == nil {
-		return fmt.Errorf("%s has the app %q already: %s. Nothing changed", map[bool]string{false: "Chasen", true: "matcha"}[*undo], name, target)
-	}
-	if *undo && isBuilt(name, app.Image) {
-		return fmt.Errorf("%s runs an image that Chasen made for it (%s). matcha cannot get that image again, so the app stays", name, app.Image)
+		if app, err = loadApp(name); err != nil {
+			return fmt.Errorf("Chasen has no app %q", name)
+		}
+		if _, err := matcha.LoadAppFrom(*from, name); err == nil {
+			return fmt.Errorf("matcha has the app %q already: %s. Nothing changed", name, *from)
+		}
+		if isBuilt(name, app.Image) {
+			return fmt.Errorf("%s runs an image that Chasen made for it (%s). matcha cannot get that image again, so the app stays", name, app.Image)
+		}
+	} else {
+		if app, err = matcha.LoadAppFrom(*from, name); err != nil {
+			return fmt.Errorf("matcha has no app %q in %s", name, *from)
+		}
+		if _, err := loadApp(name); err == nil {
+			return fmt.Errorf("Chasen has the app %q already. Nothing changed", name)
+		}
 	}
 	if _, err := activeContainer(name); err != nil {
 		return fmt.Errorf("%s does not run now. Start it first, so the record matches what runs: nothing changed", name)
@@ -69,13 +75,23 @@ func serverAdopt(args []string) error {
 			return err
 		}
 	}
-	if err := matcha.SaveAppTo(target, name, app); err != nil {
-		return err
-	}
-	if err := matcha.RemoveAppFrom(source, name); err != nil {
-		// The app is in both files now. Take it out of the new one: one owner.
-		matcha.RemoveAppFrom(target, name)
-		return fmt.Errorf("cannot take %s out of %s, so nothing changed: %w", name, source, err)
+	if *undo {
+		if err := matcha.SaveAppTo(*from, name, app); err != nil {
+			return err
+		}
+		if err := forgetApp(name); err != nil {
+			// The app is in both places now. Take it out of the new one: one owner.
+			matcha.RemoveAppFrom(*from, name)
+			return fmt.Errorf("cannot take %s out of Chasen, so nothing changed: %w", name, err)
+		}
+	} else {
+		if err := saveApp(name, app); err != nil {
+			return err
+		}
+		if err := matcha.RemoveAppFrom(*from, name); err != nil {
+			forgetApp(name)
+			return fmt.Errorf("cannot take %s out of %s, so nothing changed: %w", name, *from, err)
+		}
 	}
 	if *undo {
 		forgetSettings(name)

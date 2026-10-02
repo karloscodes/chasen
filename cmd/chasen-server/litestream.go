@@ -15,7 +15,6 @@ import (
 
 	"github.com/benbjohnson/litestream"
 	lss3 "github.com/benbjohnson/litestream/s3"
-	"github.com/karloscodes/matcha"
 )
 
 // The live replica. Litestream is inside this binary. `chasen-server replicate`
@@ -103,7 +102,7 @@ func serverReplicate() error {
 	for {
 		current := map[string]os.FileInfo{}
 		clients := map[string]*lss3.ReplicaClient{}
-		apps, err := matcha.ListAppsFrom(appsPath())
+		apps, err := listApps()
 		if err != nil {
 			slog.Error("cannot read the apps", "error", err)
 		}
