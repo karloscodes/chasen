@@ -44,9 +44,9 @@ Run `chasen` with no command, in a terminal, to open the screen of your apps. It
 
 | Key | What it does |
 |---|---|
-| up, down (or `k`, `j`) | The next app, the next row, or the next lines |
-| left, right (or `h`, `l`) | The next tab. `1` to `5` go to a tab |
-| tab | Go from the apps to the tab, and back |
+| left, right (or `h`, `l`) | Go to a side: the apps on the left, or the tab on the right |
+| up, down (or `k`, `j`) | Move in the side you are on: the next app, the next row, or the next lines |
+| tab, shift+tab | The next tab, the tab before. `1` to `5` go to a tab |
 | enter | Open the row: the output of a history entry, or the restore of a backup |
 | `d` | Deploy the app of the current directory |
 | `r` | Restart the app, from the same image |

@@ -208,19 +208,19 @@ func (t *tui) keys() [][2]string {
 	case len(t.apps) == 0:
 		return [][2]string{{"d", "deploy this directory"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
 	case !t.inPane:
-		return [][2]string{{"↑↓", "app"}, {"←→", "tab"}, {"enter", "go in"}, {"d", "deploy"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"?", "keys"}, {"q", "close"}}
+		return [][2]string{{"↑↓", "app"}, {"→", "its " + tabNames[t.tab]}, {"tab", "next tab"}, {"d", "deploy"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"?", "keys"}, {"q", "close"}}
 	}
 	switch t.tab {
 	case tabHistory:
-		return [][2]string{{"↑↓", "entry"}, {"enter", "its output"}, {"←→", "tab"}, {"esc", "apps"}, {"?", "keys"}}
+		return [][2]string{{"↑↓", "entry"}, {"enter", "its output"}, {"←", "apps"}, {"tab", "next tab"}, {"?", "keys"}}
 	case tabBackups:
-		return [][2]string{{"↑↓", "backup"}, {"enter", "restore"}, {"b", "back up now"}, {"←→", "tab"}, {"esc", "apps"}}
+		return [][2]string{{"↑↓", "backup"}, {"enter", "restore"}, {"b", "back up now"}, {"←", "apps"}, {"tab", "next tab"}}
 	case tabDomains:
-		return [][2]string{{"↑↓", "domain"}, {"a", "add"}, {"x", "remove"}, {"←→", "tab"}, {"esc", "apps"}}
+		return [][2]string{{"↑↓", "domain"}, {"a", "add"}, {"x", "remove"}, {"←", "apps"}, {"tab", "next tab"}}
 	case tabLogs:
-		return [][2]string{{"↑↓", "scroll"}, {"end", "follow"}, {"←→", "tab"}, {"esc", "apps"}}
+		return [][2]string{{"↑↓", "scroll"}, {"end", "follow"}, {"←", "apps"}, {"tab", "next tab"}}
 	}
-	return [][2]string{{"↑↓", "scroll"}, {"←→", "tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"esc", "apps"}}
+	return [][2]string{{"↑↓", "scroll"}, {"←", "apps"}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}}
 }
 
 func (t *tui) lastLine(width int) string {
@@ -332,7 +332,12 @@ func (t *tui) appLine(i, width int) string {
 		dot.text = "○ "
 	}
 	if i == t.selected {
-		return spread(width, []cell{{" ▸ ", colorAccent}, dot, {app.Name, colorBold}}, nil)
+		// The marker has the accent on the side that has the keys.
+		marker := colorAccent
+		if t.inPane {
+			marker = colorDim
+		}
+		return spread(width, []cell{{" ▸ ", marker}, dot, {app.Name, colorBold}}, nil)
 	}
 	return spread(width, []cell{{"   ", ""}, dot, {app.Name, ""}}, nil)
 }

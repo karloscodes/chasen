@@ -158,20 +158,45 @@ func TestScreen(t *testing.T) {
 		sc.press("up", "up")
 		sc.shows("▸ ● blog", "not running", "none yet", "off: the backups stay on the server")
 
-		sc.press("down", "down", "right", "right")
+		sc.press("down", "down", "3")
 		sc.shows("▸ ● shop", "Oct 1 11:00 UTC · 3 h ago", "server + offsite", "live replica")
 
-		sc.press("right")
+		sc.press("tab")
 		sc.shows("shop.example.com", "shop.com")
 
-		sc.press("right")
+		sc.press("tab")
 		sc.shows("GET /up 200")
+
+		sc.press("shift+tab", "shift+tab")
+		sc.shows("live replica")
+	})
+
+	t.Run("left and right go to a side, and up and down stay in it", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+
+		// On the left, down and up change the app.
+		sc.press("up")
+		sc.shows("▸ ● lognorth")
+
+		// On the right, they move in the rows, and the app stays.
+		sc.press("down", "2", "down")
+		if sc.tui.app() != "shop" || sc.tui.cursor != 1 {
+			t.Errorf("the app is %s and the row is %d, want shop and row 1", sc.tui.app(), sc.tui.cursor)
+		}
+		sc.press("right", "up")
+		if sc.tui.app() != "shop" || sc.tui.cursor != 0 {
+			t.Errorf("after right and up: the app is %s and the row is %d, want shop and row 0", sc.tui.app(), sc.tui.cursor)
+		}
+
+		// Back on the left, the same keys change the app again.
+		sc.press("left", "up")
+		sc.shows("▸ ● lognorth")
 	})
 
 	t.Run("enter on a history entry shows its output, without its escape codes", func(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 
-		sc.press("2", "tab", "enter")
+		sc.press("2", "enter")
 
 		sc.shows("history shop 5", "The app did not answer /up")
 		if strings.Contains(sc.tui.view(), "\x1b[2J") {
@@ -206,7 +231,7 @@ func TestScreen(t *testing.T) {
 
 		sc.press("r", "y")
 		sc.shows("restart shop", "✓ done")
-		sc.press("esc", "3", "tab", "down", "enter")
+		sc.press("esc", "3", "down", "enter")
 		sc.shows("Restore shop to the backup of Oct 1 10:00 UTC")
 		sc.press("y")
 
@@ -221,7 +246,7 @@ func TestScreen(t *testing.T) {
 
 		sc.press("4", "a", "s", "h", "o", "p", "x", "backspace", ".", "o", "r", "g")
 		sc.shows("Add a domain to shop: shop.org")
-		sc.press("enter", "esc", "tab", "down", "x", "y")
+		sc.press("enter", "esc", "down", "x", "y")
 
 		if !s.got("domains shop add shop.org") || !s.got("domains shop rm shop.com") {
 			t.Errorf("the server got %v", s.commands)
@@ -277,7 +302,7 @@ func TestScreen(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 		for _, size := range [][2]int{{60, 12}, {72, 20}, {100, 30}, {200, 60}} {
 			sc.tui.width, sc.tui.height = size[0], size[1]
-			for _, keys := range [][]string{{"1"}, {"2", "tab"}, {"3"}, {"4"}, {"5"}, {"?"}, {"esc", "b"}, {"esc", "r"}, {"n"}} {
+			for _, keys := range [][]string{{"1"}, {"2"}, {"3"}, {"4"}, {"5"}, {"?"}, {"esc", "b"}, {"esc", "r"}, {"n"}} {
 				sc.press(keys...)
 				lines := strings.Split(strings.TrimSuffix(strings.TrimPrefix(sc.text(), "\x1b[H"), "\x1b[J"), "\r\n")
 				if len(lines) > size[1] {
@@ -297,6 +322,9 @@ func TestDecodeKeys(t *testing.T) {
 	got := decodeKeys([]byte("j\x1b[A\x1b[6~\r\x7f\x1b[1;5Cq\x1b"))
 
 	want := []string{"j", "up", "pgdn", "enter", "backspace", "q", "esc"}
+	if keys := decodeKeys([]byte("\x1b[Z\t")); !slices.Equal(keys, []string{"shift+tab", "tab"}) {
+		t.Errorf("decodeKeys of shift+tab and tab = %q", keys)
+	}
 	if !slices.Equal(got, want) {
 		t.Errorf("decodeKeys = %q, want %q", got, want)
 	}

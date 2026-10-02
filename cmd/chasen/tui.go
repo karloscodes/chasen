@@ -534,16 +534,18 @@ func (t *tui) key(key string) bool {
 		t.message = "Loaded again."
 	case "s":
 		t.chooseServer()
-	case "left", "h":
-		t.setTab(t.tab - 1)
+	// The screen has two sides. Left and right go to a side, up and down move
+	// in it. The tabs have their own keys.
+	case "left", "h", "esc":
+		t.inPane = false
 	case "right", "l":
+		t.inPane = len(t.apps) > 0
+	case "tab":
 		t.setTab(t.tab + 1)
+	case "shift+tab":
+		t.setTab(t.tab - 1)
 	case "1", "2", "3", "4", "5":
 		t.setTab(int(key[0] - '1'))
-	case "tab":
-		t.inPane = !t.inPane && len(t.apps) > 0
-	case "esc":
-		t.inPane = false
 	case "up", "k":
 		t.move(-1)
 	case "down", "j":
@@ -596,6 +598,8 @@ func (t *tui) key(key string) bool {
 func (t *tui) setTab(tab int) {
 	t.tab = (tab + len(tabNames)) % len(tabNames)
 	t.cursor, t.scroll = 0, 0
+	// Who picks a tab wants to be in it.
+	t.inPane = len(t.apps) > 0
 	t.show()
 }
 
@@ -774,11 +778,10 @@ func (t *tui) overlayKey(o *overlay, key string) {
 
 var helpLines = strings.Split(strings.TrimSpace(`
 Move
-  up, down (k, j)     the next app, the next row, or the next lines
-  left, right (h, l)  the next tab. 1 to 5 go to a tab
-  tab                 go from the apps to the tab, and back
+  left, right (h, l)  go to the apps on the left, or to the tab on the right
+  up, down (k, j)     move in the side you are on: the next app, the next row, or the next lines
+  tab, shift+tab      the next tab, the tab before. 1 to 5 go to a tab
   enter               open the row: the output of a history entry, or the restore of a backup
-  esc                 go back
 
 Change the app
   d    deploy the app of this directory
@@ -808,6 +811,7 @@ func decodeKeys(input []byte) []string {
 		"\x1bOA": "up", "\x1bOB": "down", "\x1bOC": "right", "\x1bOD": "left",
 		"\x1b[5~": "pgup", "\x1b[6~": "pgdn", "\x1b[H": "home", "\x1b[F": "end",
 		"\x1b[1~": "home", "\x1b[4~": "end", "\x1bOH": "home", "\x1bOF": "end",
+		"\x1b[Z": "shift+tab",
 	}
 	var keys []string
 	for len(input) > 0 {
