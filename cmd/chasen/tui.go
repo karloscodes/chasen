@@ -96,6 +96,17 @@ type prompt struct {
 	cancel func()
 }
 
+// hits is where the things that the mouse can choose are on the screen, in
+// the lines and columns of the terminal, from 1. The drawing fills it in.
+type hits struct {
+	left     int      // the width of the side of the apps
+	appTop   int      // the line of the first app that shows
+	appFirst int      // which app that is
+	tabs     [][2]int // the first and the last column of each tab name
+	rowTop   int      // the line of the first row of the tab
+	rowFirst int      // which row that is
+}
+
 type tui struct {
 	run     runner
 	server  string // the name of the server, for the first line
@@ -119,6 +130,7 @@ type tui struct {
 	logsFollow    bool
 	overlay       *overlay
 	prompt        *prompt
+	hit           hits              // where the last drawing put the things that a click can choose
 	filter        string            // what / narrows the rows or the logs of the tab to
 	watching      map[string]string // the id of the history entry that runs now, by app
 	openURL       func(page string) error
@@ -346,7 +358,7 @@ func (t *tui) running(app string) (id, action string) {
 // commandLine is the line of the CLI that does what the screen does with
 // these arguments of the protocol. It works from any directory.
 func commandLine(args ...string) string {
-	if len(args) < 2 {
+	if len(args) < 2 || args[0] == "enable" {
 		return "chasen " + strings.Join(args, " ")
 	}
 	return "chasen -a " + args[1] + " " + args[0] + strings.TrimRight(" "+strings.Join(args[2:], " "), " ")
@@ -637,6 +649,13 @@ func (t *tui) key(key string) bool {
 		t.promptKey(p, key)
 		return true
 	}
+	if rest, ok := strings.CutPrefix(key, "mouse:"); ok {
+		var button, x, y int
+		if _, err := fmt.Sscanf(rest, "%d:%d:%d", &button, &x, &y); err == nil {
+			t.mouse(button, x, y)
+		}
+		return true
+	}
 	if o := t.overlay; o != nil {
 		t.overlayKey(o, key)
 		return true
@@ -666,6 +685,8 @@ func (t *tui) key(key string) bool {
 		t.inPane = false
 	case "/":
 		t.startFilter()
+	case ":":
+		t.prompt = &prompt{label: ":", text: true, done: t.runLine}
 	case "right", "l":
 		t.inPane = len(t.apps) > 0
 	case "tab":
@@ -793,6 +814,96 @@ func (t *tui) open() {
 		t.confirm("Restore "+app+" to "+what+"? The databases of now move aside.", func() {
 			t.act("restore", app, first)
 		})
+	}
+}
+
+// The commands that the : line runs with no question: they change nothing.
+var harmless = []string{"list", "load", "status", "history", "backups", "logs", "backup"}
+
+// runLine runs what the user typed after the colon: a command of the CLI,
+// for the chosen app. ":restore live" is `chasen -a shop restore live`.
+func (t *tui) runLine(line string) {
+	words := strings.Fields(line)
+	if len(words) > 1 && words[0] == "chasen" {
+		words = words[1:] // someone typed "chasen restore live"
+	}
+	if len(words) == 0 {
+		return
+	}
+	command := words[0]
+	switch {
+	case !slices.Contains(protocol.Commands, command):
+		t.message = "chasen has no command " + command + ". The commands: " + strings.Join(protocol.Commands, ", ")
+		return
+	case command == "deploy" || command == "check":
+		t.message = "A " + command + " needs the directory of the app. Run there: chasen " + command
+		return
+	}
+	args := []string{command}
+	switch {
+	case command == "list" || command == "load" || command == "enable":
+		args = append(args, words[1:]...) // these have no app
+	case t.app() == "":
+		t.message = "No app is chosen."
+		return
+	default:
+		args = append(append(args, t.app()), words[1:]...)
+	}
+	if slices.Contains(harmless, command) || (command == "domains" && len(words) == 1) {
+		t.act(args...)
+		return
+	}
+	t.confirm("Run "+commandLine(args...)+"?", func() { t.act(args...) })
+}
+
+// mouse acts on a click or on the wheel. A click chooses what is under it:
+// an app, a tab, or a row. A click on the chosen row opens it, like enter.
+// The wheel moves in the side that it is over.
+func (t *tui) mouse(button, x, y int) {
+	const left, wheelUp, wheelDown = 0, 64, 65
+	if t.prompt != nil {
+		return
+	}
+	if o := t.overlay; o != nil {
+		switch {
+		case button == wheelUp:
+			t.overlayKey(o, "up")
+		case button == wheelDown:
+			t.overlayKey(o, "down")
+		case button == left && o.pick != nil && y >= 5 && y-5 < len(o.choices):
+			t.overlay = nil
+			o.pick(y - 5)
+		}
+		return
+	}
+	onApps := x <= t.hit.left
+	switch button {
+	case wheelUp, wheelDown:
+		by := map[bool]int{true: 1, false: 3}[onApps]
+		if button == wheelUp {
+			by = -by
+		}
+		t.inPane = !onApps && len(t.apps) > 0
+		t.move(by)
+	case left:
+		for tab, columns := range t.hit.tabs {
+			if y == 3 && x >= columns[0] && x <= columns[1] {
+				t.setTab(tab)
+				return
+			}
+		}
+		if app := t.hit.appFirst + y - t.hit.appTop; onApps && y >= t.hit.appTop && app < len(t.apps) {
+			t.inPane = false
+			t.move(app - t.selected)
+			return
+		}
+		if row := t.hit.rowFirst + y - t.hit.rowTop; !onApps && t.hit.rowTop > 0 && y >= t.hit.rowTop && row < len(t.rows()) {
+			again := t.inPane && row == t.cursor
+			t.inPane, t.cursor = true, row
+			if again {
+				t.open()
+			}
+		}
 	}
 }
 
@@ -942,6 +1053,9 @@ Move
   tab, shift+tab      the next tab, the tab before. 1 to 5 go to a tab
   enter               open the row: the output of a history entry, or the restore of a backup
   /                   narrow the rows, or the logs, to what you type. esc takes it away
+  :                   run a command of the CLI for the chosen app, like :restore live
+  the mouse           a click chooses an app, a tab, or a row. A click on the chosen row
+                      opens it. The wheel scrolls. Hold shift to select text
 
 Change the app
   r    restart the app, from the same image
@@ -989,6 +1103,18 @@ func decodeKeys(input []byte) []string {
 			}
 			if found {
 				continue
+			}
+			// A click or the wheel: ESC [ < button ; column ; line, then M for
+			// a press and m for a release. Only the press counts.
+			if rest, ok := strings.CutPrefix(string(input), "\x1b[<"); ok {
+				if end := strings.IndexAny(rest, "Mm"); end >= 0 {
+					var button, x, y int
+					if _, err := fmt.Sscanf(rest[:end], "%d;%d;%d", &button, &x, &y); err == nil && rest[end] == 'M' {
+						keys = append(keys, fmt.Sprintf("mouse:%d:%d:%d", button, x, y))
+					}
+					input = input[len("\x1b[<")+end+1:]
+					continue
+				}
 			}
 			// An escape sequence this screen does not use: skip all of it.
 			end := 2
@@ -1054,9 +1180,10 @@ func runScreen(t *tui) error {
 	}
 	// The other screen of the terminal, with no cursor. On the way out, the
 	// terminal is as it was.
-	fmt.Print("\x1b[?1049h\x1b[?25l")
+	// The terminal also reports the clicks and the wheel of the mouse.
+	fmt.Print("\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h")
 	defer func() {
-		fmt.Print("\x1b[?25h\x1b[?1049l")
+		fmt.Print("\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l")
 		term.Restore(fd, before)
 	}()
 

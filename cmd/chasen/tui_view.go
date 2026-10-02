@@ -212,7 +212,7 @@ func (t *tui) keys() [][2]string {
 	case len(t.apps) == 0:
 		return [][2]string{{"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
 	case !t.inPane:
-		keys := [][2]string{{"↑↓", "app"}, {"→", "its " + tabNames[t.tab]}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}}
+		keys := [][2]string{{"↑↓", "app"}, {"→", "its " + tabNames[t.tab]}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {":", "command"}}
 		// With more than one login, the way to the other servers is in view.
 		if len(t.servers) > 1 {
 			keys = append(keys, [2]string{"s", "servers"})
@@ -304,6 +304,14 @@ func (t *tui) columns(width, height int) []string {
 	start, end := window(len(t.apps), height-2, t.selected)
 	for i := start; i < end; i++ {
 		leftLines = append(leftLines, t.appLine(i, left))
+	}
+	// For the mouse: the body starts at line 3, the apps two lines lower, and
+	// the tab starts after the side of the apps and the line between them.
+	t.hit = hits{left: left, appTop: 5, appFirst: start}
+	column := left + 4
+	for _, name := range tabNames {
+		t.hit.tabs = append(t.hit.tabs, [2]int{column, column + utf8.RuneCountInString(name) - 1})
+		column += utf8.RuneCountInString(name) + 3
 	}
 
 	// The corner under the apps: the server, and the whisk.
@@ -528,6 +536,7 @@ func (t *tui) rowLines(width, height int, cells func(row string) []cell) []strin
 	}
 	rows := t.rows()
 	start, end := window(len(rows), height, t.cursor)
+	t.hit.rowTop, t.hit.rowFirst = 5+len(lines), start
 	for i := start; i < end; i++ {
 		if i == t.cursor && t.inPane {
 			// One color for the whole chosen row.

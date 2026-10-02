@@ -50,6 +50,8 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 | up, down (or `k`, `j`) | Move in the side you are on: the next app, the next row, or the next lines |
 | tab, shift+tab | The next tab, the tab before. `1` to `5` go to a tab |
 | enter | Open the row: the output of a history entry, or the restore of a backup |
+| `:` | Run a command of the CLI for the chosen app: `:restore live`, `:domains add shop.com`, `:remove`. A command that changes something asks first |
+| the mouse | A click chooses an app, a tab, or a row. A click on the chosen row opens it. The wheel scrolls. Hold shift to select text |
 | `/` | Narrow the rows, or the logs, to what you type. The logs keep coming, and only the lines with the text show. Esc takes the filter away |
 | `r` | Restart the app, from the same image |
 | `b` | Back up the app now |

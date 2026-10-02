@@ -389,6 +389,69 @@ func TestScreen(t *testing.T) {
 		}
 	})
 
+	t.Run("a click chooses an app, a tab, and a row, and a second click on the row opens it", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+		sc.text() // the drawing says where things are
+
+		// The first app of the list is in line 5.
+		sc.press("mouse:0:6:5")
+		sc.shows("▸ ● blog")
+		sc.press("mouse:0:6:7")
+		sc.shows("▸ ● shop")
+
+		// The name of the second tab starts at column 37, in line 3.
+		sc.press("mouse:0:38:3")
+		sc.shows("WHEN (UTC)")
+		sc.text()
+		sc.press("mouse:0:40:7")
+		if sc.tui.cursor != 1 || sc.tui.overlay != nil {
+			t.Fatalf("after one click on the second row: row %d, overlay %v", sc.tui.cursor, sc.tui.overlay != nil)
+		}
+		sc.press("mouse:0:40:7")
+		sc.shows("history shop 4")
+
+		// The wheel over the apps goes to the next app.
+		sc.press("esc", "mouse:64:6:6")
+		sc.shows("▸ ● lognorth")
+	})
+
+	t.Run(": runs a command of the CLI for the chosen app, and asks first when it changes something", func(t *testing.T) {
+		s := newTestServer(t)
+		sc := openScreen(t, s, "shop")
+		typed := func(line string) {
+			sc.press(":")
+			for _, r := range line {
+				sc.press(string(r))
+			}
+			sc.press("enter")
+		}
+
+		typed("backups")
+		sc.shows("$ chasen -a shop backups", "server + offsite")
+
+		sc.press("esc")
+		typed("restore live")
+		sc.shows("Run chasen -a shop restore live?")
+		if s.got("restore shop live") {
+			t.Fatal("the command ran before the answer")
+		}
+		sc.press("y")
+		if !s.got("restore shop live") {
+			t.Errorf("the server got %v", s.commands)
+		}
+
+		sc.press("esc")
+		typed("deploy")
+		sc.shows("A deploy needs the directory of the app")
+		typed("rm -rf")
+		sc.shows("chasen has no command rm")
+		for _, command := range s.commands {
+			if strings.HasPrefix(command, "deploy") || strings.HasPrefix(command, "rm") {
+				t.Errorf("the server got %q", command)
+			}
+		}
+	})
+
 	t.Run("a server with no apps says how to deploy the first one", func(t *testing.T) {
 		s := newTestServer(t)
 		s.apps = "NAME  VERSION  DOMAINS\n"
@@ -436,6 +499,10 @@ func TestDecodeKeys(t *testing.T) {
 	got := decodeKeys([]byte("j\x1b[A\x1b[6~\r\x7f\x1b[1;5Cq\x1b"))
 
 	want := []string{"j", "up", "pgdn", "enter", "backspace", "q", "esc"}
+	// A click, its release, and the wheel. The release does not count.
+	if keys := decodeKeys([]byte("\x1b[<0;30;7M\x1b[<0;30;7m\x1b[<65;40;10Mq")); !slices.Equal(keys, []string{"mouse:0:30:7", "mouse:65:40:10", "q"}) {
+		t.Errorf("decodeKeys of the mouse = %q", keys)
+	}
 	if keys := decodeKeys([]byte("\x1b[Z\t")); !slices.Equal(keys, []string{"shift+tab", "tab"}) {
 		t.Errorf("decodeKeys of shift+tab and tab = %q", keys)
 	}
