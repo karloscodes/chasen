@@ -10,6 +10,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -204,7 +205,7 @@ func loadAppFile() (appFile, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&app); err != nil && err != io.EOF {
-		return app, fmt.Errorf("chasen.yml: %w", err)
+		return app, appFileError(err)
 	}
 	if appFlag != "" {
 		app.Name = appFlag
@@ -217,6 +218,17 @@ func loadAppFile() (appFile, error) {
 		app.Name = strings.ToLower(filepath.Base(wd))
 	}
 	return app, nil
+}
+
+// unknownKey matches what the YAML decoder says for a key that appFile does not have.
+var unknownKey = regexp.MustCompile(`line (\d+): field (\S+) not found in type \S+`)
+
+// appFileError says what is wrong in chasen.yml, in the words of the file,
+// with the keys it can have and the page that explains them.
+func appFileError(err error) error {
+	message := unknownKey.ReplaceAllString(err.Error(), "line $1: unknown key `$2`")
+	message = strings.TrimPrefix(strings.ReplaceAll(message, "yaml: unmarshal errors:\n  ", ""), "yaml: ")
+	return fmt.Errorf("chasen.yml: %s\n  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes.\n  %s%s", message, docsURL, docsAppFile)
 }
 
 // remote runs one command through the API of a server, or of the cloud. It

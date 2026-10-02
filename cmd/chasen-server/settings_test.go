@@ -1,8 +1,10 @@
 package main
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -197,4 +199,16 @@ func TestVersionOfTheNewestImage(t *testing.T) {
 			}
 		}
 	})
+}
+
+// The CLI refuses these names in chasen.yml before a deploy, from the list in
+// the protocol. The list must be the names that the server sets.
+func TestStandardEnvNamesMatchTheProtocol(t *testing.T) {
+	set := slices.Sorted(maps.Keys(standardEnv([]string{"shop.example.com"}, "1", "key", shape{Port: 8080, Volumes: []string{"/storage"}})))
+
+	listed := slices.Sorted(slices.Values(protocol.StandardEnv))
+
+	if !slices.Equal(set, listed) {
+		t.Errorf("the server sets %v, and the protocol lists %v", set, listed)
+	}
 }

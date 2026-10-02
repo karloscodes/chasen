@@ -88,6 +88,43 @@ chasen history 5      # the full output of that deploy
 
 The server records each deploy, restore, domain change, and removal, with its output.
 
+## The review before a deploy
+
+`chasen deploy` and `chasen check` review the app before they send anything. The review has two parts:
+
+1. **`chasen.yml`**, when the directory has one. Before the build.
+2. **The image**, after the build and before the push. Chasen reads what the image says about itself, the same way the server does.
+
+Each finding says what is wrong, what to write, and which page explains it.
+
+- **An error** is something that cannot work. The deploy stops. Nothing is pushed, and nothing changes on the server.
+- **A warning** is something that often ends in a failed deploy or in lost data, and that can also be right. The deploy goes on.
+
+| Finding | Level |
+|---|---|
+| An unknown key in `chasen.yml` | error |
+| An app name that is not lowercase letters, digits, and hyphens | error |
+| A port, a health path, a health timeout, or a volume that is not valid | error |
+| `env:` or `secrets:` has a name that Chasen sets itself (`PORT`, `BASE_URL`, and the others of [the standard](../STANDARD.md#4-environment)) | error |
+| `registry.password` holds a token, not the name of a secret | error |
+| The image declares several ports, none is 80, and `chasen.yml` has no `port:` | error |
+| The image has no command (`CMD` or `ENTRYPOINT`) | error |
+| The `Dockerfile` has no `EXPOSE`, and `chasen.yml` has no `port:` | warning |
+| The `Dockerfile` has no `VOLUME`, and `chasen.yml` has no `volumes:` | warning |
+| A value in `env:` has the name of a secret (`…_TOKEN`, `…_PASSWORD`) | warning |
+| A name is in `env:` and in `secrets:` | warning |
+| `image:` has a tag and the directory has a `Dockerfile`: nothing is built | warning |
+
+A `Dockerfile` that gets no finding says three things:
+
+```dockerfile
+EXPOSE 3000              # the port of the app. Chasen also gives it as $PORT
+VOLUME /app/storage      # where the app keeps its data. Chasen keeps it and backs it up
+CMD ["/app/server"]      # how the app starts
+```
+
+The review reads files. It does not start the app. To test a running container against every rule, with no traffic, run `chasen check`.
+
 ## chasen.yml
 
 The file is optional for a website, and for an app whose git origin is on GitHub. Without `name:`, the app name is the name of the directory. Without `image:`, the image is `ghcr.io/<owner>/<repository>` of the git origin.

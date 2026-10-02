@@ -147,6 +147,7 @@ Secrets travel with the deploy on purpose. Nothing that matters lives only on th
 
 ## Enforcement
 
+- **Before anything is sent: the review.** `chasen deploy` reads `chasen.yml` and the image it built. What cannot work is an error, and the deploy stops. What often fails is a warning, with the line to add to the `Dockerfile`. See [the review before a deploy](docs/deploy.md#the-review-before-a-deploy).
 - **At deploy.** The image must be in the registry, the container must start, and the health path must answer in time. Otherwise the deploy fails and the old version keeps the traffic.
 - **Before deploy: `chasen check`.** It pulls the image of the commit and starts it with no traffic and an empty storage. It reports each rule: the port answers, the health path returns `200` without a redirect, the storage is writable by the user of the image, no database file is outside the storage, a restart leaves the app healthy, and the app stops on `SIGTERM`. It changes nothing that is live.
 

@@ -508,18 +508,7 @@ func serverSetup(args []string) error {
 }
 
 // An app name becomes a container name, a directory, and a DNS label.
-var appNameRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-
-func checkAppName(name string) error {
-	if !appNameRe.MatchString(name) {
-		return fmt.Errorf("invalid app name %q: use lowercase letters, digits, and hyphens. Set `name:` in chasen.yml", name)
-	}
-	// "api" is the host of the API, and the others are names the server uses itself.
-	if name == "api" || name == "proxy" || name == "matcha-proxy" || name == agentContainer {
-		return fmt.Errorf("the app name %q is reserved", name)
-	}
-	return nil
-}
+func checkAppName(name string) error { return protocol.CheckAppName(name) }
 
 // primaryDomain is the first custom domain, or the default domain.
 func primaryDomain(domains []string) string {
@@ -533,9 +522,6 @@ func primaryDomain(domains []string) string {
 }
 
 var versionRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$`)
-
-// imageRe matches an image with its tag or digest: ghcr.io/you/app:3f9a2c1.
-var imageRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*(:[0-9]+)?(/[a-z0-9._/-]+)*[:@][A-Za-z0-9._:-]{1,128}$`)
 
 // A static website follows the standard like an app: Caddy listens on $PORT
 // and answers /up. This is the only image that a server makes, and the server
@@ -948,10 +934,10 @@ func serverEnable(name string, args []string) error {
 	app := matcha.AppConfig{
 		Image:      product.Image,
 		Domain:     domain,
-		Port:       defaultPort,
+		Port:       protocol.DefaultPort,
 		HealthPath: product.Health,
 		Volumes:    product.Volumes,
-		Env:        addonEnv(old.Env, standardEnv([]string{domain}, "latest", privateKey, shape{Port: defaultPort, Volumes: product.Volumes})),
+		Env:        addonEnv(old.Env, standardEnv([]string{domain}, "latest", privateKey, shape{Port: protocol.DefaultPort, Volumes: product.Volumes})),
 	}
 	fmt.Println("Starting", name)
 	if err := apply(name, app); err != nil {

@@ -19,6 +19,12 @@ import (
 // commit, pushes it, and the server pulls it. A website is an index.html with
 // no Dockerfile: its files go to the server.
 func deploy(creds credentials, app appFile, command string) error {
+	// The review comes first: before a secret is read, and before anything is
+	// built or sent.
+	_, noDockerfile := os.Stat("Dockerfile")
+	if err := printReview(os.Stderr, reviewAppFile(app, noDockerfile == nil, tagFlag)); err != nil {
+		return err
+	}
 	settings, err := appSettings(app)
 	if err != nil {
 		return err
@@ -29,7 +35,6 @@ func deploy(creds credentials, app appFile, command string) error {
 		}
 	}
 
-	_, noDockerfile := os.Stat("Dockerfile")
 	// An app on GitHub needs no chasen.yml: its image is ghcr.io/<owner>/<repository>.
 	if app.Image == "" && noDockerfile == nil {
 		origin, _ := exec.Command("git", "remote", "get-url", "origin").Output()
@@ -117,7 +122,18 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 	}
 	settings.Registry = registry
 	if build {
-		if err := buildAndPush(settings.Image, version, registry); err != nil {
+		if err := buildImage(settings.Image, version); err != nil {
+			return err
+		}
+		// The image is the contract: review what it says before it leaves this computer.
+		facts, err := inspectImage(settings.Image)
+		if err != nil {
+			return err
+		}
+		if err := printReview(os.Stderr, reviewImage(app, facts)); err != nil {
+			return err
+		}
+		if err := pushImage(settings.Image, registry); err != nil {
 			return err
 		}
 	}
@@ -150,11 +166,13 @@ func deployWebsite(creds credentials, app appFile, settings protocol.Settings, c
 	return archive.Wait()
 }
 
-// buildAndPush builds the image of the commit, where chasen runs (your
-// computer, or CI), and pushes it to the registry. The build gets the files
-// of the commit, not the working directory, so the image is what its tag
-// says. The login stays in a directory that is gone after the push.
-func buildAndPush(image, version string, registry *protocol.Registry) error {
+// buildImage builds the image of the commit, where chasen runs (your
+// computer, or CI). The build gets the files of the commit, not the working
+// directory, so the image is what its tag says.
+func buildImage(image, version string) error {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return errNoDocker
+	}
 	build := []string{"build", "--build-arg", "APP_VERSION=" + version, "-t", image}
 	// The image must run on the server. Most servers are amd64, and a Mac is not.
 	if os.Getenv("DOCKER_DEFAULT_PLATFORM") == "" {
@@ -175,10 +193,12 @@ func buildAndPush(image, version string, registry *protocol.Registry) error {
 	if err := docker.Run(); err != nil {
 		return fmt.Errorf("docker build failed: %w", err)
 	}
-	if err := archive.Wait(); err != nil {
-		return err
-	}
+	return archive.Wait()
+}
 
+// pushImage pushes the image to the registry. The login stays in a directory
+// that is gone after the push.
+func pushImage(image string, registry *protocol.Registry) error {
 	config, err := os.MkdirTemp("", "chasen-registry-")
 	if err != nil {
 		return err
@@ -216,6 +236,9 @@ func buildAndPush(image, version string, registry *protocol.Registry) error {
 // again with them, from the image it already has: a change of configuration
 // or a new secret needs no build.
 func restart(creds credentials, app appFile) error {
+	if err := printReview(os.Stderr, reviewAppFile(app, false, "")); err != nil {
+		return err
+	}
 	settings, err := appSettings(app)
 	if err != nil {
 		return err
