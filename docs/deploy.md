@@ -161,7 +161,7 @@ A secret is a value that must not be in git as plain text, and not in the image:
 chasen secrets edit
 ```
 
-The command opens the secrets in your editor (`$VISUAL`, then `$EDITOR`). They are lines of `NAME=value`:
+The command opens the secrets in your editor (`$VISUAL`, then `$EDITOR`). An editor with a window works with its plain name: for VS Code, Cursor, Zed, and Sublime Text, Chasen adds the option that makes the command wait until you close the file (`EDITOR=code` is enough). The secrets are lines of `NAME=value`:
 
 ```
 STRIPE_KEY=sk_live_...

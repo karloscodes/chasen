@@ -13,7 +13,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 )
 
 // The secrets of an app, the way Rails keeps its credentials: one encrypted
@@ -239,9 +241,10 @@ func editSecrets() error {
 	if err := os.WriteFile(path, []byte(text), 0600); err != nil {
 		return err
 	}
-	// The editor can be a command with options, like "code --wait".
-	run := exec.Command("sh", "-c", editor+` "$1"`, "sh", path)
+	// The editor can be a command with options, like "code --new-window".
+	run := exec.Command("sh", "-c", editorCommand(editor)+` "$1"`, "sh", path)
 	run.Stdin, run.Stdout, run.Stderr = os.Stdin, os.Stdout, os.Stderr
+	opened := time.Now()
 	if err := run.Run(); err != nil {
 		return fmt.Errorf("the editor failed (%w). Nothing changed", err)
 	}
@@ -251,6 +254,10 @@ func editSecrets() error {
 	}
 	if string(edited) == before {
 		fmt.Println("Nothing changed.")
+		// An editor that chasen does not know came back before a person could type.
+		if time.Since(opened) < time.Second {
+			fmt.Println(`Did the editor open a window and come back at once? Then it needs its option to wait: EDITOR="youreditor --wait" chasen secrets edit`)
+		}
 		return nil
 	}
 	for i, line := range strings.Split(string(edited), "\n") {
@@ -263,6 +270,24 @@ func editSecrets() error {
 	}
 	fmt.Printf("Encrypted and saved %s. Commit it.\n", secretsFile)
 	return nil
+}
+
+// The editors with a window that come back at once: the command returns
+// while the window is still open. Each one waits for its window with --wait.
+var windowEditors = []string{"code", "code-insiders", "codium", "cursor", "windsurf", "zed", "subl", "atom", "mate"}
+
+// editorCommand returns the command that opens the editor and waits until
+// the person closes the file. An editor with a window, like VS Code, gets
+// --wait: without it, chasen would read the file before anybody typed.
+func editorCommand(editor string) string {
+	words := strings.Fields(editor)
+	if len(words) == 0 || !slices.Contains(windowEditors, filepath.Base(words[0])) {
+		return editor
+	}
+	if slices.Contains(words[1:], "--wait") || slices.Contains(words[1:], "-w") {
+		return editor
+	}
+	return editor + " --wait"
 }
 
 // makeKey makes the key of a new secrets file, in this directory, and tells

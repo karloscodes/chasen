@@ -110,6 +110,38 @@ func TestSecrets(t *testing.T) {
 		}
 	})
 
+	t.Run("an editor with a window, like VS Code, waits for the person without a flag from them", func(t *testing.T) {
+		secretsApp(t)
+		// This "code" does what VS Code does: with --wait it stays until the file is saved, and without it, it comes back at once.
+		bin := t.TempDir()
+		os.WriteFile(filepath.Join(bin, "code"), []byte("#!/bin/sh\n[ \"$1\" = --wait ] && printf 'TOKEN=typed-in-the-window\\n' >> \"$2\"\nexit 0\n"), 0755)
+		t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		t.Setenv("EDITOR", "code")
+
+		err := editSecrets()
+
+		if stored, _ := storedSecrets(); err != nil || stored["TOKEN"] != "typed-in-the-window" {
+			t.Errorf("stored = %v (%v), want what the person typed in the window", stored, err)
+		}
+	})
+
+	t.Run("the command of the editor", func(t *testing.T) {
+		for editor, want := range map[string]string{
+			"code":                   "code --wait",
+			"cursor":                 "cursor --wait",
+			"/usr/local/bin/code -n": "/usr/local/bin/code -n --wait",
+			"code --wait":            "code --wait",
+			"subl -w":                "subl -w",
+			"vim":                    "vim",
+			"nano --restricted":      "nano --restricted",
+			"emacsclient -t":         "emacsclient -t",
+		} {
+			if got := editorCommand(editor); got != want {
+				t.Errorf("editorCommand(%q) = %q, want %q", editor, got, want)
+			}
+		}
+	})
+
 	t.Run("no editor: the error says how to give one", func(t *testing.T) {
 		secretsApp(t)
 
