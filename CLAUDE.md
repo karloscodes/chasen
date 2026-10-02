@@ -37,6 +37,7 @@ Run `mise run e2e` after a change to the protocol, the deploy, the backups, or t
 - The deploy is imperative. No desired-state file, no reconcile loop.
 - A server updates itself: `setup` installs a systemd timer that runs `chasen-server update` each night (`update.go`). It takes the newest GitHub release, checks the checksum, and goes back to the previous binary when the API does not answer. So a tag `v*` reaches every server within a day: tag only what passed the end-to-end test. `chasen-server settings auto_update off` turns it off.
 - `chasen.yml` is not a docker-compose file. An unknown key is an error.
+- `chasen run <command>` runs one command in the container of the app (`serverRun`): the words go to `docker exec` as they are, with no shell and no input, and the history keeps the run. It is not a console.
 - The CLI does not update itself. Once a day, for a person at a terminal, it looks for a newer release and prints one line (`update.go`). `chasen update` installs it, with the checksum check. Never in CI, never for a `dev` build.
 - The screen (`chasen` with no command) is for watching and running a server, not for deploys. A deploy needs the directory of an app (its commit, its Dockerfile, its `chasen.yml`), and the screen is about the whole server. Do not add a deploy key.
 - The server saves the output of a command to its history while the command runs (once a second, `saveActivity`), so `chasen history <id>` and the screen can follow a deploy that is on its way.

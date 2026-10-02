@@ -70,6 +70,9 @@ func recordedAction(command string, args []string) string {
 		return strings.TrimSpace(command + " " + strings.Join(args, " "))
 	case command == "domains" && len(args) > 0:
 		return "domains " + strings.Join(args, " ")
+	case command == "run" && len(args) > 0:
+		// A command in the container can change the data: the feed has it.
+		return "run " + strings.Join(args, " ")
 	}
 	return ""
 }

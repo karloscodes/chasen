@@ -33,6 +33,7 @@ The API runs these for the chasen client:
   check <app> <version>          Test that image against the standard. Stdin like deploy
   enable <addon> [domain]        Run fusionaly, formlander, or lognorth from its image
   restart <app>                  Start the app again. Stdin: new settings, or nothing to keep the last ones
+  run <app> <command> [args]     Run one command in the container of the app. No shell, no input
   status|logs|backup|backups|remove <app>
   history <app> [id]             The activity feed of the app, or the output of one entry
   domains <app> [add|rm <domain>]

@@ -37,6 +37,8 @@ Run these in the directory of your app:
   restart                Start the app again with the env and secrets of chasen.yml. Same image
   status                 Show the version, the URLs, and the last backup
   logs                   Follow the app logs
+  run <command>          Run one command in the container of the app: chasen run bin/rails db:migrate
+                         No input: a console that waits for lines does not work
   history [id]           Show the deploys and changes of the app, or the output of one
   domains                List the domains
   domains add <domain>   Add a custom domain

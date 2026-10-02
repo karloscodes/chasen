@@ -327,6 +327,18 @@ func TestEndToEnd(t *testing.T) {
 		must(app, bin, "restart")
 	})
 
+	t.Run("run runs a command in the container of the app, and gives its exit code back", func(t *testing.T) {
+		if out := must(app, bin, "run", "sh", "-c", `echo in-the-container && test -f "$DATABASE_PATH" && echo has-the-database`); !strings.Contains(out, "in-the-container") || !strings.Contains(out, "has-the-database") {
+			t.Errorf("run = %q, want the output of the command, with the env and the storage of the app", out)
+		}
+		if out, err := run(app, bin, "run", "sh", "-c", "echo before-the-end; exit 3"); err == nil || !strings.Contains(out, "before-the-end") {
+			t.Errorf("a command that fails: %q, %v, want its output and an error", out, err)
+		}
+		if out := must(app, bin, "history"); !strings.Contains(out, "run sh -c") {
+			t.Errorf("history = %q, want the runs in it", out)
+		}
+	})
+
 	t.Run("a custom domain serves the same app", func(t *testing.T) {
 		must(app, bin, "domains", "add", "shop.localhost")
 

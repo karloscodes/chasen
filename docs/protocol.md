@@ -42,6 +42,7 @@ A command that fails still answers `200`: the server already sent the output whe
 |---|---|---|---|
 | `list` | | | The apps of the server |
 | `load` | | | The load, the memory, and the disk of the server |
+| `run` | app, then the words of the command | | Runs the command in the container of the app. The exit code is the one of the command |
 | `deploy` | `<app> <version>` | The settings. For a website: then its files | Pull the image of the settings (or wrap the files of a website), back up, start, and swap |
 | `check` | `<app> <version>` | Like `deploy` | Run the image next to the live app and test it against the standard. It keeps nothing |
 | `enable` | `<addon> [domain]` | | Run an addon from its image |

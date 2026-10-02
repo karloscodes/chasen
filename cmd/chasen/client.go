@@ -59,9 +59,14 @@ var tagFlag string
 var serverFlag string
 
 func runClient(args []string) error {
+options:
 	for i := 0; i < len(args); i++ {
 		hasValue := i+1 < len(args) && !strings.HasPrefix(args[i+1], "-")
 		switch {
+		case args[i] == "run":
+			// The words after run are a command for the container, with its
+			// own options: chasen run ls -la.
+			break options
 		case (args[i] == "-a" || args[i] == "--app") && hasValue:
 			appFlag = args[i+1]
 		case args[i] == "--on" && hasValue:
@@ -139,6 +144,10 @@ func runCommand(creds credentials, args []string) error {
 			return err
 		}
 		return remote(creds, nil, os.Stdout, args...)
+	case "run":
+		if len(args) < 2 {
+			return errors.New("usage: chasen run <command> [arguments]. For example: chasen run bin/rails db:migrate")
+		}
 	case "restart":
 		// Start the app again with the env and the secrets of chasen.yml, from the image it has.
 		app, err := loadAppFile()

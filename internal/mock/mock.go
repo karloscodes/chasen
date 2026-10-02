@@ -353,6 +353,21 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 		if !ok {
 			return 1
 		}
+	case "run":
+		words := strings.Join(args[1:], " ")
+		index, kept := s.begin(a, "run "+words)
+		s.mu.Unlock()
+		out = io.MultiWriter(out, kept)
+		ok := len(args) > 1 && say(700*time.Millisecond, "== running in the container of %s: %s", name, words) && say(700*time.Millisecond, "(the mock server runs nothing: this is where the output of the command goes)")
+		if strings.Contains(words, "false") || strings.Contains(words, "exit 1") {
+			ok = false // a command that fails, to see how a failure looks
+		}
+		s.mu.Lock()
+		a.end(index, map[bool]string{true: "succeeded", false: "failed"}[ok])
+		s.mu.Unlock()
+		if !ok {
+			return 1
+		}
 	case "remove":
 		s.apps = slices.DeleteFunc(s.apps, func(other *app) bool { return other == a })
 		s.mu.Unlock()

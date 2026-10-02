@@ -440,6 +440,16 @@ func TestScreen(t *testing.T) {
 			t.Errorf("the server got %v", s.commands)
 		}
 
+		// A command in the container of the app, with its own options.
+		sc.press("esc")
+		typed("run bin/rails db:migrate --trace")
+		sc.shows("Run chasen -a shop run bin/rails db:migrate --trace?")
+		sc.press("y")
+		sc.shows("$ chasen -a shop run bin/rails db:migrate --trace")
+		if !s.got("run shop bin/rails db:migrate --trace") {
+			t.Errorf("the server got %v", s.commands)
+		}
+
 		sc.press("esc")
 		typed("deploy")
 		sc.shows("A deploy needs the directory of the app")

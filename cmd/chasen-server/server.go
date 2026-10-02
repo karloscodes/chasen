@@ -124,6 +124,8 @@ func runServer(args []string) error {
 		return serverDomains(name, args)
 	case "status":
 		return serverStatus(name)
+	case "run":
+		return serverRun(name, args)
 	case "logs":
 		app, err := loadApp(name)
 		if err != nil {
@@ -1040,4 +1042,35 @@ func serverRemove(name string) error {
 	forgetSettings(name)
 	fmt.Printf("Removed %s. The data and the backups stay in %s\n", name, appDir(name))
 	return nil
+}
+
+// serverRun runs one command in the container of an app, with the env and
+// the storage of the app: a migration, a rake task, a query. The words go to
+// docker as they are, with no shell on the way, and the command gets no
+// input. Its exit code is the exit code of this command.
+func serverRun(name string, words []string) error {
+	if len(words) == 0 {
+		return errors.New("usage: chasen run <command> [arguments]. For example: chasen run bin/rails db:migrate")
+	}
+	// After the name of the container, docker takes every word as the
+	// command. A first word like an option is a mistake, not a command.
+	if strings.HasPrefix(words[0], "-") {
+		return fmt.Errorf("%q is not a command. For shell syntax: chasen run sh -c \"...\"", words[0])
+	}
+	if _, err := loadApp(name); err != nil {
+		return err
+	}
+	// The container that has the traffic: <app>, or <app>-next after a swap.
+	container, _ := docker("ps", "--filter", "name=^"+name+"(-next)?$", "--format", "{{.Names}}")
+	if container, _, _ = strings.Cut(container, "\n"); container == "" {
+		return fmt.Errorf("%s does not run now, so there is no container for the command. See: chasen status", name)
+	}
+	cmd := exec.Command("docker", append([]string{"exec", container}, words...)...)
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	err := cmd.Run()
+	var failed *exec.ExitError
+	if errors.As(err, &failed) {
+		os.Exit(failed.ExitCode())
+	}
+	return err
 }

@@ -18,6 +18,7 @@
 | `chasen logs` | Follow the app logs |
 | `chasen enable <addon> [domain]` | Run fusionaly, formlander, or lognorth from its image |
 | `chasen -a <app> <command>` | Run a command for an addon, or for an app of another directory |
+| `chasen run <command>` | Run one command in the container of the app, with its env and its storage: `chasen run bin/rails db:migrate`. The output comes back as it is written, and the exit code is the one of the command. The history keeps it. See "Run a command in the app" below |
 | `chasen history [id]` | Show the deploys and changes of the app, or the output of one |
 | `chasen domains [add\|rm <domain>]` | List or change the domains |
 | `chasen backup` | Make a snapshot now |
@@ -37,6 +38,22 @@ On the server, as root:
 | `chasen-server check` | Report what the security of the server lacks |
 | `chasen-server list` | List all apps |
 | `chasen-server backup` | Back up every app now |
+
+## Run a command in the app
+
+```bash
+chasen run bin/rails db:migrate
+chasen run python manage.py createsuperuser --noinput
+chasen run sh -c "ls -la /storage | head"
+```
+
+The command runs in the container that has the traffic, so it has the env, the secrets, and the storage of the app.
+
+- **No shell on the way.** Chasen passes the words to the container as they are. For a pipe, a redirect, or a variable, call the shell yourself: `chasen run sh -c "..."`.
+- **No input.** A program that waits for lines, like a console, gets none and ends or hangs. Use `run` for a command that has an end.
+- **It runs to its end.** If you press Ctrl-C, your terminal stops listening, and the command goes on in the container.
+- **The history has it.** `chasen history` lists each run with its output.
+- **The app must run.** A stopped app has no container for the command.
 
 ## The screen
 
