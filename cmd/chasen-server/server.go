@@ -717,10 +717,12 @@ func serverDeploy(name, version string) error {
 		return err
 	}
 
-	// Keep the image of this version and of the one before it.
+	// Keep the image of this version and of the one before it, by name.
+	// The order of Docker's list says nothing: it is the age of the image, and
+	// two versions can be the same image.
 	if tags, err := docker("images", imageRepo(name), "--format", "{{.Repository}}:{{.Tag}}"); err == nil {
-		for i, tag := range strings.Fields(tags) {
-			if i >= 2 {
+		for _, tag := range strings.Fields(tags) {
+			if tag != image && tag != old.Image {
 				docker("rmi", tag)
 			}
 		}
