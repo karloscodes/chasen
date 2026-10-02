@@ -55,15 +55,17 @@ func serverServe() error {
 	// An entry that still runs is from before a restart of the server.
 	db.Exec("UPDATE activity SET status = 'failed', finished_at = CURRENT_TIMESTAMP, output = output || 'The server restarted.' WHERE status = 'running'")
 
-	if cfg.Backup.S3 != nil {
-		go func() {
-			// A restore stops the replica. This starts it again, and it waits for the restore to end.
-			for {
+	go func() {
+		// The replica runs while the server has a bucket. A restore stops it,
+		// and a new bucket stops it too: this starts it again, with the bucket
+		// of now. It waits for a restore to end.
+		for {
+			if now, err := loadServerConfig(); err == nil && now.Backup.S3 != nil {
 				run(self, "replicate")
-				time.Sleep(time.Second)
 			}
-		}()
-	}
+			time.Sleep(5 * time.Second)
+		}
+	}()
 	go func() {
 		for range time.Tick(time.Hour) {
 			if err := run(self, "backup"); err != nil {
@@ -107,7 +109,7 @@ func serverServe() error {
 			return
 		}
 		// setup, check, serve, and replicate are not in the protocol: they run only on the server itself.
-		if !slices.Contains(protocol.Commands, r.PathValue("command")) {
+		if !slices.Contains(protocol.Commands, r.PathValue("command")) && !slices.Contains(protocol.ServerCommands, r.PathValue("command")) {
 			http.Error(w, "unknown command", http.StatusNotFound)
 			return
 		}

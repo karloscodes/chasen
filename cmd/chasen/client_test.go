@@ -228,3 +228,51 @@ func TestReport(t *testing.T) {
 		t.Errorf("the report must have the version and no token: %s", page)
 	}
 }
+
+func TestBucket(t *testing.T) {
+	login := func(t *testing.T) {
+		t.Helper()
+		creds := mockServer(t)
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("XDG_CONFIG_HOME", "")
+		t.Setenv("CHASEN_URL", creds.URL)
+		t.Setenv("CHASEN_TOKEN", creds.Token)
+		t.Chdir(t.TempDir())
+	}
+	// output runs one command of the CLI and returns what it prints.
+	output := func(t *testing.T, args ...string) (string, error) {
+		t.Helper()
+		read, write, _ := os.Pipe()
+		stdout := os.Stdout
+		os.Stdout = write
+		err := runClient(args)
+		write.Close()
+		os.Stdout = stdout
+		printed, _ := io.ReadAll(read)
+		return string(printed), err
+	}
+
+	t.Run("the bucket of the server is set from this computer, and the secret goes in the request", func(t *testing.T) {
+		login(t)
+		t.Setenv("S3_SECRET_ACCESS_KEY", "the-secret")
+
+		set, err := output(t, "bucket", "--endpoint", "https://s3.example.com", "--name", "backups", "--access-key-id", "the-id")
+
+		shown, _ := output(t, "bucket")
+		if err != nil || !strings.Contains(set, "Backups now go to the bucket backups") || !strings.Contains(shown, "Bucket backups") {
+			t.Errorf("set = %q (%v), shown = %q", set, err, shown)
+		}
+	})
+
+	t.Run("with no secret and no terminal, nothing is sent", func(t *testing.T) {
+		login(t)
+		t.Setenv("S3_SECRET_ACCESS_KEY", "")
+
+		_, err := output(t, "bucket", "--endpoint", "https://s3.example.com", "--name", "backups", "--access-key-id", "the-id")
+
+		shown, _ := output(t, "bucket")
+		if err == nil || !strings.Contains(err.Error(), "S3_SECRET_ACCESS_KEY") || !strings.Contains(shown, "No bucket") {
+			t.Errorf("err = %v, shown = %q, want an error and no bucket", err, shown)
+		}
+	})
+}

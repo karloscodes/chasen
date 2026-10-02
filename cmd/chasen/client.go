@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/karloscodes/chasen/protocol"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -68,9 +69,10 @@ options:
 	for i := 0; i < len(args); i++ {
 		hasValue := i+1 < len(args) && !strings.HasPrefix(args[i+1], "-")
 		switch {
-		case args[i] == "run":
+		case args[i] == "run" || args[i] == "bucket":
 			// The words after run are a command for the container, with its
-			// own options: chasen run ls -la.
+			// own options: chasen run ls -la. The options of bucket are for
+			// the server.
 			break options
 		case (args[i] == "-a" || args[i] == "--app") && hasValue:
 			appFlag = args[i+1]
@@ -114,7 +116,19 @@ options:
 	if err != nil {
 		return err
 	}
-	creds, err := loadCredentials(app.Server)
+	// `chasen deploy root@203.0.113.5` names the server of the deploy. The
+	// first time, that is all it takes: the server gets Chasen, this computer
+	// gets its login, and the app goes live.
+	login := func() (credentials, error) { return loadCredentials(app.Server) }
+	if args[0] == "deploy" && len(args) > 1 {
+		if len(args) > 2 {
+			return errors.New("usage: chasen deploy [<user>@<host>] [--domain <domain>] [--tag <tag>]")
+		}
+		server := args[1]
+		args = args[:1]
+		login = func() (credentials, error) { return serverLogin(server) }
+	}
+	creds, err := login()
 	if err != nil {
 		return err
 	}
@@ -125,7 +139,7 @@ options:
 		if err := connect(creds.URL); err != nil {
 			return err
 		}
-		if creds, err = loadCredentials(app.Server); err != nil {
+		if creds, err = login(); err != nil {
 			return err
 		}
 		creds.Server = serverFlag
@@ -138,6 +152,8 @@ func runCommand(creds credentials, args []string) error {
 	switch cmd := args[0]; cmd {
 	case "list", "load":
 		return remote(creds, nil, os.Stdout, cmd)
+	case "bucket":
+		return bucket(creds, args[1:])
 	case "deploy", "check":
 		app, err := loadAppFile()
 		if err != nil {
@@ -237,6 +253,30 @@ func appFileError(err error) error {
 	message := unknownKey.ReplaceAllString(err.Error(), "line $1: unknown key `$2`")
 	message = strings.TrimPrefix(strings.ReplaceAll(message, "yaml: unmarshal errors:\n  ", ""), "yaml: ")
 	return fmt.Errorf("chasen.yml: %s\n  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes.\n  %s%s", message, docsURL, docsAppFile)
+}
+
+// bucket shows where the backups of the server go, or sets the bucket: the
+// server tests the bucket before it saves it. The secret access key does not
+// go on the command line: it comes from S3_SECRET_ACCESS_KEY, or the person
+// types it, and it travels in the request, like every secret.
+func bucket(creds credentials, args []string) error {
+	if len(args) == 0 {
+		return remote(creds, nil, os.Stdout, "bucket")
+	}
+	secret := os.Getenv("S3_SECRET_ACCESS_KEY")
+	if secret == "" {
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			return errors.New("the secret access key is missing: set S3_SECRET_ACCESS_KEY, or run the command at a terminal")
+		}
+		fmt.Fprint(os.Stderr, "Secret access key: ")
+		typed, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return err
+		}
+		secret = strings.TrimSpace(string(typed))
+	}
+	return remote(creds, strings.NewReader(secret+"\n"), os.Stdout, append([]string{"bucket"}, args...)...)
 }
 
 // remote runs one command through the API of a server, or of the cloud. It

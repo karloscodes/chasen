@@ -111,6 +111,22 @@ func loadCredentials(server string) (credentials, error) {
 	return creds, errors.New("not logged in. " + howToLogin)
 }
 
+// serverLogin returns the login of the server that a command names, like
+// `chasen deploy root@203.0.113.5`. A server that this computer does not
+// know yet is added first: it gets Chasen when it has none, and this
+// computer gets its login. A server that it knows is used for this command
+// only: the current server stays the current one.
+func serverLogin(server string) (credentials, error) {
+	address := apiAddress(server)
+	if token, ok := loadLogins().Tokens[address]; ok {
+		return credentials{URL: address, Token: token}, nil
+	}
+	if err := connect(address); err != nil {
+		return credentials{}, err
+	}
+	return credentials{URL: address, Token: loadLogins().Tokens[address]}, nil
+}
+
 // listServers shows the saved logins. The star marks the current one.
 func listServers() error {
 	saved := loadLogins()
@@ -271,7 +287,7 @@ func serverToken(address string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("cannot log in to the server through SSH: %s", cmp.Or(lastLineOf(problem), err.Error()))
 	}
-	fmt.Println("The server is ready. It has no base domain, so an app gets its domain at its first deploy: chasen deploy --domain shop.example.com")
+	fmt.Println("The server is ready.")
 	return strings.TrimSpace(out), nil
 }
 

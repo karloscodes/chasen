@@ -11,16 +11,16 @@ A single server with SQLite needs backups that you can trust. Chasen has two lay
 
 **Live replica.** Litestream streams every change to the S3 bucket, about one second behind. This is the copy that loses almost nothing when the server dies.
 
-Set the bucket on the server. Any S3-compatible store works: S3, Cloudflare R2, Backblaze B2, Hetzner.
+Set the bucket from your computer. Any S3-compatible store works: S3, Cloudflare R2, Backblaze B2, Hetzner.
 
 ```bash
-chasen-server bucket --endpoint https://fsn1.your-objectstorage.com --region fsn1 \
+chasen bucket --endpoint https://fsn1.your-objectstorage.com --region fsn1 \
   --name chasen-backups --access-key-id <id>
-# Secret access key: ...
-chasen-server bucket          # show the bucket
+# Secret access key:
+chasen bucket          # show the bucket
 ```
 
-The command creates the bucket when it does not exist, then writes and deletes a test object. It saves the settings only when all of that works. Set `S3_SECRET_ACCESS_KEY` to skip the question.
+The server creates the bucket when it does not exist, then writes and deletes a test object. It saves the settings only when all of that works, and then the live replica starts. The secret access key is not an argument: you type it, or it comes from `S3_SECRET_ACCESS_KEY`. The same command exists on the server, as `chasen-server bucket`.
 
 For a monitor that alerts when backups stop, run `chasen-server settings heartbeat_url <url>` on the server. The server calls the URL after each hourly backup that worked.
 
@@ -61,7 +61,7 @@ The data is yours. This is how you look at it on your computer, keep a copy of y
 When a server is gone, these steps bring everything back:
 
 1. Add the new server: `chasen add server root@<its address>`. With a base domain, run `chasen-server setup --domain <domain>` on it too.
-2. Give it the same bucket: `chasen-server bucket`, on the server.
+2. Give it the same bucket: `chasen bucket`, with the same values as before.
 3. Point the DNS records of your apps at the new server.
 4. Run `chasen deploy --domain <domain of the app>` for each app, and `chasen enable` for each addon. When the server has no data for the app and the bucket has a copy, the deploy restores it first: the live replica, or the newest snapshot if the replica fails.
 5. Add the custom domains again (`chasen domains add`). They were on the old server.

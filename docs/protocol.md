@@ -64,6 +64,10 @@ A command that fails still answers `200`: the server already sent the output whe
 
 Every command except `logs` runs to its end on the server, also when the client goes away. So a lost connection never leaves a deploy half done.
 
+## A command about the server
+
+One command is about the server and not about an app: `bucket`. With no arguments it prints where the backups go. With `--endpoint`, `--name`, `--access-key-id`, and `--region` as arguments, it sets the bucket; the secret access key is the first line of the request body. It is in the list `ServerCommands`, apart from the commands of the apps. A server answers it. A service that runs servers for its users, like the cloud, does not pass it on: there the bucket is not the user's to change.
+
 ## Two requests that are not commands
 
 A shell and a file do not fit "text out, exit code last". They are `GET` requests with the same token.

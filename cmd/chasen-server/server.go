@@ -20,6 +20,7 @@ import (
 
 	"github.com/karloscodes/chasen/protocol"
 	"github.com/karloscodes/matcha"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -364,11 +365,18 @@ func serverBucket(args []string) error {
 	if s3.Endpoint == "" || s3.Bucket == "" || s3.AccessKeyID == "" {
 		return errors.New("usage: chasen-server bucket --endpoint <url> --name <bucket> --access-key-id <id> [--region <region>]")
 	}
-	// The secret does not go on the command line: other users of the machine can read it there.
+	// The secret does not go on the command line: other users of the machine
+	// can read it there. It comes from the environment, or as the first line
+	// of the input: a person types it, and the API sends it in the request.
 	if s3.SecretAccessKey = os.Getenv("S3_SECRET_ACCESS_KEY"); s3.SecretAccessKey == "" {
-		fmt.Print("Secret access key: ")
+		if term.IsTerminal(int(os.Stdin.Fd())) {
+			fmt.Print("Secret access key: ")
+		}
 		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		s3.SecretAccessKey = strings.TrimSpace(line)
+	}
+	if s3.SecretAccessKey == "" {
+		return errors.New("the secret access key is missing: nothing changed")
 	}
 
 	// Prove that the keys can create the bucket, write, and delete.
@@ -393,19 +401,12 @@ func serverBucket(args []string) error {
 	}
 	fmt.Printf("Backups now go to the bucket %s, and the live replica starts.\n", s3.Bucket)
 
-	// The API reads the config when it starts.
-	if running, _ := docker("ps", "-q", "--filter", "name=^"+agentContainer+"$"); running == "" {
-		return nil
+	// The replica of the bucket from before, if there was one, stops now. The
+	// API starts it again in a few seconds, with the new bucket.
+	if pid := replicaPID(); pid != 0 {
+		syscall.Kill(pid, syscall.SIGTERM)
 	}
-	self, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	if err := startAgent(self); err != nil {
-		return err
-	}
-	_, err = routeAgent(cfg.Domain)
-	return err
+	return nil
 }
 
 // engine returns the matcha deployer for an app. Chasen keeps its apps in its

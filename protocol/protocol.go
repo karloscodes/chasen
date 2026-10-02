@@ -36,6 +36,12 @@ const ExitMarker = "\x00chasen-exit "
 // is the app, except for list. For enable, the app is the name of the addon.
 var Commands = []string{"list", "load", "deploy", "check", "enable", "restart", "status", "logs", "run", "history", "domains", "backup", "backups", "restore", "remove"}
 
+// ServerCommands are the commands about the server itself, for its owner:
+// `bucket` shows or sets where the backups go. Their first argument is not
+// an app. A server answers them. A service in front of servers, which owns
+// the servers it runs, does not pass them on.
+var ServerCommands = []string{"bucket"}
+
 // Settings is what the client sends with `deploy`, `check`, and `restart`:
 // the image, the env and the secrets of the app, and the overrides of the
 // standard from chasen.yml. A zero value means "use the default".

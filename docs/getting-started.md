@@ -1,6 +1,6 @@
 # Get started
 
-Chasen puts your app on one server that you own. `chasen` is the CLI on your computer, and it is all you run. This page takes you from an empty server to a live app.
+Chasen puts your app on one server that you own. `chasen` is the CLI on your computer, and it is all you run. This page takes you from an empty server to a live app, in one command.
 
 ## What you need
 
@@ -18,38 +18,7 @@ On your computer (macOS or Linux):
 curl -fsSL https://chasenhq.com/cli | sh
 ```
 
-## 2. Add the server
-
-```bash
-chasen add server root@203.0.113.5
-# chasen-server is not on this server yet. Installing it.
-# Setting up the server: Docker, the proxy, and the API. This can take a minute.
-# The server is ready. ...
-# Logged in to ssh://root@203.0.113.5
-```
-
-This one command makes the machine a Chasen server. It logs in with your `ssh`, the same way you do: your keys, your `~/.ssh/config`, and your known hosts apply. Then it:
-
-1. downloads `chasen-server`, one binary, and checks its checksum,
-2. installs Docker when the server has none, and starts the proxy and the API,
-3. gets a login for this computer.
-
-From now on, every command of `chasen` goes to the server through SSH. So the server needs no name in DNS and no certificate of its own, and the only open ports are SSH and the ports 80 and 443 of your apps.
-
-On a second computer, run the same line: a server that is set up already only gives a login.
-
-## 3. Add a backup bucket (optional)
-
-A server works without a bucket: the backups then stay on its disk, and a dead server takes them with it. Add a bucket when the data matters. Any S3-compatible store works: Cloudflare R2, Backblaze B2, Hetzner, or S3. Run this on the server, as root:
-
-```bash
-chasen-server bucket --endpoint https://<your-store> --name chasen-backups --access-key-id <id>
-# Secret access key: ...
-```
-
-The command creates the bucket when it does not exist, and tests it before it saves the settings.
-
-## 4. Log in to the registry
+## 2. Log in to the registry
 
 Your app needs a place for its image. When the git origin of the app is on GitHub, that place is `ghcr.io/<owner>/<repository>`. Chasen finds the name by itself. It needs a login to push there, and it uses the one that Docker already has:
 
@@ -71,27 +40,52 @@ image: you/shop          # where the image goes. No tag
 
 Your app also follows [the standard](../STANDARD.md): it listens on the port of its `EXPOSE` line (or on `$PORT`), answers `GET /up` with `200`, and keeps its SQLite files in `/storage`.
 
-## 5. Deploy
+## 3. Deploy
 
 ```bash
 cd shop
-chasen deploy --domain shop.example.com
+chasen deploy root@203.0.113.5 --domain shop.example.com
+# chasen-server is not on this server yet. Installing it.
+# Setting up the server: Docker, the proxy, and the API. This can take a minute.
+# The server is ready.
+# Logged in to ssh://root@203.0.113.5
 # Building ghcr.io/you/shop:3f9a2c1d...
 # Pushing ghcr.io/you/shop:3f9a2c1d...
 # Pulling ghcr.io/you/shop:3f9a2c1d...
 # Port 3000 (EXPOSE in the image). Health path /up. Storage /storage.
-# shop: backup 20261001T120000Z (on the server and offsite)
+# shop: backup 20261001T120000Z (on the server only)
 # Starting shop 3f9a2c1
 #
 # Deployed shop 3f9a2c1
 #   https://shop.example.com
 ```
 
-The first deploy of an app says its domain. After that the app has it, and the command is `chasen deploy`.
+This one command does everything. The first time, it also makes the machine a Chasen server:
 
-`chasen deploy` builds the image of the current git commit, pushes it, and tells the server to pull it. The server backs up the databases, starts the new version next to the old one, and moves the traffic when `/up` answers. If the new version does not answer in 30 seconds, the old one keeps the traffic.
+1. It logs in with your `ssh`, the same way you do: your keys, your `~/.ssh/config`, and your known hosts apply.
+2. It downloads `chasen-server`, one binary, checks its checksum, installs Docker when the server has none, and starts the proxy and the API. It changes nothing else on the server.
+3. It gets a login for this computer.
+
+Then it builds the image of the current git commit, pushes it, and tells the server to pull it. The server backs up the databases, starts the new version next to the old one, and moves the traffic when `/up` answers. If the new version does not answer in 30 seconds, the old one keeps the traffic.
+
+**After the first time, the command is `chasen deploy`.** The computer knows the server, and the app has its domain. Every command goes to the server through SSH, so the server needs no name in DNS and no certificate of its own, and the only open ports are SSH and the ports 80 and 443 of your apps.
+
+- **A second app** on the same server: `chasen deploy --domain blog.example.com` in its directory.
+- **A second computer:** `chasen add server root@203.0.113.5` logs in with no deploy.
+- **Several servers:** name the server in the command each time, or in `chasen.yml` (`server: root@203.0.113.5`).
 
 To test an app before it gets traffic, run `chasen check`.
+
+## 4. Add a backup bucket (optional)
+
+A server works without a bucket: the backups then stay on its disk, and a dead server takes them with it. Add a bucket when the data matters. Any S3-compatible store works: Cloudflare R2, Backblaze B2, Hetzner, or S3.
+
+```bash
+chasen bucket --endpoint https://<your-store> --name chasen-backups --access-key-id <id>
+# Secret access key:
+```
+
+The server creates the bucket when it does not exist, and tests it before it saves the settings. Then the snapshots go to the bucket too, and the live replica starts.
 
 ## What comes next
 

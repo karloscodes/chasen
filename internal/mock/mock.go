@@ -78,8 +78,9 @@ type Server struct {
 	// Log gets one line for each request, or nil.
 	Log *log.Logger
 
-	mu   sync.Mutex
-	apps []*app
+	mu     sync.Mutex
+	apps   []*app
+	bucket string // the name of the bucket of the server, or ""
 }
 
 // New returns a server with three apps: a blog with no backups, the addon
@@ -217,6 +218,31 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 	}
 
 	switch command {
+	case "bucket":
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if len(args) == 0 {
+			if s.bucket == "" {
+				fmt.Fprintln(out, "No bucket. The backups stay on this server.")
+			} else {
+				fmt.Fprintf(out, "Bucket %s at https://s3.example.com (region auto)\n", s.bucket)
+			}
+			return 0
+		}
+		// The secret access key is the first line of the request, like on a server.
+		secret, _ := bufio.NewReader(body).ReadString('\n')
+		name := ""
+		for i, arg := range args {
+			if arg == "--name" && i+1 < len(args) {
+				name = args[i+1]
+			}
+		}
+		if strings.TrimSpace(secret) == "" || name == "" {
+			return fail("usage: chasen-server bucket --endpoint <url> --name <bucket> --access-key-id <id> [--region <region>]")
+		}
+		s.bucket = name
+		fmt.Fprintf(out, "Backups now go to the bucket %s, and the live replica starts.\n", name)
+		return 0
 	case "list":
 		s.mu.Lock()
 		defer s.mu.Unlock()

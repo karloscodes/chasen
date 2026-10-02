@@ -425,6 +425,30 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	if offsite {
+		t.Run("the bucket is shown and set from the CLI, and the replica runs on", func(t *testing.T) {
+			shown := must(app, bin, "bucket")
+			name := strings.Fields(strings.TrimPrefix(shown, "Bucket "))[0]
+
+			// The same bucket again, through the API: the server tests it, saves it, and starts the replica again.
+			out := must(app, bin, "bucket", "--endpoint", os.Getenv("CHASEN_TEST_S3"), "--region", "us-east-1", "--access-key-id", "minioadmin", "--name", name)
+
+			if !strings.HasPrefix(shown, "Bucket chasen-e2e-") || !strings.Contains(out, "Backups now go to the bucket "+name) {
+				t.Errorf("bucket = %q, set = %q", shown, out)
+			}
+			replica := ""
+			for range 20 {
+				if replica = must(app, bin, "status"); strings.Contains(replica, "Replica:  live") {
+					break
+				}
+				time.Sleep(time.Second)
+			}
+			if !strings.Contains(replica, "Replica:  live") {
+				t.Errorf("status = %q, want the replica live again with no restart of the API", replica)
+			}
+		})
+	}
+
 	t.Run("the CLI reaches the server through SSH, with no address on the web", func(t *testing.T) {
 		address := sshServer(t, root, os.Getenv("CHASEN_BIN"))
 

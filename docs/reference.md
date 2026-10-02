@@ -5,7 +5,8 @@
 | Command | What it does |
 |---|---|
 | `chasen login` | Log in to the Chasen cloud, with a browser |
-| `chasen add server <user>@<host>` | Use your own server, through SSH. A new machine gets `chasen-server` and its setup first |
+| `chasen deploy <user>@<host>` | Deploy to that server, through SSH. The first time, the server gets `chasen-server` and this computer gets its login |
+| `chasen add server <user>@<host>` | Log in to your own server through SSH, with no deploy |
 | `chasen add server <domain>` | Use your own server through its address on the web (`https://api.<domain>`), with a login in the browser |
 | `chasen servers` | List the servers you are logged in to. The star marks the current one |
 | `chasen use <server>` | Make another server the current one: a name from the list, or `cloud` |
@@ -32,13 +33,14 @@
 | `chasen remove` | Stop the app. Keeps the data and the backups |
 | `chasen list` | List all apps on the server |
 | `chasen load` | Show how busy the server is: the load, the memory in use, and the disk of the apps |
+| `chasen bucket` | Show where the backups of the server go. With `--endpoint`, `--name`, and `--access-key-id`: send them to an S3 bucket too |
 
 On the server, as root:
 
 | Command | What it does |
 |---|---|
 | `chasen-server setup --domain <domain>` | Start the proxy and the API, and the timer of the nightly update |
-| `chasen-server bucket ...` | Set the S3 bucket for offsite backups |
+| `chasen-server bucket ...` | Set the S3 bucket for offsite backups. From your computer it is `chasen bucket ...` |
 | `chasen-server update` | Install the newest release now. The timer does this each night |
 | `chasen-server check` | Report what the security of the server lacks |
 | `chasen-server list` | List all apps |
@@ -154,7 +156,7 @@ server: root@203.0.113.5   # or a base domain like example.org, or: cloud
 
 | | Through SSH | On the web |
 |---|---|---|
-| You type | `chasen add server root@203.0.113.5` | `chasen add server example.com` |
+| You type | `chasen deploy root@203.0.113.5`, or `chasen add server root@203.0.113.5` for a login with no deploy | `chasen add server example.com` |
 | The server needs | SSH, as root or with `sudo` and no password | a base domain, a DNS record for `api.<domain>`, and a certificate, which it gets by itself |
 | The login | who can log in with SSH owns the server | the token of the server, typed in a browser |
 | Good for | your own computers. No DNS, no open port but SSH | CI with a token, and people with no SSH access |

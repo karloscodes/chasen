@@ -249,3 +249,71 @@ esac
 		}
 	})
 }
+
+func TestDeployToANamedServer(t *testing.T) {
+	// app makes the folder of an app whose image is in a registry: nothing to build.
+	app := func(t *testing.T) {
+		t.Helper()
+		t.Chdir(t.TempDir())
+		os.WriteFile("chasen.yml", []byte("name: shop\nimage: example/shop\n"), 0644)
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("XDG_CONFIG_HOME", "")
+		t.Setenv("CHASEN_TOKEN", "")
+		t.Setenv("CHASEN_URL", "")
+		t.Cleanup(func() { domainFlag = "" })
+	}
+
+	t.Run("the first deploy to a server logs in to it and deploys, in one command", func(t *testing.T) {
+		creds, calls := sshServer(t)
+		app(t)
+		server := strings.TrimPrefix(creds.URL, "ssh://")
+
+		err := runClient([]string{"deploy", server, "--domain", "shop.example.org"})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if saved := loadLogins(); saved.Current != creds.URL || saved.Tokens[creds.URL] == "" {
+			t.Errorf("saved %+v, want the login of %s", saved, creds.URL)
+		}
+		ran, _ := os.ReadFile(calls)
+		login, connect := strings.Index(string(ran), "chasen-server login"), strings.Index(string(ran), "chasen-server connect")
+		if login < 0 || connect < login {
+			t.Errorf("ssh ran:\n%s\nwant the login, then the commands of the deploy", ran)
+		}
+		var history strings.Builder
+		remote(creds, nil, &history, "history", "shop")
+		if !strings.Contains(history.String(), "deploy") {
+			t.Errorf("the history of the app on the server = %q, want the deploy", history.String())
+		}
+	})
+
+	t.Run("a server that this computer knows is used for this deploy, and the current server stays", func(t *testing.T) {
+		creds, calls := sshServer(t)
+		app(t)
+		saved := logins{Current: "https://api.example.com", Tokens: map[string]string{"https://api.example.com": "other", creds.URL: creds.Token}}
+		saved.save()
+
+		err := runClient([]string{"deploy", strings.TrimPrefix(creds.URL, "ssh://")})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if after := loadLogins(); after.Current != "https://api.example.com" {
+			t.Errorf("the current server is %s, want it as it was", after.Current)
+		}
+		if ran, _ := os.ReadFile(calls); strings.Contains(string(ran), "chasen-server login") {
+			t.Errorf("ssh ran:\n%s\nwant no new login: the computer has one", ran)
+		}
+	})
+
+	t.Run("two servers in one command is an error", func(t *testing.T) {
+		app(t)
+
+		err := runClient([]string{"deploy", "root@a.example.com", "root@b.example.com"})
+
+		if err == nil || !strings.Contains(err.Error(), "usage: chasen deploy") {
+			t.Errorf("got %v", err)
+		}
+	})
+}

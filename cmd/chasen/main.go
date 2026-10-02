@@ -19,7 +19,7 @@ const usage = `Usage: chasen <command>
   chasen                 With no command: the screen of your server. Its load, and the state,
                          history, backups, domains, and logs of each app. Keys restart and restore
 
-  add server <user>@<host>   Use your own server, through SSH. A new machine gets Chasen first
+  add server <user>@<host>   Log in to your own server through SSH, with no deploy
   add server <domain>    Use your own server through its address on the web, with a browser
   login                  Log in to the Chasen cloud instead
   servers                List the servers you are logged in to. The star marks the current one
@@ -30,6 +30,8 @@ const usage = `Usage: chasen <command>
 
 Run these in the directory of your app:
   deploy                 Build the image of the current git commit, push it, and deploy it.
+  deploy <user>@<host>   The same, to that server, through SSH. The first time, the server
+                         gets Chasen and this computer gets its login: no other step
                          A directory with an index.html and no Dockerfile is a website
                          --tag <tag> deploys an image that is already in the registry. No build
                          --domain <domain> gives a new app its domain. A server with no base
@@ -60,6 +62,10 @@ Run these in the directory of your app:
   remove                 Stop the app. Keeps the data and the backups
   list                   List all apps on the server
   load                   Show the load, the memory, and the disk of the server
+  bucket                 Show where the backups of the server go
+  bucket --endpoint <url> --name <bucket> --access-key-id <id> [--region <region>]
+                         Send the backups to an S3 bucket too, and start the live replica.
+                         It asks for the secret access key
 
 Addons run from a ready image, with the same backups:
   enable <addon> [domain]   Run fusionaly, formlander, or lognorth. Run it again to update
