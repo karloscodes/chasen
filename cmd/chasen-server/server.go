@@ -86,6 +86,8 @@ func runServer(args []string) error {
 		return serverLoad()
 	case "quiet-hour":
 		return serverQuietHour()
+	case "adopt":
+		return serverAdopt(args)
 	case "backup":
 		if len(args) == 0 {
 			return backupAll()
@@ -157,6 +159,9 @@ func runServer(args []string) error {
 func lock() error {
 	if err := os.MkdirAll(filepath.Dir(configPath()), 0755); err != nil {
 		return err
+	}
+	if lockFile != nil {
+		return nil // this process has the lock already
 	}
 	var err error
 	lockFile, err = os.OpenFile(filepath.Dir(configPath())+"/lock", os.O_CREATE|os.O_RDWR, 0600)

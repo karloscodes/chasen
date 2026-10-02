@@ -41,6 +41,7 @@ On the server, as root:
 | `chasen-server list` | List all apps |
 | `chasen-server quiet-hour` | Print the hour of the day with the fewest requests in the last week, for work that takes the server away |
 | `chasen-server backup` | Back up every app now |
+| `chasen-server adopt <app>` | Take over an app that [matcha](https://github.com/karloscodes/matcha) runs on this server. See "Coming from matcha" below |
 
 ## Run a command in the app
 
@@ -72,6 +73,24 @@ You get a shell in the container that has the traffic, with the env, the secrets
 - **The history has it:** when the shell opened and for how long, not what you typed.
 - **It needs a shell in the image.** An image with no `sh` (distroless, scratch) has nothing to open.
 - **A pipe works too:** `echo "bin/rails runner 'puts User.count'" | chasen ssh` runs the lines and ends with the exit code of the shell.
+
+## Coming from matcha
+
+A server that runs its apps with matcha can move to Chasen one app at a time, with no downtime and no copy of data. Chasen is built on matcha: it uses the same proxy, the same names for containers, and the same directories for the data. So the app does not move. Only its record does.
+
+```bash
+curl -fsSL https://chasenhq.com/server | sudo sh
+sudo chasen-server setup --domain example.com    # next to matcha: the proxy that runs stays as it is
+sudo chasen-server adopt shop                     # for each app
+```
+
+- **Nothing restarts.** The container keeps running, with its env, its domains, and its databases in `/var/matcha/shop`.
+- **The record moves** from `/etc/matcha/config.yml` to Chasen, as it is. matcha does not know the app any more, so its updates leave it alone. A copy of the file from before stays next to it.
+- **From then on** `chasen status`, `logs`, `backup`, `restore`, `domains`, `ssh`, and `restart` work on the app, and the hourly backups include it.
+- **The first `chasen restart`** starts the app again from the same record, with the health check and the swap that matcha did. If the new container does not get healthy, the old one keeps the traffic.
+- **The way back:** `sudo chasen-server adopt --undo shop`.
+
+If a nightly job on the server updates the app with matcha (a cron line with `matcha update`), turn that job off for an app you adopt.
 
 ## The screen
 
