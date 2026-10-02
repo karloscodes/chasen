@@ -230,12 +230,21 @@ func cleanLines(output string) []string {
 	return lines
 }
 
-// parseApps reads the table of `chasen list`: NAME, VERSION, DOMAINS.
+// parseApps reads the table of `chasen list`: NAME, VERSION, DOMAINS. The
+// cloud puts the server of each app in a first column, SERVER. The screen
+// leaves it out.
 func parseApps(output string) []appRow {
 	var apps []appRow
-	for i, line := range cleanLines(output) {
-		cells := columns.Split(strings.TrimSpace(line), 3)
-		if i == 0 || cells[0] == "" {
+	lines := cleanLines(output)
+	withServer := len(lines) > 0 && strings.HasPrefix(lines[0], "SERVER")
+	for i, line := range lines {
+		cells := columns.Split(strings.TrimSpace(line), 4)
+		if withServer {
+			cells = cells[min(1, len(cells)):]
+		} else if len(cells) == 4 {
+			cells = append(cells[:2], cells[2]+"  "+cells[3])
+		}
+		if i == 0 || len(cells) == 0 || cells[0] == "" {
 			continue
 		}
 		app := appRow{Name: cells[0]}
