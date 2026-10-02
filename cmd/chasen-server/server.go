@@ -205,8 +205,8 @@ func readServerConfig() (cfg serverConfig, found bool, err error) {
 
 	// A server with an empty database takes its settings from config.yml, one
 	// time. That is the move from an older version, and it is also how a
-	// script gives a new server its domain and its token before `setup`: the
-	// first-boot script of the Chasen cloud does. Keep it.
+	// script gives a new server its domain and its token before `setup`.
+	// Programs outside this repository use it. Keep it.
 	if len(saved) == 0 {
 		data, err := os.ReadFile(configPath())
 		if errors.Is(err, fs.ErrNotExist) {

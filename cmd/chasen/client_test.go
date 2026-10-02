@@ -134,7 +134,7 @@ func TestChoosePlacement(t *testing.T) {
 	})
 
 	t.Run("one server and no way to create another: no question", func(t *testing.T) {
-		only := protocol.Placement{Servers: withServer.Servers, Reason: "set HCLOUD_TOKEN"}
+		only := protocol.Placement{Servers: withServer.Servers, Reason: "this cloud cannot create servers now"}
 		var out strings.Builder
 
 		choice, err := choosePlacement("shop", only, strings.NewReader(""), &out)

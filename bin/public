@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# This repository is public, and the Chasen cloud is not. This check fails
+# when a file here, or the message of a new commit, has a name from the inside
+# of the cloud. It knows names, not ideas: it is a net under the rule in
+# CLAUDE.md, not the rule.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# Names that exist only inside the cloud. "The cloud creates a server at
+# Hetzner" is public, and passes.
+inside='HCLOUD_|CLOUDFLARE_API|CLOUDFLARE_ZONE|api\.hetzner\.cloud|api\.cloudflare\.com|\.env\.cloud|chasen-cloud|first-boot script|chasen-quiet|bin/chasen-reboot|chasen-reboot(-hour)?\.(sh|timer|service)|quiet reboot|edge (machine|server|of the cloud)|the edge left'
+# The check began after this commit. Older messages stay as they are.
+since=dd0bedb
+
+failed=0
+if git grep -n -I -i -E "$inside" -- . ':!bin/public'; then
+  echo "bin/public: the lines above name the inside of the cloud. Say the general reason, or move the text to the cloud." >&2
+  failed=1
+fi
+if git log --format='%h %s%n%b' "$since..HEAD" 2>/dev/null | grep -n -i -E "$inside"; then
+  echo "bin/public: a commit message names the inside of the cloud. Change the message before the push." >&2
+  failed=1
+fi
+exit $failed

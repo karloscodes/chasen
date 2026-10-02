@@ -1,6 +1,6 @@
 [tasks.test]
-description = "Unit tests. No Docker"
-run = "go vet ./... && go test ./..."
+description = "Unit tests, and the check that nothing of the cloud's inside is here. No Docker"
+run = "bin/public && go vet ./... && go test ./..."
 
 [tasks.e2e]
 description = "End-to-end test: real Docker, proxy on ports 80/443, S3 store. Needs sudo"

@@ -6,7 +6,7 @@
 #
 # The machine needs no sudo for its network and takes no port 80 or 443 on this
 # computer, so it does not collide with other work. It has no systemd: the
-# hardening step of the first-boot script is skipped, and this script starts
+# hardening of a real server is skipped, and this script starts
 # Docker by hand.
 set -euo pipefail
 cd "$(dirname "$0")/.."
