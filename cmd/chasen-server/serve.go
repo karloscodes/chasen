@@ -93,7 +93,7 @@ func serverServe() error {
 	})
 	mux.HandleFunc("GET "+protocol.DownloadPath, func(w http.ResponseWriter, r *http.Request) {
 		if allowed(w, r) {
-			serveDownload(w, r)
+			serveDownload(w, r, db)
 		}
 	})
 	mux.HandleFunc("POST /v1/{command}", func(w http.ResponseWriter, r *http.Request) {

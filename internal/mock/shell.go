@@ -29,6 +29,9 @@ func (s *Server) shell(w http.ResponseWriter, r *http.Request) {
 				send(true, "%s app %q is not deployed", protocol.ShellError, name)
 				return
 			}
+			s.mu.Lock()
+			s.app(name).record("ssh", "succeeded", "A shell in the container.\n")
+			s.mu.Unlock()
 			send(false, "The mock server has no container. This shell repeats each line. exit ends it.\r\n%s$ ", name)
 			var line []byte
 			for {
@@ -103,6 +106,9 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	s.mu.Lock()
+	a.record("download "+stamp, "succeeded", "The databases of the backup "+stamp+" went to the client.\n")
+	s.mu.Unlock()
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.tar.gz"`, a.name, stamp))
 	zip := gzip.NewWriter(w)

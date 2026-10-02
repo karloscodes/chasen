@@ -28,8 +28,13 @@ func TestDownload(t *testing.T) {
 		}
 	}
 	download := func(query string) *httptest.ResponseRecorder {
+		db, err := openServerDB()
+		if err != nil {
+			panic(err)
+		}
+		defer db.Close()
 		answer := httptest.NewRecorder()
-		serveDownload(answer, httptest.NewRequest("GET", "/v1/download?"+query, nil))
+		serveDownload(answer, httptest.NewRequest("GET", "/v1/download?"+query, nil), db)
 		return answer
 	}
 	server := func(t *testing.T) {
@@ -62,6 +67,18 @@ func TestDownload(t *testing.T) {
 		content, _ := io.ReadAll(archive)
 		if file.Name != "storage/db.sqlite3" || string(content) != "the newer database" {
 			t.Fatalf("got the file %q with %q, want storage/db.sqlite3 with the newer database, not compressed", file.Name, content)
+		}
+	})
+
+	t.Run("the history says that the data left the server", func(t *testing.T) {
+		server(t)
+		backup(t, "20261002T120000Z", "the database")
+
+		download("arg=shop")
+
+		got := query(t, root()+"/etc/chasen/server.sqlite3", "SELECT action || ' ' || status FROM activity WHERE app = 'shop'")
+		if got != "download 20261002T120000Z succeeded" {
+			t.Fatalf("the history has %q", got)
 		}
 	})
 

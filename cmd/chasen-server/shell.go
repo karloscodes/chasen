@@ -53,9 +53,10 @@ func serveShell(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		// The token is the check. A browser cannot send it, so the origin says nothing.
 		Handshake: func(*websocket.Config, *http.Request) error { return nil },
 		Handler: func(ws *websocket.Conn) {
-			container, err := activeContainer(name)
-			if _, known := loadApp(name); known != nil {
-				err = known
+			_, err := loadApp(name)
+			container := ""
+			if err == nil {
+				container, err = activeContainer(name)
 			}
 			if err != nil {
 				protocol.ShellCodec.Send(ws, protocol.ShellMessage{Text: true, Data: []byte(protocol.ShellError + " " + err.Error())})
@@ -64,12 +65,14 @@ func serveShell(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 			// The feed says who was in the container and for how long, not what they typed.
 			activity, _ := startActivity(db, name, "ssh")
 			start := time.Now()
-			code, err := shellSession(ws, container, cols, rows)
+			_, err = shellSession(ws, container, cols, rows)
 			output := fmt.Sprintf("A shell in the container, for %s.\n", time.Since(start).Round(time.Second))
 			if err != nil {
 				output += "Error: " + err.Error() + "\n"
 			}
-			finishActivity(db, activity, err == nil && code == 0, output)
+			// The exit code of a shell is the one of the last command typed: it
+			// says nothing about the session.
+			finishActivity(db, activity, err == nil, output)
 		},
 	}.ServeHTTP(w, r)
 }

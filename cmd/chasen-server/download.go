@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -16,7 +17,7 @@ import (
 // serveDownload answers GET /v1/download: the databases of one backup of an
 // app, as a tar.gz file. This is how the owner takes the data away: to look
 // at it, to keep a copy, or to leave. The caller checked the token.
-func serveDownload(w http.ResponseWriter, r *http.Request) {
+func serveDownload(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	args := r.URL.Query()["arg"]
 	if len(args) == 0 || len(args) > 2 || checkAppName(args[0]) != nil {
 		http.Error(w, "usage: /v1/download?arg=<app>[&arg=<backup>]", http.StatusBadRequest)
@@ -41,13 +42,17 @@ func serveDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	// The feed has it: the data of the app left the server.
+	activity, _ := startActivity(db, name, "download "+stamp)
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.tar.gz"`, name, stamp))
 	if err := writeBackup(w, filepath.Join(backupsDir(name), stamp), stamp); err != nil {
+		finishActivity(db, activity, false, "The download stopped before the end: "+err.Error()+"\n")
 		// The file is half sent. Break the connection, so the client does not
 		// take a part of a backup for a backup.
 		panic(http.ErrAbortHandler)
 	}
+	finishActivity(db, activity, true, "The databases of the backup "+stamp+" went to the client.\n")
 }
 
 // writeBackup writes the databases of a local backup as a tar.gz archive.
@@ -64,6 +69,8 @@ func writeBackup(out io.Writer, dir, stamp string) error {
 	for _, file := range files {
 		// A tar entry starts with its size, and the size of a database is
 		// known only after it is unpacked. So read it two times: count, then copy.
+		// ponytail: two passes cost time for a database of several GB. Send
+		// the .gz files as they are when a download gets slow.
 		size, err := unpack(io.Discard, filepath.Join(dir, file))
 		if err != nil {
 			return err
