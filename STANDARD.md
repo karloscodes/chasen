@@ -104,6 +104,8 @@ In both ways, Chasen makes a checked backup of every database before the migrati
 | `APP_VERSION` | the git commit | |
 | `APP_ENV` | `production` | |
 
+The engine also sets four variables with the name of the app in front, for an app that was made for matcha: `SHOP_PRIVATE_KEY`, `SHOP_DOMAIN`, `SHOP_APP_PORT`, and `SHOP_ENV`. `chasen check` sets them too.
+
 **Rules for the app:**
 
 - All configuration comes from environment variables. No config file that differs between your machine and the server.

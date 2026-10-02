@@ -143,3 +143,17 @@ func TestShellOverTheProtocol(t *testing.T) {
 		}
 	})
 }
+
+func TestSecretsFromACommand(t *testing.T) {
+	t.Run("a value in double quotes loses the quotes and the escapes of the tool that printed it", func(t *testing.T) {
+		// What `fnox export` prints for the value: a "quote", a \ and = sign
+		env := parseDotenv(`KEY="a \"quote\", a \\ and = sign"` + "\nPLAIN=abc123\nexport OTHER='single \\n stays'\n# a comment\n")
+
+		if env["KEY"] != `a "quote", a \ and = sign` {
+			t.Errorf("KEY is %q", env["KEY"])
+		}
+		if env["PLAIN"] != "abc123" || env["OTHER"] != `single \n stays` {
+			t.Errorf("got %q", env)
+		}
+	})
+}

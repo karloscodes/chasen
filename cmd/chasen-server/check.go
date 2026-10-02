@@ -8,11 +8,26 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/karloscodes/matcha"
 )
+
+// engineEnv is the env that the engine adds to every container at a deploy,
+// with the name of the app in front: SHOP_PRIVATE_KEY, SHOP_DOMAIN,
+// SHOP_APP_PORT, and SHOP_ENV. An app made for matcha reads them. The check
+// gives them too: an app must not pass a deploy and fail the check.
+func engineEnv(name, domain string, port int, privateKey string) map[string]string {
+	prefix := strings.ToUpper(name)
+	return map[string]string{
+		prefix + "_PRIVATE_KEY": privateKey,
+		prefix + "_DOMAIN":      domain,
+		prefix + "_APP_PORT":    strconv.Itoa(port),
+		prefix + "_ENV":         "production",
+	}
+}
 
 // serverCheck tests one commit against the standard. It gets the image and
 // runs it next to the live app, with no traffic and an empty storage, and
@@ -80,7 +95,11 @@ func serverCheck(name, version string) error {
 	// `-e NAME` takes the value from the environment of the docker command, so
 	// a secret is not in its arguments, where every user of the server sees it.
 	var env []string
-	for k, v := range appEnv(settings, []string{name + ".check"}, version, privateKey, sh) {
+	checked := appEnv(settings, []string{name + ".check"}, version, privateKey, sh)
+	for k, v := range engineEnv(name, name+".check", sh.Port, privateKey) {
+		checked[k] = v
+	}
+	for k, v := range checked {
 		args = append(args, "-e", k)
 		env = append(env, k+"="+v)
 	}

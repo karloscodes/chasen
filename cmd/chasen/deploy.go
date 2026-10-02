@@ -265,6 +265,8 @@ func secretValues(app appFile, names []string) (map[string]string, error) {
 
 // parseDotenv reads KEY=VALUE lines. It accepts an `export ` prefix and quotes.
 // ponytail: one line per value. Multi-line values need a real dotenv parser.
+var dotenvEscapes = strings.NewReplacer(`\\`, `\`, `\"`, `"`, `\n`, "\n")
+
 func parseDotenv(s string) map[string]string {
 	env := map[string]string{}
 	for _, line := range strings.Split(s, "\n") {
@@ -275,7 +277,12 @@ func parseDotenv(s string) map[string]string {
 		}
 		value = strings.TrimSpace(value)
 		if len(value) >= 2 && (value[0] == '"' || value[0] == '\'') && value[len(value)-1] == value[0] {
+			double := value[0] == '"'
 			value = value[1 : len(value)-1]
+			// A tool that prints "..." escapes a quote and a backslash inside it.
+			if double {
+				value = dotenvEscapes.Replace(value)
+			}
 		}
 		env[strings.TrimSpace(key)] = value
 	}

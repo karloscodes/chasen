@@ -171,3 +171,14 @@ func TestAddonKeepsItsEnvAtAnUpdate(t *testing.T) {
 		t.Errorf("the env of the standard is not there: %v", env)
 	}
 }
+
+func TestCheckHasTheEnvOfADeploy(t *testing.T) {
+	env := engineEnv("fusionaly", "fusionaly.check", 8080, "the-key")
+
+	want := map[string]string{"FUSIONALY_PRIVATE_KEY": "the-key", "FUSIONALY_DOMAIN": "fusionaly.check", "FUSIONALY_APP_PORT": "8080", "FUSIONALY_ENV": "production"}
+	for name, value := range want {
+		if env[name] != value {
+			t.Errorf("%s is %q, want %q: the engine sets it at a deploy, so the check must too", name, env[name], value)
+		}
+	}
+}
