@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -30,6 +31,17 @@ var DefaultVolumes = []string{"/storage", "/rails/storage"}
 // StandardEnv are the names that Chasen sets in every container. The
 // settings of an app cannot set them.
 var StandardEnv = []string{"PORT", "BASE_URL", "SECRET_KEY_BASE", "PRIVATE_KEY", "STORAGE_DIR", "DATABASE_PATH", "APP_VERSION", "APP_ENV"}
+
+// The secret key of an app has two names: SECRET_KEY_BASE (Rails, ONCE) and
+// PRIVATE_KEY (matcha). The server makes the key at the first deploy and
+// keeps it. A deploy can bring the key as a secret instead: then the key is
+// the owner's, and a new server gets the same one.
+var secretKeyNames = []string{"SECRET_KEY_BASE", "PRIVATE_KEY"}
+
+// SecretKey returns the secret key that the settings bring, or "".
+func (s Settings) SecretKey() string {
+	return cmp.Or(s.Env["SECRET_KEY_BASE"], s.Env["PRIVATE_KEY"])
+}
 
 var (
 	appNameRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -80,9 +92,16 @@ func (s Settings) Check() error {
 		switch {
 		case !envKeyRe.MatchString(key):
 			problems = append(problems, fmt.Errorf("invalid env name %q: use letters, digits, and _", key))
-		case slices.Contains(StandardEnv, key):
+		case slices.Contains(StandardEnv, key) && !slices.Contains(secretKeyNames, key):
 			problems = append(problems, fmt.Errorf("chasen sets %s itself. Remove it from chasen.yml", key))
 		}
+	}
+	base, private := s.Env["SECRET_KEY_BASE"], s.Env["PRIVATE_KEY"]
+	switch key := s.SecretKey(); {
+	case base != "" && private != "" && base != private:
+		problems = append(problems, errors.New("SECRET_KEY_BASE and PRIVATE_KEY are one secret in Chasen, and they have two values. Keep one of them in `secrets:`"))
+	case key != "" && len(key) < 32:
+		problems = append(problems, errors.New("the secret key is too short: use 32 characters or more. Make one: openssl rand -hex 32"))
 	}
 	if s.Image != "" && !imageRe.MatchString(s.Image) {
 		problems = append(problems, fmt.Errorf("invalid image %q: use the form ghcr.io/you/app:tag, in lowercase", s.Image))

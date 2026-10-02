@@ -66,4 +66,6 @@ When a server is gone, these steps bring everything back:
 4. Run `chasen deploy` for each app, and `chasen enable` for each addon. When the server has no data for the app and the bucket has a copy, the deploy restores it first: the live replica, or the newest snapshot if the replica fails.
 5. Add the custom domains again (`chasen domains add`). They were on the old server.
 
+The new server makes a new secret key for each app, unless the deploy brings one: an app with `SECRET_KEY_BASE` in its `secrets:` gets its old key back. Without it, people log in again, and data that the app encrypted with the old key stays unreadable. See [the standard](../STANDARD.md#4-environment).
+
 An app name owns its data. A new app that reuses the name of an old app gets the data of the old app.

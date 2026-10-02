@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"errors"
 	"flag"
 	"fmt"
@@ -683,7 +684,8 @@ func serverDeploy(name, version string) error {
 
 	old, oldErr := loadApp(name)
 	domains := []string{name + "." + cfg.Domain}
-	privateKey := old.Env["PRIVATE_KEY"]
+	// The key that the deploy brings, then the key the app has, then a new one.
+	privateKey := cmp.Or(settings.SecretKey(), old.Env["PRIVATE_KEY"])
 	if oldErr == nil {
 		domains = strings.Split(old.Domain, ",")
 	}
@@ -766,7 +768,7 @@ func serverRestart(name string) error {
 		}
 		version := app.Image[strings.LastIndex(app.Image, ":")+1:]
 		app.Port, app.HealthPath, app.HealthTimeout, app.Volumes = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes
-		app.Env = appEnv(settings, strings.Split(app.Domain, ","), version, app.Env["PRIVATE_KEY"], sh)
+		app.Env = appEnv(settings, strings.Split(app.Domain, ","), version, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
 	}
 	fmt.Println("Restarting", name)
 	if err := apply(name, app); err != nil {

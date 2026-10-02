@@ -91,7 +91,7 @@ In both ways, Chasen makes a checked backup of every database before the migrati
 
 ## 4. Environment
 
-**Chasen sets these in every container.** An app must not set them itself, and `chasen.yml` cannot change them:
+**Chasen sets these in every container.** An app must not set them itself, and `chasen.yml` cannot change them, with one exception: the secret key.
 
 | Variable | Value | Same as |
 |---|---|---|
@@ -103,6 +103,12 @@ In both ways, Chasen makes a checked backup of every database before the migrati
 | `DATABASE_PATH` | `$STORAGE_DIR/db.sqlite3`: a suggestion for an app with one database | |
 | `APP_VERSION` | the git commit | |
 | `APP_ENV` | `production` | |
+
+**The secret key.** `SECRET_KEY_BASE` and `PRIVATE_KEY` are one secret with two names. An app signs its sessions with it, and some apps encrypt data with it.
+
+- By default the server makes the key at the first deploy and keeps it. That is enough for an app that only signs sessions: with a new key, people log in again.
+- When the data of the app cannot be read without the key, keep the key yourself. Add `SECRET_KEY_BASE` to `secrets:` in `chasen.yml` and put the value in your secret store, 32 characters or more (`openssl rand -hex 32`). Then every deploy brings the key, and a new server gets the same one.
+- To take over the key of an app that runs already, read it first: `chasen run printenv SECRET_KEY_BASE`. A different key logs everybody out and can make encrypted data unreadable.
 
 The engine also sets four variables with the name of the app in front, for an app that was made for matcha: `SHOP_PRIVATE_KEY`, `SHOP_DOMAIN`, `SHOP_APP_PORT`, and `SHOP_ENV`. `chasen check` sets them too.
 
@@ -126,7 +132,7 @@ A secret is a variable whose value must not be in git or in the image.
 - On the server, the values are in a file that only root can read, and they reach the container as environment variables. Whoever is root on the server can read them.
 - To rotate a secret, change it in your secret store and run `chasen restart`. No build.
 
-Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a server that is gone costs you a new server and a `chasen deploy`, not a hunt for lost keys.
+Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a server that is gone costs you a new server and a `chasen deploy`, not a hunt for lost keys. One key is the exception until you take it: the secret key that the server makes for the app (see "Environment").
 
 ## 6. Logs and signals
 

@@ -31,6 +31,10 @@ func deploy(creds credentials, app appFile, command string) error {
 	if err != nil {
 		return err
 	}
+	// The values of the secrets are here now: check the ones that have a rule.
+	if err := settings.Check(); err != nil {
+		return fmt.Errorf("chasen.yml: %w", err)
+	}
 	if command == "deploy" {
 		if creds, err = placed(creds, app.Name); err != nil {
 			return err

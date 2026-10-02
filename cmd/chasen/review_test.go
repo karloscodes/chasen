@@ -53,11 +53,21 @@ Error: chasen.yml: the volumes /a/data and /b/data end in the same name. Rename 
 	})
 
 	t.Run("a secret that has a name of the standard is an error too", func(t *testing.T) {
+		app := appFile{Name: "shop", Secrets: []string{"DATABASE_PATH"}}
+
+		output, stopped := review(reviewAppFile(app, true, ""))
+
+		if !stopped || !strings.Contains(output, "Error: chasen.yml: chasen sets DATABASE_PATH itself") {
+			t.Errorf("stopped = %v, output:\n%s", stopped, output)
+		}
+	})
+
+	t.Run("the secret key of the app can come as a secret: then the owner keeps it", func(t *testing.T) {
 		app := appFile{Name: "shop", Secrets: []string{"SECRET_KEY_BASE"}}
 
 		output, stopped := review(reviewAppFile(app, true, ""))
 
-		if !stopped || !strings.Contains(output, "Error: chasen.yml: chasen sets SECRET_KEY_BASE itself") {
+		if output != "" || stopped {
 			t.Errorf("stopped = %v, output:\n%s", stopped, output)
 		}
 	})

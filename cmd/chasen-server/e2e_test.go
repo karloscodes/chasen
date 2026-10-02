@@ -314,7 +314,9 @@ func TestEndToEnd(t *testing.T) {
 
 	t.Run("restart applies new configuration and secrets, from the same image", func(t *testing.T) {
 		// The change is in the working directory only: a restart needs no commit.
-		os.WriteFile(filepath.Join(app, "chasen.yml"), []byte(yml+"port: 9000\nenv:\n  GREETING: adios\nsecrets: [TOKEN]\nsecrets_command: echo TOKEN=rotated\n"), 0644)
+		// The secret key of the app comes as a secret too: then it is the owner's key, not one the server made.
+		const key = "0123456789abcdef0123456789abcdef-kept-by-the-owner"
+		os.WriteFile(filepath.Join(app, "chasen.yml"), []byte(yml+"port: 9000\nenv:\n  GREETING: adios\nsecrets: [TOKEN, SECRET_KEY_BASE]\nsecrets_command: printf 'TOKEN=rotated\\nSECRET_KEY_BASE="+key+"\\n'\n"), 0644)
 
 		out := must(app, bin, "restart")
 
@@ -326,8 +328,15 @@ func TestEndToEnd(t *testing.T) {
 		if values != "adios rotated 9000" {
 			t.Errorf("env in the container = %q, want the new greeting, the rotated secret, and the port of chasen.yml", values)
 		}
+		if keys, _ := docker("exec", greeting, "sh", "-c", "echo $SECRET_KEY_BASE $PRIVATE_KEY"); keys != key+" "+key {
+			t.Errorf("the secret key in the container = %q, want the key that the deploy brought, under both names", keys)
+		}
 		must(app, "git", "checkout", "-q", "chasen.yml")
 		must(app, bin, "restart")
+		// A restart that brings no key keeps the one the app has.
+		if out := must(app, bin, "run", "sh", "-c", "echo $SECRET_KEY_BASE"); !strings.Contains(out, key) {
+			t.Errorf("the secret key after a restart with no key = %q, want the same key", out)
+		}
 	})
 
 	t.Run("run runs a command in the container of the app, and gives its exit code back", func(t *testing.T) {
