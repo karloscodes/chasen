@@ -26,6 +26,7 @@ Run these on the server, as root:
   check                          Check the security of the server (with no arguments)
   list                           List all apps
   load                           Show the load, the memory, and the disk of the server
+  quiet-hour                     Print the hour of the day with the fewest requests, from the last week
   backup                         Back up every app now
 
 The API runs these for the chasen client:

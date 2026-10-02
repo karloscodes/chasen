@@ -156,4 +156,14 @@ cat /var/run/reboot-required   # the file exists when a reboot is waiting
 reboot
 ```
 
-To move the reboot to another hour, keep `"true"` and change `Automatic-Reboot-Time`. A server from the Chasen cloud has the reboot on, at about 04:00 in its own region; the same file turns it off.
+To move the reboot to another hour, keep `"true"` and change `Automatic-Reboot-Time`.
+
+**The server knows its quiet hour.** The proxy logs each request, so the server can count them. This command prints the hour of the day with the fewest requests to your apps in the last week, in the time zone of the server:
+
+```bash
+chasen-server quiet-hour   # 03:00
+```
+
+Put that hour in `Automatic-Reboot-Time`. The command needs one full day of log before it answers.
+
+A server from the Chasen cloud has the reboot on. It starts at about 04:00 in its own region, and moves to its quiet hour each week. The same file turns it off.

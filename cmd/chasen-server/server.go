@@ -87,6 +87,8 @@ func runServer(args []string) error {
 		return serverList()
 	case "load":
 		return serverLoad()
+	case "quiet-hour":
+		return serverQuietHour()
 	case "backup":
 		if len(args) == 0 {
 			return backupAll()
