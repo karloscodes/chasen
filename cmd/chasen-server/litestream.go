@@ -102,6 +102,11 @@ func serverReplicate() error {
 	if cfg.Backup.S3 == nil {
 		return errors.New("no live replica: this server has no bucket")
 	}
+	// CHASEN_DEBUG=1 shows what Litestream decides at each sync, and why it
+	// takes a full copy when it does.
+	if os.Getenv("CHASEN_DEBUG") != "" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
 	// One daemon at a time. A restore holds this lock while it replaces the databases.
 	if err := waitForReplicaLock(); err != nil {
 		return err
@@ -127,7 +132,13 @@ func serverReplicate() error {
 			if !backedUp(name) {
 				continue
 			}
-			dbs, err := findDatabases(appDir(name))
+			// The databases that this process replicates stay closed here: to
+			// open and close one would drop the locks of its replica.
+			held := map[string]bool{}
+			for path := range registered {
+				held[path] = true
+			}
+			dbs, err := findDatabasesBut(appDir(name), held)
 			if err != nil {
 				slog.Error("cannot read the data directory", "app", name, "error", err)
 			}

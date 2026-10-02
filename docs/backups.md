@@ -76,7 +76,7 @@ So the replica holds one full copy and the changes of one day, and for a moment 
 Three things make a replica larger than you expect:
 
 - **An app that writes the same pages over and over.** A database of 40 MB that writes 4 GB of changes in a day has a replica of several GB. Fix the app: write in transactions, not one commit for each row.
-- **A restart of the server** (an update, a restore) adds one full copy. It goes away with the next daily cleanup.
+- **A restart of the server** (an update, a restore) can add one full copy of a busy database. The replica is away for some seconds. An app that writes a lot in that time starts its write-ahead log again, and the replica can no longer read the changes that it missed, so it copies the whole database. A quiet app gets no full copy. The extra copy goes away with the next daily cleanup.
 - **Files of an app that is gone.** Chasen does not delete the files of an app that you removed. Delete its folder in the bucket by hand.
 
 **An app with no backups.** Some data is not worth a copy: a demo that makes its data again at each start. Say so in the `chasen.yml` of that app, and deploy it:

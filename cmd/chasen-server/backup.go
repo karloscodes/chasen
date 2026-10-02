@@ -47,7 +47,20 @@ func localBackups(name string) []string {
 
 // findDatabases returns the SQLite files in the volumes of an app, relative to dir.
 // It reads the file header, so the file name does not matter.
-func findDatabases(dir string) ([]string, error) {
+func findDatabases(dir string) ([]string, error) { return findDatabasesBut(dir, nil) }
+
+// findDatabasesBut is findDatabases for a process that has databases open: it
+// does not open the files that the process knows to be databases, and takes
+// them as databases.
+//
+// On Linux, a process that closes a file loses every lock it holds on that
+// file, also the locks that another part of the process took. The live
+// replica holds its databases with such locks: that is what keeps an app from
+// starting its write-ahead log again, or deleting it, behind the back of the
+// replica. So the replica must never open and close a database that it
+// replicates, and never its -wal or -shm file. Nothing here opens those two:
+// they are never databases.
+func findDatabasesBut(dir string, known map[string]bool) ([]string, error) {
 	var dbs []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		// Skip what is not live data: the backups, the databases a restore moved
@@ -58,6 +71,14 @@ func findDatabases(dir string) ([]string, error) {
 		if err != nil || !d.Type().IsRegular() {
 			return err
 		}
+		if strings.HasSuffix(path, "-wal") || strings.HasSuffix(path, "-shm") {
+			return nil
+		}
+		rel, _ := filepath.Rel(dir, path)
+		if known[path] {
+			dbs = append(dbs, rel)
+			return nil
+		}
 		f, err := os.Open(path)
 		if err != nil {
 			return err
@@ -65,7 +86,6 @@ func findDatabases(dir string) ([]string, error) {
 		defer f.Close()
 		header := make([]byte, 16)
 		if _, err := io.ReadFull(f, header); err == nil && string(header) == "SQLite format 3\x00" {
-			rel, _ := filepath.Rel(dir, path)
 			dbs = append(dbs, rel)
 		}
 		return nil
