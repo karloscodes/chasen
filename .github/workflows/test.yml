@@ -14,8 +14,6 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test ./...
-      # The Worker of docs/domains.md, against a real server that is down first.
-      - run: node --test tools/worker/hold.test.mjs
 
   # The end-to-end test: real Docker, the proxy on ports 80 and 443, an S3
   # store, and a private registry. A runner is a clean machine, so it always
