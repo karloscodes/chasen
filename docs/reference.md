@@ -40,7 +40,6 @@ On the server, as root:
 | `chasen-server check` | Report what the security of the server lacks |
 | `chasen-server list` | List all apps |
 | `chasen-server quiet-hour` | Print the hour of the day with the fewest requests in the last week, for work that takes the server away |
-| `chasen-server settings https off` | For a server behind a proxy or a load balancer that does HTTPS. The server then answers plain HTTP and gets no certificates. Keep port 80 closed to everything but that proxy |
 | `chasen-server backup` | Back up every app now |
 
 ## Run a command in the app

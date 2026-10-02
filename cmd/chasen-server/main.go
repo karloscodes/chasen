@@ -20,7 +20,6 @@ Run these on the server, as root:
   settings                       Show the settings of the server
   settings auto_update on|off    Turn the nightly update on or off
   settings heartbeat_url <url>   Call this URL after each hourly backup that worked. "" turns it off
-  settings https on|off          Off when another proxy in front of this server does HTTPS
   token                          Print the login token
   update                         Install the newest release now. A timer does this each night
   check                          Check the security of the server (with no arguments)

@@ -267,26 +267,20 @@ func startAgent(self string) error {
 
 // routeAgent makes the proxy serve the API on api.<base domain>, with a
 // certificate. It reports false when the proxy does not run yet.
-func routeAgent(cfg serverConfig) (bool, error) {
+func routeAgent(domain string) (bool, error) {
 	if running, _ := docker("ps", "-q", "--filter", "name=^matcha-proxy$"); running == "" {
 		return false, nil
 	}
-	if out, err := docker(agentRoute(cfg)...); err != nil {
+	args := []string{"exec", "matcha-proxy", "kamal-proxy", "deploy", agentContainer,
+		"--target", agentContainer + ":" + apiPort, "--host", "api." + domain,
+		"--health-check-path", "/up", "--target-timeout", "1h"}
+	if !isLocal(domain) {
+		args = append(args, "--tls")
+	}
+	if out, err := docker(args...); err != nil {
 		return false, fmt.Errorf("cannot route the API: %s", out)
 	}
 	return true, nil
-}
-
-// agentRoute is the docker command that routes the API. The API gets a
-// certificate, unless the domain is local or another proxy does HTTPS.
-func agentRoute(cfg serverConfig) []string {
-	args := []string{"exec", "matcha-proxy", "kamal-proxy", "deploy", agentContainer,
-		"--target", agentContainer + ":" + apiPort, "--host", "api." + cfg.Domain,
-		"--health-check-path", "/up", "--target-timeout", "1h"}
-	if !isLocal(cfg.Domain) && !cfg.PlainHTTP {
-		args = append(args, "--tls")
-	}
-	return args
 }
 
 // isLocal reports a domain that only resolves on this machine. It gets no certificate.
