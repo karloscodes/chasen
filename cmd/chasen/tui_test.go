@@ -69,6 +69,10 @@ func newTestServer(t *testing.T) *testServer {
 		case "logs":
 			output = "GET /up 200\nGET / 200\n"
 		case "backup":
+			if name == "blog" {
+				io.WriteString(w, "Error: the disk of the server is full\n"+protocol.ExitMarker+"1\n")
+				return
+			}
 			output = name + ": backup 20261001T120000Z (on the server and offsite)\n"
 		default:
 			output = "done: " + command + "\n"
@@ -120,6 +124,14 @@ func (sc *screen) settle() {
 			return
 		}
 	}
+}
+
+// ticks lets the clock of the screen run: eight ticks are one second.
+func (sc *screen) ticks(count int) {
+	for range count {
+		sc.tui.handle(tickEvent{})
+	}
+	sc.settle()
 }
 
 func (sc *screen) press(keys ...string) {
@@ -314,6 +326,69 @@ func TestScreen(t *testing.T) {
 		}
 	})
 
+	t.Run("each tab and each action shows the line of the CLI that does the same", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+
+		sc.shows("$ chasen -a shop status")
+		sc.press("3")
+		sc.shows("$ chasen -a shop backups")
+		sc.press("b")
+		sc.shows("$ chasen -a shop backup")
+		sc.press("esc", "down", "enter", "y")
+		sc.shows("$ chasen -a shop restore 20261001T100000Z")
+		sc.press("esc", "2", "enter")
+		sc.shows("$ chasen -a shop history 5")
+
+		// The restart of the CLI is not the same: it also sends chasen.yml.
+		sc.press("esc", "r", "y")
+		sc.shows("chasen restart, in the directory of shop, also applies its chasen.yml")
+	})
+
+	t.Run("/ narrows the logs and the rows to what the user types, and esc takes it away", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+
+		sc.press("5", "/", "U", "P")
+		sc.shows("/UP · 1 of 2", "GET /up 200")
+		if strings.Contains(sc.text(), "GET / 200") {
+			t.Errorf("the filter kept a line without the text:\n%s", sc.text())
+		}
+		sc.press("enter", "esc")
+		sc.shows("GET / 200")
+
+		sc.press("2", "/", "r", "e", "s", "t")
+		if rows := sc.tui.rows(); len(rows) != 1 || !strings.Contains(rows[0], "restore") {
+			t.Errorf("the history rows are %q, want the restore only", rows)
+		}
+		sc.press("enter", "enter")
+		sc.shows("history shop 4")
+
+		// Esc in the line itself puts back what was there before.
+		sc.press("esc", "/", "x", "esc")
+		if sc.tui.filter != "rest" {
+			t.Errorf("the filter is %q, want rest", sc.tui.filter)
+		}
+		sc.press("esc")
+		if sc.tui.filter != "" || !sc.tui.inPane {
+			t.Errorf("the first esc must take the filter away only: filter %q, in the tab %v", sc.tui.filter, sc.tui.inPane)
+		}
+	})
+
+	t.Run("! on an action that failed opens a report with the command and its output", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+		opened := ""
+		sc.tui.openURL = func(page string) error { opened = page; return nil }
+
+		sc.press("up", "up", "b")
+		sc.shows("backup blog", "✗ failed", "the disk of the server is full", "! report this")
+		sc.press("!")
+
+		for _, want := range []string{"https://github.com/karloscodes/chasen/issues/new?body=", "backup+blog", "the+disk+of+the+server+is+full"} {
+			if !strings.Contains(opened, want) {
+				t.Errorf("the report is %q, want %q in it", opened, want)
+			}
+		}
+	})
+
 	t.Run("a server with no apps says how to deploy the first one", func(t *testing.T) {
 		s := newTestServer(t)
 		s.apps = "NAME  VERSION  DOMAINS\n"
@@ -438,6 +513,53 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		sc.shows("mem ", "disk 41%  3 apps")
 		if strings.Contains(sc.text(), "━") {
 			t.Errorf("a low window still draws the bars:\n%s", sc.text())
+		}
+	})
+
+	t.Run("a deploy from another terminal shows up while it runs, and then the new version", func(t *testing.T) {
+		server := mock.New(time.Now())
+		server.Wait = func(ctx context.Context, d time.Duration) bool {
+			time.Sleep(d / 5) // a deploy of about 1.5 seconds
+			return true
+		}
+		web := httptest.NewServer(server)
+		t.Cleanup(web.Close)
+		client := protocol.Client{URL: web.URL, Token: server.Token}
+		run := func(ctx context.Context, out io.Writer, args ...string) (int, error) {
+			return client.Run(ctx, args[0], args[1:], nil, out)
+		}
+		ui := newTUI(run, "mock", "")
+		ui.width, ui.height = 110, 34
+		sc := &screen{t, ui}
+		ui.loadApps()
+		sc.settle()
+		sc.press("down", "down")
+		sc.shows("▸ ● shop")
+
+		// Another terminal deploys the shop.
+		done := make(chan int)
+		go func() {
+			code, _ := client.Run(context.Background(), "deploy", []string{"shop", "abc1234"}, protocol.Settings{Image: "ghcr.io/you/shop:abc1234"}.Body(nil), io.Discard)
+			done <- code
+		}()
+		time.Sleep(150 * time.Millisecond)
+
+		// The slow look, every five seconds, finds it. Then the screen follows it.
+		sc.ticks(40)
+		sc.ticks(8)
+		sc.shows("Running now: deploy abc1234", "Pulling ghcr.io/you/shop:abc1234")
+		if !strings.Contains(sc.text(), "▸ "+spinner[sc.tui.frame%len(spinner)]+" shop") {
+			t.Errorf("the app in the list has no sign that it runs:\n%s", sc.text())
+		}
+
+		if code := <-done; code != 0 {
+			t.Fatalf("the deploy ended with %d", code)
+		}
+		sc.ticks(8)
+		sc.ticks(8)
+		sc.shows("shop: deploy abc1234 succeeded", "abc1234", "Up 1 second (healthy)")
+		if strings.Contains(sc.text(), "Running now") {
+			t.Errorf("the screen still says that it runs:\n%s", sc.text())
 		}
 	})
 

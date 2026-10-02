@@ -205,6 +205,8 @@ func (t *tui) keys() [][2]string {
 	switch {
 	case t.overlay != nil && t.overlay.pick != nil:
 		return [][2]string{{"↑↓", "choose"}, {"enter", "go"}, {"esc", "back"}}
+	case t.overlay != nil && t.overlay.failed:
+		return [][2]string{{"!", "report this, with its output"}, {"↑↓", "scroll"}, {"esc", "close"}}
 	case t.overlay != nil:
 		return [][2]string{{"↑↓", "scroll"}, {"esc", "close"}}
 	case len(t.apps) == 0:
@@ -219,13 +221,13 @@ func (t *tui) keys() [][2]string {
 	}
 	switch t.tab {
 	case tabHistory:
-		return [][2]string{{"↑↓", "entry"}, {"enter", "its output"}, {"←", "apps"}, {"tab", "next tab"}, {"?", "keys"}}
+		return [][2]string{{"↑↓", "entry"}, {"enter", "its output"}, {"/", "filter"}, {"←", "apps"}, {"tab", "next tab"}, {"?", "keys"}}
 	case tabBackups:
-		return [][2]string{{"↑↓", "backup"}, {"enter", "restore"}, {"b", "back up now"}, {"←", "apps"}, {"tab", "next tab"}}
+		return [][2]string{{"↑↓", "backup"}, {"enter", "restore"}, {"b", "back up now"}, {"/", "filter"}, {"←", "apps"}, {"tab", "next tab"}}
 	case tabDomains:
-		return [][2]string{{"↑↓", "domain"}, {"a", "add"}, {"x", "remove"}, {"←", "apps"}, {"tab", "next tab"}}
+		return [][2]string{{"↑↓", "domain"}, {"a", "add"}, {"x", "remove"}, {"/", "filter"}, {"←", "apps"}, {"tab", "next tab"}}
 	case tabLogs:
-		return [][2]string{{"↑↓", "scroll"}, {"end", "follow"}, {"←", "apps"}, {"tab", "next tab"}}
+		return [][2]string{{"/", "filter"}, {"↑↓", "scroll"}, {"end", "follow"}, {"←", "apps"}, {"tab", "next tab"}}
 	}
 	return [][2]string{{"↑↓", "scroll"}, {"←", "apps"}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}}
 }
@@ -347,6 +349,9 @@ func (t *tui) appLine(i, width int) string {
 	if state == "" {
 		dot.text = "○ "
 	}
+	if id, _ := t.running(app.Name); id != "" {
+		dot = cell{spinner[t.frame%len(spinner)] + " ", colorAccent}
+	}
 	if i == t.selected {
 		// The marker has the accent on the side that has the keys.
 		marker := colorAccent
@@ -369,7 +374,27 @@ func (t *tui) tabLine(width int) string {
 		}
 		cells = append(cells, cell{name, color}, cell{"   ", ""})
 	}
-	return spread(width, cells, nil)
+	// On the right: the filter and how much it keeps, or the line of the CLI
+	// that prints this tab.
+	var right []cell
+	switch {
+	case t.app() == "":
+	case t.filter != "" || (t.prompt != nil && t.prompt.label == "/"):
+		kept, all := len(t.rows()), len(t.pane(t.app(), t.tab).lines)
+		if t.tab == tabHistory {
+			all = max(0, all-1) // without the header
+		}
+		if t.tab == tabLogs {
+			kept, all = len(t.filtered(t.logs)), len(t.logs)
+		}
+		right = []cell{{"/" + t.filter, colorAccent}, {" · " + itoa(kept) + " of " + itoa(all) + " ", colorDim}}
+	default:
+		// Only when the names of the tabs leave room for it.
+		if command := "$ " + commandLine(tabCommand[t.tab], t.app()) + " "; 46+utf8.RuneCountInString(command) <= width {
+			right = []cell{{command, colorDim}}
+		}
+	}
+	return spread(width, cells, right)
 }
 
 // tabLines draws the tab of the chosen app.
@@ -436,6 +461,14 @@ func (t *tui) overviewLines(app string, status []string, width int) []string {
 			replica = "off: the backups stay on the server"
 		}
 		field("Replica", replica)
+	}
+
+	if id, action := t.running(app); id != "" {
+		lines = append(lines, "", spread(width, []cell{{spinner[t.frame%len(spinner)] + " ", colorAccent}, {"Running now: ", colorAccent}, {action, colorBold}}, []cell{{"2, then enter, follows it ", colorDim}}))
+		output := t.pane(app, paneRunning).lines
+		for _, line := range output[max(0, len(output)-6):] {
+			lines = append(lines, spread(width, []cell{{"  " + line, colorDim}}, nil))
+		}
 	}
 
 	history := t.pane(app, tabHistory).lines
@@ -514,15 +547,29 @@ func (t *tui) logLines(width, height int) []string {
 	if len(t.logs) == 0 {
 		return []string{paint(spinner[t.frame%len(spinner)], colorAccent) + paint(" Waiting for the logs of "+t.app(), colorDim)}
 	}
-	start := max(0, len(t.logs)-height)
+	logs := t.filtered(t.logs)
+	if len(logs) == 0 {
+		return []string{paint("No line of the logs has "+t.filter+" yet. New lines keep coming.", colorDim)}
+	}
+	start := max(0, len(logs)-height)
 	if !t.logsFollow {
 		start = min(t.scroll, start)
 	}
 	var lines []string
-	for _, line := range t.logs[start:min(len(t.logs), start+height)] {
-		lines = append(lines, clip(line, width))
+	for _, line := range logs[start:min(len(logs), start+height)] {
+		lines = append(lines, spread(width, marked(line, t.filter), nil))
 	}
 	return lines
+}
+
+// marked splits a line around the first place that has the filter, so that
+// place gets the accent.
+func marked(line, filter string) []cell {
+	at := strings.Index(strings.ToLower(line), strings.ToLower(filter))
+	if filter == "" || at < 0 || len(strings.ToLower(line)) != len(line) {
+		return []cell{{line, ""}}
+	}
+	return []cell{{line[:at], ""}, {line[at : at+len(filter)], colorAccent + ";" + colorBold}, {line[at+len(filter):], ""}}
 }
 
 // overlayLines draws the overlay over the whole body.
@@ -537,7 +584,15 @@ func (t *tui) overlayLines(o *overlay, width, height int) []string {
 	default:
 		state = cell{"✓ done ", colorAccent}
 	}
-	lines := []string{spread(width, []cell{{" " + o.title, colorAccent + ";" + colorBold}}, []cell{state}), ""}
+	lines := []string{spread(width, []cell{{" " + o.title, colorAccent + ";" + colorBold}}, []cell{state})}
+	if o.command != "" {
+		prefix := " $ "
+		if !strings.HasPrefix(o.command, "chasen -a") {
+			prefix = " " // a note, not a line to type
+		}
+		lines = append(lines, spread(width, []cell{{prefix + o.command, colorDim}}, nil))
+	}
+	lines = append(lines, "")
 
 	if o.pick != nil {
 		for i, choice := range o.choices {
@@ -550,7 +605,7 @@ func (t *tui) overlayLines(o *overlay, width, height int) []string {
 		return lines
 	}
 
-	room := height - 2
+	room := height - len(lines)
 	start := max(0, len(o.lines)-room)
 	if !o.follow {
 		start = min(o.scroll, start)

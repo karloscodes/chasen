@@ -116,10 +116,20 @@ const issuesURL = "https://github.com/karloscodes/chasen/issues/new"
 // reportURL is the page of a new issue, with the questions that every report
 // answers and the facts that the program knows: its version and the system.
 // It has nothing about the server and no token.
-func reportURL() string {
+// what is the command and its output, when the program has them.
+func reportURL(what ...string) string {
 	body := "**What I ran**\n\n```\n\n```\n\n**What I saw**\n\n```\n\n```\n\n**What I expected**\n\n\n\n---\n" +
 		"chasen " + version + " on " + runtime.GOOS + "/" + runtime.GOARCH + "\n" +
 		"For a failed deploy, `chasen history` lists the entries and `chasen history <id>` prints the output of one.\n"
+	if len(what) > 0 {
+		// A URL has a limit. The end of the output says what went wrong.
+		seen := what[0]
+		if len(seen) > 4000 {
+			seen = "…" + seen[len(seen)-4000:]
+		}
+		body = "**What I ran, and what I saw**\n\n" + seen + "\n\n**What I expected**\n\n\n\n---\n" +
+			"chasen " + version + " on " + runtime.GOOS + "/" + runtime.GOARCH + ", from the screen\n"
+	}
 	return issuesURL + "?" + url.Values{"body": {body}}.Encode()
 }
 

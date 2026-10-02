@@ -83,6 +83,11 @@ func startActivity(db *sql.DB, app, action string) (int64, error) {
 	return result.LastInsertId()
 }
 
+// saveActivity keeps the output so far of an entry that still runs.
+func saveActivity(db *sql.DB, id int64, output string) {
+	db.Exec("UPDATE activity SET output = ? WHERE id = ? AND status = 'running'", output, id)
+}
+
 func finishActivity(db *sql.DB, id int64, succeeded bool, output string) {
 	status := "failed"
 	if succeeded {

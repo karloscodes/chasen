@@ -159,6 +159,9 @@ func serveCommand(w http.ResponseWriter, r *http.Request, self string, db *sql.D
 	if action := recordedAction(r.PathValue("command"), args[min(1, len(args)):]); action != "" && len(args) > 0 && checkAppName(args[0]) == nil {
 		activity, _ = startActivity(db, args[0], action)
 		out.keep = &bytes.Buffer{}
+		// The feed has the output while the command runs, so `chasen history`
+		// and the screen can show a deploy that is on its way.
+		out.save = func(output string) { saveActivity(db, activity, output) }
 	}
 	cmd := exec.CommandContext(ctx, self, append([]string{r.PathValue("command")}, args...)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = body, out, out
@@ -192,11 +195,20 @@ type flushWriter struct {
 	w       http.ResponseWriter
 	newline bool          // the last byte was a newline
 	keep    *bytes.Buffer // when set, a copy of the output for the activity feed
+	save    func(output string)
+	saved   time.Time // when save ran last
 }
+
+// saveEvery is how often a running command saves its output to the feed.
+const saveEvery = time.Second
 
 func (f *flushWriter) Write(p []byte) (int, error) {
 	if f.keep != nil && f.keep.Len() < activityOutputMax {
 		f.keep.Write(p)
+		if f.save != nil && time.Since(f.saved) >= saveEvery {
+			f.save(f.keep.String())
+			f.saved = time.Now()
+		}
 	}
 	n, err := f.w.Write(p)
 	if n > 0 {

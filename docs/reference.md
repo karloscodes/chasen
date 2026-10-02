@@ -50,6 +50,7 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 | up, down (or `k`, `j`) | Move in the side you are on: the next app, the next row, or the next lines |
 | tab, shift+tab | The next tab, the tab before. `1` to `5` go to a tab |
 | enter | Open the row: the output of a history entry, or the restore of a backup |
+| `/` | Narrow the rows, or the logs, to what you type. The logs keep coming, and only the lines with the text show. Esc takes the filter away |
 | `r` | Restart the app, from the same image |
 | `b` | Back up the app now |
 | `a`, `x` | On the domains tab: add a domain, remove the chosen domain |
@@ -58,6 +59,12 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 | `g` | Load everything again |
 | `?` | Show the keys |
 | `q` | Close |
+
+**A deploy shows up while it runs.** Start `chasen deploy` in another terminal, or let CI do it. Within five seconds the app gets a spinner in the list, and its overview shows "Running now" with the output as it comes. Enter on the entry in the history follows it to its end.
+
+**The screen shows its commands.** Each tab has the line of the CLI that prints it, like `chasen -a shop backups`, and each action shows the line that does the same. So the screen also teaches the CLI.
+
+**When an action fails,** `!` opens a new issue in the browser with the command and the end of its output. You read it and send it; the screen sends nothing by itself.
 
 A restart, a restore, and the removal of a domain ask first. Each action is a command of this page, so the screen can do nothing that the commands cannot. Without a terminal, or without a login, `chasen` prints its usage.
 

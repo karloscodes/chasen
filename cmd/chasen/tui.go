@@ -39,6 +39,10 @@ const (
 	tabLogs
 )
 
+// paneRunning is the pane with the output of the entry that runs now. It is
+// not a tab: the overview shows it.
+const paneRunning = 5
+
 var tabNames = []string{"overview", "history", "backups", "domains", "logs"}
 
 // tabCommand is the protocol command that fills a tab.
@@ -61,15 +65,20 @@ type pane struct {
 // overlay covers the apps and the tabs: the output of an action while it
 // runs, one history entry, the help, or the list of servers.
 type overlay struct {
-	title  string
-	lines  []string
-	scroll int
-	follow bool // stay at the end while lines arrive
+	title string
+	// command is the line of the CLI that does the same, or a note about it.
+	command string
+	lines   []string
+	scroll  int
+	follow  bool // stay at the end while lines arrive
 	// headings gives the lines that start at the edge the accent: the help.
 	headings bool
 	running  bool
 	failed   bool
 	cancel   context.CancelFunc
+	// live is the history entry that the overlay follows while it runs:
+	// the app and the id.
+	live [2]string
 	// choices makes the overlay a list to pick from.
 	choices []string
 	cursor  int
@@ -82,6 +91,9 @@ type prompt struct {
 	text  bool // false: y or n
 	value string
 	done  func(value string)
+	// For a text: change runs after each key, and cancel when esc ends it.
+	change func(value string)
+	cancel func()
 }
 
 type tui struct {
@@ -107,6 +119,9 @@ type tui struct {
 	logsFollow    bool
 	overlay       *overlay
 	prompt        *prompt
+	filter        string            // what / narrows the rows or the logs of the tab to
+	watching      map[string]string // the id of the history entry that runs now, by app
+	openURL       func(page string) error
 	message       string // one line of news, until the next key
 	update        string // a newer release of chasen, or ""
 	// stats is the output of `chasen load`: how busy the server is.
@@ -144,6 +159,11 @@ type (
 		on   *overlay
 		line string
 	}
+	// liveEvent is the output so far of the entry that an overlay follows.
+	liveEvent struct {
+		on     *overlay
+		output string
+	}
 	actionDone struct {
 		on  *overlay
 		err error
@@ -154,7 +174,7 @@ func newTUI(run runner, server, cwdApp string) *tui {
 	return &tui{
 		run: run, server: server, cwdApp: cwdApp,
 		width: 80, height: 24,
-		panes: map[string]*pane{}, logsFollow: true,
+		panes: map[string]*pane{}, logsFollow: true, watching: map[string]string{}, openURL: openURL,
 		events: make(chan any, 256), now: time.Now,
 	}
 }
@@ -277,13 +297,14 @@ func (t *tui) pane(app string, tab int) *pane {
 	return p
 }
 
-// rows returns the lines of the current tab that the cursor can choose.
+// rows returns the lines of the current tab that the cursor can choose: all
+// of them, or those that the filter keeps.
 func (t *tui) rows() []string {
 	lines := t.pane(t.app(), t.tab).lines
 	switch t.tab {
 	case tabHistory:
 		if len(lines) > 0 && strings.HasPrefix(lines[0], "ID") {
-			return lines[1:]
+			lines = lines[1:]
 		}
 	case tabBackups:
 		if len(lines) == 1 && lines[0] == "No backups." {
@@ -292,7 +313,43 @@ func (t *tui) rows() []string {
 	case tabOverview, tabLogs:
 		return nil
 	}
-	return lines
+	return t.filtered(lines)
+}
+
+// filtered returns the lines that have the text of the filter, in any case.
+func (t *tui) filtered(lines []string) []string {
+	if t.filter == "" {
+		return lines
+	}
+	want := strings.ToLower(t.filter)
+	var kept []string
+	for _, line := range lines {
+		if strings.Contains(strings.ToLower(line), want) {
+			kept = append(kept, line)
+		}
+	}
+	return kept
+}
+
+// running returns the history entry of an app that runs now: its id and its
+// action. A deploy from another terminal, or from CI, shows up here.
+func (t *tui) running(app string) (id, action string) {
+	lines := t.pane(app, tabHistory).lines
+	for _, line := range lines[min(1, len(lines)):] {
+		if parts := columns.Split(strings.TrimSpace(line), 4); len(parts) == 4 && parts[3] == "running" {
+			return parts[0], parts[2]
+		}
+	}
+	return "", ""
+}
+
+// commandLine is the line of the CLI that does what the screen does with
+// these arguments of the protocol. It works from any directory.
+func commandLine(args ...string) string {
+	if len(args) < 2 {
+		return "chasen " + strings.Join(args, " ")
+	}
+	return "chasen -a " + args[1] + " " + args[0] + strings.TrimRight(" "+strings.Join(args[2:], " "), " ")
 }
 
 func (t *tui) loadApps() {
@@ -395,29 +452,78 @@ func (w *lineWriter) flush() {
 	}
 }
 
-// act runs a command that changes something, and shows its output while it
-// runs. When it ends, the screen loads the app again.
-func (t *tui) act(title string, work func(ctx context.Context, out io.Writer) error) {
+// act runs a protocol command that changes something, and shows its output
+// while it runs, under the line of the CLI that does the same. When it ends,
+// the screen loads the app again.
+func (t *tui) act(args ...string) {
 	ctx, cancel := context.WithCancel(context.Background())
-	o := &overlay{title: title, running: true, follow: true, cancel: cancel}
+	o := &overlay{title: strings.Join(args, " "), command: commandLine(args...), running: true, follow: true, cancel: cancel}
+	if args[0] == "restart" {
+		// The restart of the CLI also sends the chasen.yml of the directory.
+		o.command = "chasen restart, in the directory of " + args[1] + ", also applies its chasen.yml. This one keeps the settings of the last deploy."
+	}
 	t.overlay = o
+	run := t.run
 	go func() {
 		w := &lineWriter{emit: func(line string) { t.events <- actionLine{o, line} }}
-		err := work(ctx, w)
+		code, err := run(ctx, w, args...)
+		if err == nil && code != 0 {
+			err = fmt.Errorf("it failed, with exit code %d", code)
+		}
 		w.flush()
 		t.events <- actionDone{o, err}
 	}()
 }
 
-// command is the work of act for one protocol command.
-func (t *tui) command(args ...string) func(ctx context.Context, out io.Writer) error {
-	run := t.run
-	return func(ctx context.Context, out io.Writer) error {
-		code, err := run(ctx, out, args...)
-		if err == nil && code != 0 {
-			err = fmt.Errorf("it failed, with exit code %d", code)
+// watch notes if an app has an entry that runs. When the entry ends, the
+// state of the app is new: the screen asks for it again and says what ended.
+func (t *tui) watch(app string) {
+	id, _ := t.running(app)
+	before := t.watching[app]
+	t.watching[app] = id
+	if before == "" || before == id {
+		return
+	}
+	for _, line := range t.pane(app, tabHistory).lines {
+		if parts := columns.Split(strings.TrimSpace(line), 4); len(parts) == 4 && parts[0] == before {
+			t.message = app + ": " + parts[2] + " " + parts[3]
 		}
-		return err
+	}
+	delete(t.panes, paneKey(app, paneRunning))
+	t.load(app, tabOverview)
+	t.loadApps()
+}
+
+// follow asks again for what runs: the history of each app with a running
+// entry, the output of the one of the chosen app, and the entry that an
+// overlay shows.
+func (t *tui) follow() {
+	for app, id := range t.watching {
+		if id == "" {
+			continue
+		}
+		t.load(app, tabHistory)
+		if app == t.app() {
+			run := t.run
+			go func() {
+				var out strings.Builder
+				_, err := run(context.Background(), &out, "history", app, id)
+				t.events <- paneEvent{app, paneRunning, out.String(), err}
+			}()
+		}
+	}
+	if o := t.overlay; o != nil && o.live[1] != "" {
+		app, id := o.live[0], o.live[1]
+		if t.watching[app] != id {
+			o.running, o.live = false, [2]string{}
+		}
+		run := t.run
+		go func() {
+			var out strings.Builder
+			if _, err := run(context.Background(), &out, "history", app, id); err == nil {
+				t.events <- liveEvent{o, out.String()}
+			}
+		}()
 	}
 }
 
@@ -433,10 +539,18 @@ func (t *tui) handle(event any) bool {
 		t.width, t.height = e.width, e.height
 	case tickEvent:
 		t.frame++
-		// Every few seconds, ask again for what the screen shows.
+		// Every few seconds, ask again for what the screen shows, and for the
+		// history of each app: a deploy from somewhere else starts there.
 		if t.frame%40 == 0 && t.overlay == nil && t.prompt == nil {
 			t.loadApps()
 			t.load(t.app(), t.tab)
+			for _, app := range t.apps[:min(len(t.apps), 12)] {
+				t.load(app.Name, tabHistory)
+			}
+		}
+		// Every second, follow what runs now.
+		if t.frame%8 == 0 {
+			t.follow()
 		}
 	case appsEvent:
 		t.appsLoaded = true
@@ -482,6 +596,9 @@ func (t *tui) handle(event any) bool {
 			p.lines = cleanLines(e.output)
 		}
 		t.cursor = max(0, min(t.cursor, len(t.rows())-1))
+		if e.tab == tabHistory && e.err == nil {
+			t.watch(e.app)
+		}
 	case logEvent:
 		if e.app == t.logsFor {
 			t.logs = append(t.logs, e.line)
@@ -491,6 +608,8 @@ func (t *tui) handle(event any) bool {
 		}
 	case actionLine:
 		e.on.lines = append(e.on.lines, e.line)
+	case liveEvent:
+		e.on.lines = cleanLines(e.output)
 	case actionDone:
 		e.on.running = false
 		if e.err != nil && !errors.Is(e.err, context.Canceled) {
@@ -536,8 +655,17 @@ func (t *tui) key(key string) bool {
 		t.chooseServer()
 	// The screen has two sides. Left and right go to a side, up and down move
 	// in it. The tabs have their own keys.
-	case "left", "h", "esc":
+	case "esc":
+		// Esc takes one thing away at a time: the filter, then the side.
+		if t.filter != "" {
+			t.filter, t.cursor, t.scroll = "", 0, 0
+		} else {
+			t.inPane = false
+		}
+	case "left", "h":
 		t.inPane = false
+	case "/":
+		t.startFilter()
 	case "right", "l":
 		t.inPane = len(t.apps) > 0
 	case "tab":
@@ -568,17 +696,17 @@ func (t *tui) key(key string) bool {
 	switch key {
 	case "r":
 		t.confirm("Restart "+app+"? It starts again from the same image, with the same settings.", func() {
-			t.act("restart "+app, t.command("restart", app))
+			t.act("restart", app)
 		})
 	case "b":
-		t.act("backup "+app, t.command("backup", app))
+		t.act("backup", app)
 	case "o":
 		t.openInBrowser()
 	case "a":
 		if t.tab == tabDomains {
 			t.prompt = &prompt{label: "Add a domain to " + app + ":", text: true, done: func(domain string) {
 				if domain = strings.TrimSpace(domain); domain != "" {
-					t.act("domains add "+domain, t.command("domains", app, "add", domain))
+					t.act("domains", app, "add", domain)
 				}
 			}}
 		}
@@ -586,7 +714,7 @@ func (t *tui) key(key string) bool {
 		if rows := t.rows(); t.tab == tabDomains && t.inPane && t.cursor < len(rows) {
 			domain := strings.Fields(rows[t.cursor] + " ")[0]
 			t.confirm("Remove the domain "+domain+" from "+app+"?", func() {
-				t.act("domains rm "+domain, t.command("domains", app, "rm", domain))
+				t.act("domains", app, "rm", domain)
 			})
 		}
 	}
@@ -595,7 +723,7 @@ func (t *tui) key(key string) bool {
 
 func (t *tui) setTab(tab int) {
 	t.tab = (tab + len(tabNames)) % len(tabNames)
-	t.cursor, t.scroll = 0, 0
+	t.cursor, t.scroll, t.filter = 0, 0, ""
 	// Who picks a tab wants to be in it.
 	t.inPane = len(t.apps) > 0
 	t.show()
@@ -612,11 +740,11 @@ func (t *tui) move(by int) {
 		before := t.selected
 		t.selected = max(0, min(t.selected+by, len(t.apps)-1))
 		if t.selected != before {
-			t.cursor, t.scroll = 0, 0
+			t.cursor, t.scroll, t.filter = 0, 0, ""
 			t.show()
 		}
 	case t.tab == tabLogs:
-		last := max(0, len(t.logs)-t.pageSize())
+		last := max(0, len(t.filtered(t.logs))-t.pageSize())
 		if t.logsFollow {
 			t.scroll = last
 		}
@@ -642,16 +770,20 @@ func (t *tui) open() {
 	first := strings.Fields(rows[t.cursor] + " ")[0]
 	switch t.tab {
 	case tabHistory:
-		o := &overlay{title: "history " + app + " " + first, running: true}
+		o := &overlay{title: "history " + app + " " + first, command: commandLine("history", app, first), running: true}
+		if t.watching[app] == first {
+			// The entry still runs: the overlay follows it to its end.
+			o.live, o.follow = [2]string{app, first}, true
+		}
 		t.overlay = o
 		run := t.run
 		go func() {
 			var out strings.Builder
 			_, err := run(context.Background(), &out, "history", app, first)
-			for _, line := range cleanLines(out.String()) {
-				t.events <- actionLine{o, line}
+			t.events <- liveEvent{o, out.String()}
+			if o.live[1] == "" {
+				t.events <- actionDone{o, err}
 			}
-			t.events <- actionDone{o, err}
 		}()
 	case tabBackups:
 		what := "the backup of " + t.stampText(first)
@@ -659,9 +791,35 @@ func (t *tui) open() {
 			what = "the newest state of the live replica"
 		}
 		t.confirm("Restore "+app+" to "+what+"? The databases of now move aside.", func() {
-			t.act("restore "+app+" "+first, t.command("restore", app, first))
+			t.act("restore", app, first)
 		})
 	}
+}
+
+// startFilter opens the / line. The rows, or the logs, narrow with each key.
+func (t *tui) startFilter() {
+	if t.tab == tabOverview || t.app() == "" {
+		t.message = "Nothing to filter here. / works on the history, the backups, the domains, and the logs."
+		return
+	}
+	t.inPane = true
+	before := t.filter
+	set := func(value string) { t.filter, t.cursor, t.scroll, t.logsFollow = value, 0, 0, true }
+	t.prompt = &prompt{label: "/", text: true, value: t.filter, change: set, done: set, cancel: func() { set(before) }}
+}
+
+// reportFailure opens a new issue with the command that failed and the end
+// of its output. The page is in the browser: nothing is sent before the user
+// reads it and sends it.
+func (t *tui) reportFailure(o *overlay) {
+	lines := o.lines[max(0, len(o.lines)-25):]
+	what := "```\n$ " + o.title + "\n" + strings.Join(lines, "\n") + "\n```"
+	page := reportURL(what)
+	if err := t.openURL(page); err != nil {
+		t.message = "Open this page to report it: " + page
+		return
+	}
+	t.message = "A new issue is open in the browser, with the command and its output. Read it, then send it."
 }
 
 func (t *tui) openInBrowser() {
@@ -670,15 +828,20 @@ func (t *tui) openInBrowser() {
 		t.message = "This app has no URL yet."
 		return
 	}
-	opener := "xdg-open"
-	if runtime.GOOS == "darwin" {
-		opener = "open"
-	}
-	if err := exec.Command(opener, urls[0]).Start(); err != nil {
+	if err := t.openURL(urls[0]); err != nil {
 		t.message = urls[0]
 		return
 	}
 	t.message = "Opened " + urls[0]
+}
+
+// openURL opens a page in the browser of the machine.
+func openURL(page string) error {
+	opener := "xdg-open"
+	if runtime.GOOS == "darwin" {
+		opener = "open"
+	}
+	return exec.Command(opener, page).Start()
 }
 
 func (t *tui) chooseServer() {
@@ -704,9 +867,13 @@ func (t *tui) chooseServer() {
 }
 
 func (t *tui) promptKey(p *prompt, key string) {
+	before := p.value
 	switch {
 	case key == "esc" || (!p.text && (key == "n" || key == "q")):
 		t.prompt = nil
+		if p.cancel != nil {
+			p.cancel()
+		}
 	case !p.text && key == "y", p.text && key == "enter":
 		t.prompt = nil
 		p.done(p.value)
@@ -717,6 +884,9 @@ func (t *tui) promptKey(p *prompt, key string) {
 	case p.text && utf8.RuneCountInString(key) == 1:
 		p.value += key
 	}
+	if p.change != nil && p.value != before {
+		p.change(p.value)
+	}
 }
 
 func (t *tui) overlayKey(o *overlay, key string) {
@@ -726,6 +896,11 @@ func (t *tui) overlayKey(o *overlay, key string) {
 		o.scroll = last
 	}
 	switch key {
+	case "!":
+		if o.failed {
+			t.reportFailure(o)
+		}
+		return
 	case "esc", "q":
 		if o.running && o.cancel != nil {
 			t.message = "It still runs on the server, to its end."
@@ -766,6 +941,7 @@ Move
   up, down (k, j)     move in the side you are on: the next app, the next row, or the next lines
   tab, shift+tab      the next tab, the tab before. 1 to 5 go to a tab
   enter               open the row: the output of a history entry, or the restore of a backup
+  /                   narrow the rows, or the logs, to what you type. esc takes it away
 
 Change the app
   r    restart the app, from the same image
@@ -783,7 +959,11 @@ Each action is a command of the CLI: chasen restart, chasen backup,
 chasen restore, chasen domains. A deploy is not here: it belongs to the
 directory of the app. Run chasen deploy there, and watch it arrive here.
 
-Something is wrong with Chasen? Close the screen and run: chasen report
+A deploy that runs somewhere else shows up by itself: in the list of the
+apps, in the overview, and in the history. Enter on it follows its output.
+
+Something is wrong with Chasen? When an action fails, ! opens a report with
+its output. Or close the screen and run: chasen report
 `), "\n")
 
 // --- the loop ---------------------------------------------------------------

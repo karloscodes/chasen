@@ -44,6 +44,31 @@ func (a *app) record(action, result, output string) {
 	a.history = append(a.history, entry{time.Now(), action, result, output})
 }
 
+// begin adds an entry that runs. Its output grows while the command works,
+// as on a real server, so the history shows a deploy that is on its way. The
+// writer it returns is for that output. Call it with the lock held.
+func (s *Server) begin(a *app, action string) (index int, output io.Writer) {
+	a.history = append(a.history, entry{at: time.Now(), action: action, result: "running"})
+	index = len(a.history) - 1
+	return index, running{s, a, index}
+}
+
+// end gives a running entry its result. Call it with the lock held.
+func (a *app) end(index int, result string) { a.history[index].result = result }
+
+type running struct {
+	s     *Server
+	a     *app
+	index int
+}
+
+func (r running) Write(p []byte) (int, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.a.history[r.index].output += string(p)
+	return len(p), nil
+}
+
 // Server is the mock server. It is an http.Handler.
 type Server struct {
 	// Token is the token that a request must send.
@@ -292,35 +317,42 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 		say(0, "%s: backup %s (on the server and offsite)", name, stamp)
 	case "restart":
 		version := a.version
+		index, kept := s.begin(a, "restart")
 		s.mu.Unlock()
+		out = io.MultiWriter(out, kept)
 		sent := settings(body)
-		if !say(1200*time.Millisecond, "Starting %s %s", name, version) || !say(600*time.Millisecond, "Waiting for /up") {
-			return 1
-		}
-		if _, broken := sent.Env["FAIL"]; broken {
+		ok := say(1200*time.Millisecond, "Starting %s %s", name, version) && say(600*time.Millisecond, "Waiting for /up")
+		_, broken := sent.Env["FAIL"]
+		if !ok || broken {
+			code := fail("the app did not answer /up in 30 seconds. The previous container keeps the traffic")
 			s.mu.Lock()
-			a.record("restart", "failed", "Starting "+name+"\nThe app did not answer /up\n")
+			a.end(index, "failed")
 			s.mu.Unlock()
-			return fail("the app did not answer /up in 30 seconds. The previous container keeps the traffic")
+			return code
 		}
+		say(0, "Restarted %s", name)
 		s.mu.Lock()
 		a.state = "Up 1 second (healthy)"
-		a.record("restart", "succeeded", "Starting "+name+"\nRestarted "+name+"\n")
+		a.end(index, "succeeded")
 		s.mu.Unlock()
-		say(0, "Restarted %s", name)
 	case "restore":
+		index, kept := s.begin(a, "restore")
 		s.mu.Unlock()
+		out = io.MultiWriter(out, kept)
 		which := strings.Join(args[1:], " ")
 		if which == "" {
 			which = "the newest backup"
 		}
-		if !say(900*time.Millisecond, "Stopping %s", name) || !say(900*time.Millisecond, "Restoring the databases from %s", which) {
-			return 1
+		ok := say(900*time.Millisecond, "Stopping %s", name) && say(900*time.Millisecond, "Restoring the databases from %s", which)
+		if ok {
+			say(0, "Restored %s from %s. The previous databases are in\n/var/matcha/%s/pre-restore-%s", name, which, name, time.Now().UTC().Format(stampLayout))
 		}
 		s.mu.Lock()
-		a.record("restore", "succeeded", "Restored "+name+" from "+which+"\n")
+		a.end(index, map[bool]string{true: "succeeded", false: "failed"}[ok])
 		s.mu.Unlock()
-		say(0, "Restored %s from %s. The previous databases are in\n/var/matcha/%s/pre-restore-%s", name, which, name, time.Now().UTC().Format(stampLayout))
+		if !ok {
+			return 1
+		}
 	case "remove":
 		s.apps = slices.DeleteFunc(s.apps, func(other *app) bool { return other == a })
 		s.mu.Unlock()
@@ -352,59 +384,73 @@ func (s *Server) logs(ctx context.Context, out io.Writer, name string) int {
 // deploy plays a deploy, a check, or the start of an addon: a pull, a backup,
 // and a new version. An app with FAIL in its env does not get healthy.
 func (s *Server) deploy(ctx context.Context, out io.Writer, command, name, version string, sent protocol.Settings) int {
-	var output strings.Builder
-	out = io.MultiWriter(out, &output)
 	first := "Pulling " + sent.Image
 	if sent.Image == "" {
 		first = "Building the image of the website"
 	}
+	action := strings.TrimSpace(command + " " + version)
+
 	s.mu.Lock()
 	a := s.app(name)
+	// A check changes nothing, and has no entry in the history.
+	index := -1
+	if command != "check" {
+		if a == nil {
+			a = &app{name: name, state: "not running", domains: []string{name + ".example.com"}}
+			s.apps = append(s.apps, a)
+			slices.SortFunc(s.apps, func(x, y *app) int { return strings.Compare(x.name, y.name) })
+		}
+		var kept io.Writer
+		index, kept = s.begin(a, action)
+		out = io.MultiWriter(out, kept)
+	}
 	hasData := a != nil && len(a.backups) > 0
 	s.mu.Unlock()
+	finish := func(result string) {
+		if index >= 0 {
+			s.mu.Lock()
+			a.end(index, result)
+			s.mu.Unlock()
+		}
+	}
 
 	steps := []string{first, "Port 3000 (EXPOSE in the image). Health path /up. Storage /storage."}
 	if hasData && command != "check" {
 		steps = append(steps, name+": backup "+time.Now().UTC().Format(stampLayout)+" (on the server and offsite)")
 	}
-	steps = append(steps, "Starting "+name+" "+version)
+	steps = append(steps, "Starting "+name+" "+version, "Waiting for /up")
 	for _, step := range steps {
 		fmt.Fprintln(out, step)
-		if !s.Wait(ctx, 800*time.Millisecond) {
+		if !s.Wait(ctx, 1500*time.Millisecond) {
+			finish("failed")
 			return 1
 		}
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if a = s.app(name); a == nil && command != "check" {
-		a = &app{name: name, state: "not running", domains: []string{name + ".example.com"}}
-		s.apps = append(s.apps, a)
-		slices.SortFunc(s.apps, func(x, y *app) int { return strings.Compare(x.name, y.name) })
-	}
 	if _, broken := sent.Env["FAIL"]; broken {
 		fmt.Fprintln(out, "Error: the new version did not answer /up in 30 seconds. The previous version keeps the traffic.\nThe app must listen on port 3000 and answer 200 on /up")
-		if a != nil {
-			a.record(command+" "+version, "failed", output.String())
-		}
+		finish("failed")
 		return 1
 	}
 	if command == "check" {
 		fmt.Fprintf(out, "%s %s follows the standard. Nothing live changed.\n", name, version)
 		return 0
 	}
-	if hasData {
-		a.backups = append([]string{time.Now().UTC().Format(stampLayout)}, a.backups...)
-	}
-	a.version, a.state = version, "Up 1 second (healthy)"
 	verb := "Deployed"
 	if command == "enable" {
 		verb = "Enabled"
 	}
+	s.mu.Lock()
+	if hasData {
+		a.backups = append([]string{time.Now().UTC().Format(stampLayout)}, a.backups...)
+	}
+	a.version, a.state = version, "Up 1 second (healthy)"
+	domains := slices.Clone(a.domains)
+	s.mu.Unlock()
 	fmt.Fprintf(out, "\n%s %s %s\n", verb, name, version)
-	for _, domain := range a.domains {
+	for _, domain := range domains {
 		fmt.Fprintf(out, "  https://%s\n", domain)
 	}
-	a.record(strings.TrimSpace(command+" "+version), "succeeded", output.String())
+	finish("succeeded")
 	return 0
 }
