@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -110,8 +111,10 @@ type tui struct {
 	update        string // a newer release of chasen, or ""
 	// stats is the output of `chasen load`: how busy the server is.
 	stats         []string
-	noStats       bool // the server is older than the load command: do not ask again
-	frame         int  // for the spinner
+	noStats       bool      // the server is older than the load command: do not ask again
+	loads         []float64 // the last loads of the server, for the small graph
+	stirUntil     int       // the frame at which the whisk is still again
+	frame         int       // for the spinner
 	events        chan any
 	now           func() time.Time
 	deployCommand func(ctx context.Context, out io.Writer) error
@@ -296,6 +299,8 @@ func (t *tui) rows() []string {
 }
 
 func (t *tui) loadApps() {
+	// The whisk stirs for a moment each time the screen asks the server.
+	t.stirUntil = t.frame + stirFrames
 	run := t.run
 	go func() {
 		var out strings.Builder
@@ -472,6 +477,11 @@ func (t *tui) handle(event any) bool {
 		t.stats = nil
 		if !e.failed {
 			t.stats = cleanLines(e.output)
+			if parts := loadLine.FindStringSubmatch(strings.Join(statusValues(t.stats, "Load"), "")); parts != nil {
+				load, _ := strconv.ParseFloat(parts[1], 64)
+				t.loads = append(t.loads, load)
+				t.loads = t.loads[max(0, len(t.loads)-graphWidth):]
+			}
 		}
 	case paneEvent:
 		p := t.pane(e.app, e.tab)
@@ -713,7 +723,7 @@ func (t *tui) chooseServer() {
 		t.stopLogs()
 		t.run, t.server = run, name
 		t.apps, t.appsLoaded, t.selected, t.panes = nil, false, 0, map[string]*pane{}
-		t.stats, t.noStats = nil, false
+		t.stats, t.noStats, t.loads = nil, false, nil
 		t.loadApps()
 	}
 	t.overlay = o

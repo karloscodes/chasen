@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"math"
 	"os"
 	"regexp"
 	"strconv"
@@ -146,7 +148,7 @@ func (t *tui) firstLine(width int) string {
 	// In the corner: how busy the server is, then the count of the apps. A
 	// narrow window drops the notice of a new release first, then the numbers.
 	right := []cell{{count, colorDim}}
-	if stats := t.statCells(); utf8.RuneCountInString(t.server)+60 < width {
+	if stats := t.statCells(); !t.cornerFits() && utf8.RuneCountInString(t.server)+60 < width {
 		right = append(stats, right...)
 	}
 	if t.update != "" && utf8.RuneCountInString(t.server)+100 < width {
@@ -254,7 +256,12 @@ func (t *tui) body(width, height int) []string {
 	case t.overlay != nil:
 		lines = t.overlayLines(t.overlay, width, height)
 	case !t.appsLoaded && t.appsErr == "":
-		lines = []string{"", paint(" "+spinner[t.frame%len(spinner)], colorAccent) + " Asking " + t.server + " for its apps"}
+		// The first moment: the whisk stirs while the server answers.
+		lines = []string{"", ""}
+		for _, line := range whisk(1, t.frame) {
+			lines = append(lines, "   "+paint(line, colorAccent))
+		}
+		lines = append(lines, "", "   "+paint("chasen", colorBold)+paint("  asks "+t.server+" for its apps", colorDim))
 	case t.appsErr != "":
 		lines = []string{""}
 		for _, line := range wrap(t.appsErr, width-4) {
@@ -279,7 +286,7 @@ func (t *tui) body(width, height int) []string {
 
 // columns draws the apps on the left and the chosen app on the right.
 func (t *tui) columns(width, height int) []string {
-	left := 18
+	left := 22
 	for _, app := range t.apps {
 		left = max(left, utf8.RuneCountInString(app.Name)+7)
 	}
@@ -294,6 +301,14 @@ func (t *tui) columns(width, height int) []string {
 	start, end := window(len(t.apps), height-2, t.selected)
 	for i := start; i < end; i++ {
 		leftLines = append(leftLines, t.appLine(i, left))
+	}
+
+	// The corner under the apps: the server, and the whisk.
+	if corner := t.corner(left, height-len(leftLines)-1); len(corner) > 0 {
+		for len(leftLines) < height-len(corner) {
+			leftLines = append(leftLines, strings.Repeat(" ", left))
+		}
+		leftLines = append(leftLines, corner...)
 	}
 
 	rightLines := []string{t.tabLine(right), ""}
@@ -544,6 +559,140 @@ func (t *tui) overlayLines(o *overlay, width, height int) []string {
 			color = colorAccent // a heading of the help
 		}
 		lines = append(lines, " "+paint(clip(line, width-2), color))
+	}
+	return lines
+}
+
+// --- the corner: the server and the whisk -------------------------------------
+
+const (
+	graphWidth = 8 // how many loads the small graph shows
+	stirFrames = 9 // how long the whisk stirs, in ticks of the clock
+)
+
+// cornerFits reports if the window has room under the apps for the numbers
+// of the server. Without it, the first line has them.
+func (t *tui) cornerFits() bool {
+	return len(t.stats) > 0 && len(t.apps) > 0 && t.overlay == nil && t.height-4-2-len(t.apps)-1 >= 4 && t.width >= 60
+}
+
+// corner draws what goes under the apps, from the bottom: the whisk when
+// there is room for it, and above it the load, the memory, and the disk of
+// the server.
+func (t *tui) corner(width, room int) []string {
+	var lines []string
+	if t.cornerFits() {
+		lines = t.gauges(width)
+	}
+	if room >= len(lines)+len(whiskShape)/2+2 {
+		force := 0.0
+		if left := t.stirUntil - t.frame; left > 0 && left <= stirFrames {
+			force = math.Sin(math.Pi * float64(left) / stirFrames)
+		}
+		if len(lines) > 0 {
+			lines = append(lines, strings.Repeat(" ", width))
+		}
+		for _, line := range whisk(force, t.frame) {
+			lines = append(lines, paint(fit("   "+line, width), colorAccent))
+		}
+	}
+	return lines
+}
+
+var (
+	sparks = []rune("▁▂▃▄▅▆▇█")
+	bars   = []rune(" ▏▎▍▌▋▊▉█")
+)
+
+// gauges draws the server in three lines: the load as a small graph of the
+// last minute, and the memory and the disk as bars.
+func (t *tui) gauges(width int) []string {
+	lines := []string{paint(fit(" server", width), colorDim)}
+
+	if parts := loadLine.FindStringSubmatch(strings.Join(statusValues(t.stats, "Load"), "")); parts != nil {
+		cores, _ := strconv.Atoi(parts[2])
+		color, graph := colorAccent, ""
+		for _, load := range t.loads {
+			// The top of the graph is a load equal to the count of the cores.
+			level := int(load / float64(max(cores, 1)) * float64(len(sparks)-1))
+			graph += string(sparks[max(0, min(level, len(sparks)-1))])
+			if load > float64(cores) {
+				color = colorBad
+			}
+		}
+		lines = append(lines, spread(width, []cell{{" load ", colorDim}, {fit(graph, graphWidth), color}, {" " + parts[1], ""}}, nil))
+	}
+	for _, name := range []string{"Memory", "Disk"} {
+		parts := percent.FindStringSubmatch(strings.Join(statusValues(t.stats, name), ""))
+		if parts == nil {
+			continue
+		}
+		used, _ := strconv.Atoi(parts[1])
+		color := colorAccent
+		if used >= 90 {
+			color = colorBad
+		}
+		// Eight cells, and each cell has eight steps.
+		steps := used * graphWidth * 8 / 100
+		bar := strings.Repeat("█", steps/8)
+		if steps%8 > 0 {
+			bar += string(bars[steps%8])
+		}
+		label := map[string]string{"Memory": " mem  ", "Disk": " disk "}[name]
+		lines = append(lines, spread(width, []cell{{label, colorDim}, {bar, color}, {strings.Repeat("░", graphWidth-utf8.RuneCountInString(bar)), colorDim}, {fmt.Sprintf(" %3d%%", used), ""}}, nil))
+	}
+	return lines
+}
+
+// whiskShape is the Chasen mark: a bamboo whisk of seven tines, a binding,
+// and a handle, on a grid of 15 by 14 pixels. Two pixels make one character,
+// one above the other.
+var whiskShape = func() [14][15]bool {
+	var grid [14][15]bool
+	for row := 9; row <= 13; row++ {
+		from, to := 6, 8 // the handle
+		switch row {
+		case 9:
+			from, to = 3, 11 // the binding
+		case 10:
+			from, to = 4, 10
+		}
+		for col := from; col <= to; col++ {
+			grid[row][col] = true
+		}
+	}
+	return grid
+}()
+
+// whisk draws the mark. force is how hard it stirs, from 0 to 1: the tines
+// bend from their base, and the wave runs across them.
+func whisk(force float64, frame int) []string {
+	grid := whiskShape
+	for tine := range 7 {
+		for row := range 9 {
+			up := float64(8-row) / 8 // 1 at the tip, 0 at the binding
+			lean := math.Pow(up, 1.5)
+			flare := float64(tine-3) * 0.4 * lean // at rest the outer tines lean out
+			bend := force * 1.25 * lean * math.Sin(float64(frame)*1.9-float64(tine)*0.45)
+			col := 1 + tine*2 + int(math.Round(flare+bend))
+			grid[row][max(0, min(col, 14))] = true
+		}
+	}
+	lines := make([]string, 7)
+	for line := range lines {
+		for col := range 15 {
+			top, bottom := grid[line*2][col], grid[line*2+1][col]
+			switch {
+			case top && bottom:
+				lines[line] += "█"
+			case top:
+				lines[line] += "▀"
+			case bottom:
+				lines[line] += "▄"
+			default:
+				lines[line] += " "
+			}
+		}
 	}
 	return lines
 }

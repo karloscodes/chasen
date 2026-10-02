@@ -389,7 +389,17 @@ func TestScreenOnTheMockServer(t *testing.T) {
 	t.Run("the corner shows the load, the memory, and the disk of the server", func(t *testing.T) {
 		sc := open(t)
 
-		sc.shows("load 0.", "mem ", "disk 41%", "3 apps")
+		sc.shows("server", " load ", " mem  ", " disk ", " 41%", "░", "3 apps")
+		if whisk := strings.Join(whisk(0, 0), "\n"); !strings.Contains(sc.text(), strings.Split(whisk, "\n")[5]) {
+			t.Errorf("the whisk is not under the apps:\n%s", sc.text())
+		}
+
+		// A low window has no room under the apps: the first line has the numbers.
+		sc.tui.height = 12
+		sc.shows("mem ", "disk 41%  3 apps")
+		if strings.Contains(sc.text(), "░") {
+			t.Errorf("a low window still draws the bars:\n%s", sc.text())
+		}
 	})
 
 	t.Run("a backup, a new domain, and the logs all answer", func(t *testing.T) {
@@ -404,4 +414,19 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		sc.press("5")
 		sc.shows("shop GET /up 200")
 	})
+}
+
+func TestWhisk(t *testing.T) {
+	still, stirring := whisk(0, 0), whisk(1, 2)
+
+	if len(still) != 7 || utf8.RuneCountInString(still[0]) != 15 {
+		t.Fatalf("the whisk is %d lines of %d columns, want 7 of 15", len(still), utf8.RuneCountInString(still[0]))
+	}
+	if slices.Equal(still, stirring) {
+		t.Error("the whisk does not move when it stirs")
+	}
+	// The binding and the handle do not move: only the tines bend.
+	if !slices.Equal(still[5:], stirring[5:]) {
+		t.Errorf("the handle moved:\n%s\n%s", strings.Join(still[5:], "\n"), strings.Join(stirring[5:], "\n"))
+	}
 }
