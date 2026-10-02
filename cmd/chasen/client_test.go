@@ -215,3 +215,16 @@ func TestRegistryLogin(t *testing.T) {
 		}
 	})
 }
+
+func TestReport(t *testing.T) {
+	t.Setenv("CHASEN_TOKEN", "secret-token")
+
+	page := reportURL()
+
+	if !strings.HasPrefix(page, "https://github.com/karloscodes/chasen/issues/new?body=") {
+		t.Errorf("the report goes to %s", page)
+	}
+	if !strings.Contains(page, "chasen+"+version) || strings.Contains(page, "secret-token") {
+		t.Errorf("the report must have the version and no token: %s", page)
+	}
+}

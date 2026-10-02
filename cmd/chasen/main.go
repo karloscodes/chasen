@@ -5,7 +5,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"os/exec"
+	"runtime"
 
 	"golang.org/x/term"
 )
@@ -23,6 +26,7 @@ const usage = `Usage: chasen <command>
   servers                List the servers you are logged in to. The star marks the current one
   use <server>           Make another server the current one: a name from the list
   logout                 Forget the login, here and on the server
+  report                 Something is wrong with Chasen? Open an issue, with your version filled in
 
 Run these in the directory of your app:
   deploy                 Build the image of the current git commit, push it, and deploy it.
@@ -78,6 +82,8 @@ func main() {
 			break
 		}
 		err = runScreen(demoScreen())
+	case "report":
+		err = report()
 	case "version":
 		fmt.Println("chasen " + version)
 	case "help", "-h", "--help":
@@ -102,4 +108,29 @@ func directoryApp(app appFile) string {
 		}
 	}
 	return ""
+}
+
+// issuesURL is where a report goes.
+const issuesURL = "https://github.com/karloscodes/chasen/issues/new"
+
+// reportURL is the page of a new issue, with the questions that every report
+// answers and the facts that the program knows: its version and the system.
+// It has nothing about the server and no token.
+func reportURL() string {
+	body := "**What I ran**\n\n```\n\n```\n\n**What I saw**\n\n```\n\n```\n\n**What I expected**\n\n\n\n---\n" +
+		"chasen " + version + " on " + runtime.GOOS + "/" + runtime.GOARCH + "\n" +
+		"For a failed deploy, `chasen history` lists the entries and `chasen history <id>` prints the output of one.\n"
+	return issuesURL + "?" + url.Values{"body": {body}}.Encode()
+}
+
+// report opens a new issue in the browser.
+func report() error {
+	page := reportURL()
+	fmt.Printf("Open this page to report the problem:\n  %s\n\nYour version and your system are filled in. Add what you ran and what you saw.\n", page)
+	for _, opener := range []string{"xdg-open", "open"} {
+		if exec.Command(opener, page).Start() == nil {
+			break
+		}
+	}
+	return nil
 }

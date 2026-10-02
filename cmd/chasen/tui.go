@@ -771,6 +771,8 @@ The screen
 
 Each action is a command of the CLI: chasen deploy, chasen restart,
 chasen backup, chasen restore, chasen domains. Run chasen help for all of them.
+
+Something is wrong with Chasen? Close the screen and run: chasen report
 `), "\n")
 
 // --- the loop ---------------------------------------------------------------

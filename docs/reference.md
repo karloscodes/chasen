@@ -9,6 +9,7 @@
 | `chasen servers` | List the servers you are logged in to. The star marks the current one |
 | `chasen use <server>` | Make another server the current one: a name from the list, or `cloud` |
 | `chasen logout` | Forget the login, here and on the server |
+| `chasen report` | Something is wrong with Chasen? Open a new issue on GitHub, with your version and your system filled in. It sends nothing by itself |
 | `chasen deploy` | Build the image of the current git commit, push it, and deploy it. Or deploy a static website. `--tag <tag>` deploys an image that is already in the registry. In the cloud: `--on <id>` or `--new[=type@location]` picks the server of a new app |
 | `chasen check` | Test the current git commit against the standard. Changes nothing live |
 | `chasen restart` | Start the app again with the env and secrets of `chasen.yml`, from the image it has |
