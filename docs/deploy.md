@@ -33,7 +33,26 @@ registry:                 # the login of the registry
 - **`chasen deploy --tag <tag>`** deploys an image that is already in the registry, and builds nothing. This is the rollback (`--tag <older commit>`), and the way to deploy an image that another system built.
 - **The architecture.** The build is for `linux/amd64`, like most servers. For another server, set `DOCKER_DEFAULT_PLATFORM`.
 
-## Websites
+## An image that another repository releases
+
+Some apps are not yours to build: a product that ships as an image, like an analytics tool or a form backend. You only run it. Keep a folder for it with a `chasen.yml` that names the image, and no `Dockerfile`:
+
+```yaml
+# analytics/chasen.yml
+image: karloscodes/fusionaly
+health: /_health
+volumes: [/app/storage]
+```
+
+```bash
+chasen deploy                 # the newest image
+chasen deploy --tag 2.7.6     # one version
+```
+
+- **Nothing is built,** and the folder needs no git commit. The name of the app is the name of the folder.
+- **With no tag, the server pulls `latest` and names the version itself:** the version that the image has in its label (`org.opencontainers.image.version`), or the start of its id. So `chasen status` and `chasen history` say what runs, not "latest".
+- **The settings of your server stay in your folder,** not in the repository of the product.
+
 
 A directory with an `index.html` and no `Dockerfile` deploys as a static website. Chasen serves the files of the commit with Caddy. A site that needs a build step (Astro, Hugo) is an image like any app: it has a `Dockerfile` like any app.
 

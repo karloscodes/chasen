@@ -31,6 +31,7 @@ Run these in the directory of your app:
   deploy                 Build the image of the current git commit, push it, and deploy it.
                          A directory with an index.html and no Dockerfile is a website
                          --tag <tag> deploys an image that is already in the registry. No build
+                         A folder with image: in chasen.yml and no Dockerfile: the newest image
                          In the cloud, the first deploy of an app asks for its server:
                          --on <id> uses one of your servers, --new creates one (--new=cx33, --new=@ash)
   check                  Test the current git commit against the standard. Changes nothing live

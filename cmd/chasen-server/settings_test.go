@@ -182,3 +182,19 @@ func TestCheckHasTheEnvOfADeploy(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionOfTheNewestImage(t *testing.T) {
+	t.Run("the version that the build wrote in the image", func(t *testing.T) {
+		if got := imageVersion("v3.2.2\n", "sha256:3c18953fc50018000e671b6f75f4f9d5fba52d30495370128497c"); got != "3.2.2" {
+			t.Fatalf("got %q, want 3.2.2", got)
+		}
+	})
+
+	t.Run("an image with no version gets the start of its id", func(t *testing.T) {
+		for _, label := range []string{"", "<no value>", "not a version!"} {
+			if got := imageVersion(label, "sha256:a7811c5ec9ab0123456789"); got != "a7811c5ec9ab" {
+				t.Fatalf("label %q: got %q, want a7811c5ec9ab", label, got)
+			}
+		}
+	})
+}

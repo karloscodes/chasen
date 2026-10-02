@@ -638,6 +638,19 @@ func fetchImage(settings protocol.Settings, files io.Reader, as string) error {
 	return nil
 }
 
+// imageVersion names an image that came as "latest": the version in its
+// label, when the build wrote one (org.opencontainers.image.version), or the
+// first 12 characters of its id.
+func imageVersion(label, id string) string {
+	if label = strings.TrimPrefix(strings.TrimSpace(label), "v"); label != "" && label != "<no value>" && versionRe.MatchString(label) {
+		return label
+	}
+	if id = strings.TrimPrefix(strings.TrimSpace(id), "sha256:"); len(id) >= 12 {
+		return id[:12]
+	}
+	return ""
+}
+
 // link is the address of a domain for a person: https, or http for a domain
 // that only resolves on one machine and gets no certificate.
 func link(domain string) string {
@@ -674,6 +687,21 @@ func serverDeploy(name, version string) error {
 	image := imageRepo(name) + ":" + version
 	if err := fetchImage(settings, in, image); err != nil {
 		return err
+	}
+	// "latest" says nothing about what runs. Give the image the version that
+	// it says it has, or the start of its id, so the history and the status
+	// name it, and the image of the deploy before stays for a way back.
+	if version == "latest" {
+		label, _ := docker("inspect", "-f", `{{index .Config.Labels "org.opencontainers.image.version"}}`, image)
+		id, _ := docker("inspect", "-f", "{{.Id}}", image)
+		if named := imageVersion(label, id); named != "" {
+			if out, err := docker("tag", image, imageRepo(name)+":"+named); err != nil {
+				return errors.New(out)
+			}
+			docker("rmi", image)
+			version, image = named, imageRepo(name)+":"+named
+			fmt.Printf("The newest image is %s\n", version)
+		}
 	}
 
 	old, oldErr := matcha.LoadAppFrom(appsPath(), name)

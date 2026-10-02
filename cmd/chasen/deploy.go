@@ -80,7 +80,9 @@ func headCommit() (string, error) {
 
 // deployImage builds the image of the commit, pushes it, and tells the server
 // to pull it. With a tag (--tag, or in chasen.yml) the image is already in
-// the registry: nothing is built, and the directory needs no git commit.
+// the registry: nothing is built, and the directory needs no git commit. The
+// same is true for a directory with no Dockerfile: its image is the newest
+// one in the registry.
 func deployImage(creds credentials, app appFile, settings protocol.Settings, command string) error {
 	tag := tagFlag
 	if at := strings.LastIndexAny(app.Image, ":@"); at > strings.LastIndex(app.Image, "/") {
@@ -90,6 +92,12 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 		app.Image = app.Image[:at]
 	}
 	build := tag == ""
+	if _, err := os.Stat("Dockerfile"); build && err != nil {
+		// Nothing to build here: the image comes from the release of another
+		// repository. Deploy the newest one. The server names the version.
+		fmt.Printf("No Dockerfile here: chasen deploys the newest %s. For one version: chasen deploy --tag <version>\n", app.Image)
+		tag, build = "latest", false
+	}
 	if build {
 		var err error
 		if tag, err = headCommit(); err != nil {

@@ -414,6 +414,35 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("a folder with an image and no Dockerfile deploys the newest image, and the server names its version", func(t *testing.T) {
+		// The release of another repository: the image of the app, pushed as latest.
+		commit := strings.TrimSpace(must(app, "git", "rev-parse", "HEAD"))
+		config := t.TempDir()
+		login := exec.Command("docker", "--config", config, "login", "-u", "chasen", "--password-stdin", registry)
+		login.Stdin = strings.NewReader("chasen-e2e")
+		if out, err := login.CombinedOutput(); err != nil {
+			t.Fatalf("docker login: %s", out)
+		}
+		must(".", "docker", "tag", registry+"/example:"+commit, registry+"/example:latest")
+		must(".", "docker", "--config", config, "push", "-q", registry+"/example:latest")
+		// The folder of the one who runs it: the settings, and nothing to build.
+		released := t.TempDir()
+		settings, _ := os.ReadFile(filepath.Join(app, "chasen.yml"))
+		os.WriteFile(filepath.Join(released, "chasen.yml"), settings, 0644)
+
+		out := must(released, bin, "deploy")
+
+		if !strings.Contains(out, "No Dockerfile here") || strings.Contains(out, "Building") {
+			t.Errorf("deploy = %q, want the newest image and no build", out)
+		}
+		if !strings.Contains(out, "The newest image is") {
+			t.Errorf("deploy = %q, want the server to name the version of the image", out)
+		}
+		if status := must(released, bin, "status"); strings.Contains(status, "Version:  latest") {
+			t.Errorf("status = %q, want a version that says what runs, not latest", status)
+		}
+	})
+
 	t.Run("a deploy that does not get healthy keeps the previous version live", func(t *testing.T) {
 		commit("app.py", "raise SystemExit('broken')\n")
 

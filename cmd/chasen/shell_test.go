@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -154,6 +155,49 @@ func TestSecretsFromACommand(t *testing.T) {
 		}
 		if env["PLAIN"] != "abc123" || env["OTHER"] != `single \n stays` {
 			t.Errorf("got %q", env)
+		}
+	})
+}
+
+func TestDeployOfAnImageFromAnotherRepository(t *testing.T) {
+	// A folder with a chasen.yml that names an image, and nothing to build.
+	server := mock.New(time.Now())
+	server.Wait = func(context.Context, time.Duration) bool { return true }
+	web := httptest.NewServer(server)
+	defer web.Close()
+	creds := credentials{URL: web.URL, Token: server.Token}
+	t.Setenv("HOME", t.TempDir()) // no registry login of this machine
+	t.Chdir(t.TempDir())
+	history := func() string {
+		var out strings.Builder
+		protocol.Client(creds).Run(context.Background(), "history", []string{"shop"}, nil, &out)
+		return out.String()
+	}
+
+	t.Run("with no tag, it deploys the newest image and builds nothing", func(t *testing.T) {
+		tagFlag = ""
+
+		err := deployImage(creds, appFile{Name: "shop", Image: "example/shop"}, protocol.Settings{}, "deploy")
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(history(), "deploy latest") {
+			t.Fatalf("the history has no deploy of the newest image:\n%s", history())
+		}
+	})
+
+	t.Run("with a tag, it deploys that version", func(t *testing.T) {
+		tagFlag = "3.2.3"
+		defer func() { tagFlag = "" }()
+
+		err := deployImage(creds, appFile{Name: "shop", Image: "example/shop"}, protocol.Settings{}, "deploy")
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(history(), "deploy 3.2.3") {
+			t.Fatalf("the history has no deploy of 3.2.3:\n%s", history())
 		}
 	})
 }
