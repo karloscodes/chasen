@@ -103,7 +103,8 @@ func serverReplicate() error {
 		return errors.New("no live replica: this server has no bucket")
 	}
 	// CHASEN_DEBUG=1 shows what Litestream decides at each sync, and why it
-	// takes a full copy when it does.
+	// takes a full copy when it does. It is for a run by hand on the machine
+	// of a developer: on a server the API starts this process.
 	if os.Getenv("CHASEN_DEBUG") != "" {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
@@ -132,13 +133,9 @@ func serverReplicate() error {
 			if !backedUp(name) {
 				continue
 			}
-			// The databases that this process replicates stay closed here: to
-			// open and close one would drop the locks of its replica.
-			held := map[string]bool{}
-			for path := range registered {
-				held[path] = true
-			}
-			dbs, err := findDatabasesBut(appDir(name), held)
+			// The search leaves the registered databases closed: to open and
+			// close one would drop the locks of its replica.
+			dbs, err := findDatabases(appDir(name), registered)
 			if err != nil {
 				slog.Error("cannot read the data directory", "app", name, "error", err)
 			}

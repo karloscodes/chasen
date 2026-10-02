@@ -47,20 +47,11 @@ func localBackups(name string) []string {
 
 // findDatabases returns the SQLite files in the volumes of an app, relative to dir.
 // It reads the file header, so the file name does not matter.
-func findDatabases(dir string) ([]string, error) { return findDatabasesBut(dir, nil) }
-
-// findDatabasesBut is findDatabases for a process that has databases open: it
-// does not open the files that the process knows to be databases, and takes
-// them as databases.
 //
-// On Linux, a process that closes a file loses every lock it holds on that
-// file, also the locks that another part of the process took. The live
-// replica holds its databases with such locks: that is what keeps an app from
-// starting its write-ahead log again, or deleting it, behind the back of the
-// replica. So the replica must never open and close a database that it
-// replicates, and never its -wal or -shm file. Nothing here opens those two:
-// they are never databases.
-func findDatabasesBut(dir string, known map[string]bool) ([]string, error) {
+// A process that closes a file loses every lock it holds on that file. So the
+// live replica gives the files it holds in open: those count as databases and
+// stay closed. A -wal or -shm file is never a database, and is never opened.
+func findDatabases(dir string, open map[string]os.FileInfo) ([]string, error) {
 	var dbs []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		// Skip what is not live data: the backups, the databases a restore moved
@@ -75,7 +66,7 @@ func findDatabasesBut(dir string, known map[string]bool) ([]string, error) {
 			return nil
 		}
 		rel, _ := filepath.Rel(dir, path)
-		if known[path] {
+		if info, err := d.Info(); err == nil && os.SameFile(open[path], info) {
 			dbs = append(dbs, rel)
 			return nil
 		}
@@ -213,7 +204,7 @@ func backupFiles(dir string) ([]string, error) {
 // backupApp backs up every SQLite database of the app. It returns the stamp
 // of the backup, or "" when the app has no database yet.
 func backupApp(name string, cfg serverConfig) (string, error) {
-	dbs, err := findDatabases(appDir(name))
+	dbs, err := findDatabases(appDir(name), nil)
 	if err != nil || len(dbs) == 0 {
 		return "", err
 	}

@@ -839,7 +839,7 @@ func prepareData(name, image string, volumes []string, cfg serverConfig) error {
 		fmt.Printf("%s: no backup. chasen.yml says backup: false\n", name)
 		return nil
 	}
-	dbs, err := findDatabases(appDir(name))
+	dbs, err := findDatabases(appDir(name), nil)
 	if err != nil {
 		return err
 	}

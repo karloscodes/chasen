@@ -60,12 +60,16 @@ func TestFindDatabasesOfTheReplica(t *testing.T) {
 		if err := read.QueryRow("SELECT COUNT(1) FROM orders").Scan(&orders); err != nil {
 			t.Fatal(err)
 		}
+		held, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
 		onDatabase, onIndex := heldLocks(t, path), heldLocks(t, path+"-shm")
 		if len(onDatabase) == 0 || len(onIndex) == 0 {
 			t.Fatalf("the open read holds no lock: database %v, index %v", onDatabase, onIndex)
 		}
 
-		dbs, err := findDatabasesBut(dir, map[string]bool{path: true})
+		dbs, err := findDatabases(dir, map[string]os.FileInfo{path: held})
 
 		if err != nil || !slices.Equal(dbs, []string{"storage/db.sqlite3"}) {
 			t.Fatalf("found %v, %v", dbs, err)
@@ -78,15 +82,22 @@ func TestFindDatabasesOfTheReplica(t *testing.T) {
 		}
 	})
 
-	t.Run("finds a database that the process does not know yet", func(t *testing.T) {
+	t.Run("reads a new file that took the path of a held database", func(t *testing.T) {
 		dir := t.TempDir()
-		query(t, filepath.Join(dir, "db.sqlite3"), "PRAGMA journal_mode=WAL; CREATE TABLE orders (name); SELECT 1")
-		query(t, filepath.Join(dir, "queue.db"), "CREATE TABLE jobs (name); SELECT 1")
-		os.WriteFile(filepath.Join(dir, "upload.txt"), []byte("not a database"), 0644)
+		path := filepath.Join(dir, "db.sqlite3")
+		query(t, path, "CREATE TABLE orders (name); SELECT 1")
+		held, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The old file moves aside, as a restore moves it.
+		os.MkdirAll(filepath.Join(dir, "pre-restore-1"), 0755)
+		os.Rename(path, filepath.Join(dir, "pre-restore-1", "db.sqlite3"))
+		os.WriteFile(path, []byte("not a database"), 0644)
 
-		dbs, err := findDatabasesBut(dir, map[string]bool{filepath.Join(dir, "db.sqlite3"): true})
+		dbs, err := findDatabases(dir, map[string]os.FileInfo{path: held})
 
-		if err != nil || !slices.Equal(dbs, []string{"db.sqlite3", "queue.db"}) {
+		if err != nil || len(dbs) != 0 {
 			t.Fatalf("found %v, %v", dbs, err)
 		}
 	})
