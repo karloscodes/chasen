@@ -107,11 +107,14 @@ func s3Escape(path string) string {
 	return b.String()
 }
 
-// createBucket makes the bucket. A bucket that this account already owns is fine.
+// createBucket makes the bucket. A bucket that exists already is fine. Some
+// stores say "you own it already", and others, like Hetzner for a bucket
+// made in its console, only say "the name is taken". So this does not decide
+// whose bucket it is: the caller writes a test object, and that proves it.
 func (c *s3Config) createBucket() error {
 	resp, err := c.do("PUT", "", nil, nil, 0)
 	if err != nil {
-		if strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") {
+		if strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") || strings.Contains(err.Error(), "BucketAlreadyExists") {
 			return nil
 		}
 		return err
