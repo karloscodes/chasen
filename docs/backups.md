@@ -38,7 +38,7 @@ chasen verify
 
 Run it after you set a bucket, and now and then after that. It downloads the whole replica of the app.
 
-The server also checks by itself. Each hour, after the snapshots, it compares each database with its replica in the bucket. A replica that is more than 10 minutes behind a database that changed makes the hourly run fail: a wrong key, a full bucket, a store that refuses. Then the server does not call `heartbeat_url`, and your monitor tells you.
+The server also checks by itself. It writes down, every few seconds, the last transaction of each database and the last one that reached the bucket. A replica that misses transactions for more than 10 minutes makes the hourly run fail: a wrong key, a full bucket, a store that refuses. Then `chasen status` says that the replica is behind, the server does not call `heartbeat_url`, and your monitor tells you.
 
 ## What the bucket holds, and how it grows
 

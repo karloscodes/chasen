@@ -10,40 +10,70 @@ import (
 	"github.com/karloscodes/matcha"
 )
 
-func TestReplicaGap(t *testing.T) {
+func TestReplicaBehind(t *testing.T) {
 	now := time.Date(2026, 10, 2, 19, 0, 0, 0, time.UTC)
-	replica := func(ages ...time.Duration) []s3Object {
-		var objects []s3Object
-		for _, age := range ages {
-			objects = append(objects, s3Object{Key: "shop/live/db/0000/a.ltx", LastModified: now.Add(-age)})
+	shop := func() string { return filepath.Join(dataDir("shop"), "db.sqlite3") }
+
+	t.Run("a replica that has every transaction is not behind", func(t *testing.T) {
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		saveReplicaState(map[string]replicaPosition{shop(): {Local: 40, Replica: 40}}, now.Add(-time.Hour))
+
+		behind, err := replicasBehind("", now)
+
+		if err != nil || len(behind) != 0 {
+			t.Errorf("behind = %v (%v), want nothing", behind, err)
 		}
-		return objects
-	}
-	cases := []struct {
-		name    string
-		changed time.Duration // how long ago the database changed
-		replica []s3Object
-		want    time.Duration
-	}{
-		{"a replica that got the last change has no gap", 30 * time.Second, replica(2*time.Hour, 29*time.Second), 0},
-		{"a database that did not change for hours has no gap", 5 * time.Hour, replica(5 * time.Hour), 0},
-		{"a replica that stopped an hour ago is behind by the changes since", time.Minute, replica(2*time.Hour, time.Hour), 59 * time.Minute},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			got := replicaGap(now.Add(-c.changed), c.replica)
+	})
 
-			if got != c.want {
-				t.Errorf("gap = %s, want %s", got, c.want)
-			}
-		})
-	}
+	t.Run("a replica that misses transactions for a moment is not a failure", func(t *testing.T) {
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		saveReplicaState(map[string]replicaPosition{shop(): {Local: 41, Replica: 40}}, now.Add(-time.Minute))
 
-	t.Run("a database with no replica at all is behind since its first day", func(t *testing.T) {
-		got := replicaGap(now, nil)
+		behind, err := replicasBehind("", now)
 
-		if got < replicaMayBeBehind {
-			t.Errorf("gap = %s, want more than the limit of %s", got, replicaMayBeBehind)
+		if err != nil || len(behind) != 0 {
+			t.Errorf("behind = %v (%v), want nothing after one minute", behind, err)
+		}
+	})
+
+	t.Run("a replica that stays behind is a failure, with the moment it started and how much it misses", func(t *testing.T) {
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		// The daemon looks every few seconds. The replica stopped an hour ago, and the app writes on.
+		saveReplicaState(map[string]replicaPosition{shop(): {Local: 41, Replica: 40}}, now.Add(-time.Hour))
+		saveReplicaState(map[string]replicaPosition{shop(): {Local: 90, Replica: 40}}, now.Add(-time.Minute))
+
+		behind, err := replicasBehind("", now)
+
+		want := "the live replica of shop (storage/db.sqlite3) is behind since 18:00 UTC: 50 transactions are not in the bucket"
+		if err != nil || len(behind) != 1 || behind[0] != want {
+			t.Errorf("behind = %q (%v), want %q", behind, err, want)
+		}
+		if other, _ := replicasBehind("blog", now); len(other) != 0 {
+			t.Errorf("the blog is behind too: %v. It has no replica that is behind", other)
+		}
+	})
+
+	t.Run("a replica that caught up is in sync again", func(t *testing.T) {
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		saveReplicaState(map[string]replicaPosition{shop(): {Local: 41, Replica: 40}}, now.Add(-time.Hour))
+		saveReplicaState(map[string]replicaPosition{shop(): {Local: 90, Replica: 90}}, now.Add(-time.Minute))
+
+		behind, err := replicasBehind("", now)
+
+		if err != nil || len(behind) != 0 {
+			t.Errorf("behind = %v (%v), want nothing", behind, err)
+		}
+	})
+
+	t.Run("a database that is gone leaves the state", func(t *testing.T) {
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		saveReplicaState(map[string]replicaPosition{shop(): {Local: 41, Replica: 40}}, now.Add(-time.Hour))
+		saveReplicaState(map[string]replicaPosition{}, now.Add(-time.Minute))
+
+		behind, err := replicasBehind("", now)
+
+		if err != nil || len(behind) != 0 {
+			t.Errorf("behind = %v (%v), want nothing: the app has no replica any more", behind, err)
 		}
 	})
 }

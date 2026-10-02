@@ -24,6 +24,14 @@ CREATE TABLE IF NOT EXISTS apps (
 	volumes        TEXT NOT NULL,
 	env            TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS replica_state (
+	db           TEXT PRIMARY KEY,
+	app          TEXT NOT NULL,
+	local_txid   INTEGER NOT NULL,
+	replica_txid INTEGER NOT NULL,
+	behind_since TEXT,
+	checked_at   TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS imported_files (
 	file     TEXT PRIMARY KEY,
 	modified TEXT NOT NULL

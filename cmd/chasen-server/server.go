@@ -1093,6 +1093,9 @@ func serverStatus(name string) error {
 	replica := "off"
 	if replicaPID() != 0 {
 		replica = "live"
+		if behind, _ := replicasBehind(name, time.Now()); len(behind) > 0 {
+			replica = "behind. Run: chasen verify, and check docker logs chasen-server on the server"
+		}
 	}
 	if !backedUp(name) {
 		last, replica = "off (backup: false in chasen.yml)", "off"

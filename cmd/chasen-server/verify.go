@@ -1,10 +1,12 @@
 package main
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -74,51 +76,93 @@ func serverVerify(name string) error {
 	return nil
 }
 
-// replicaMayBeBehind is how far the live replica may be behind a database
+// replicaMayBeBehind is how long the live replica may be behind a database
 // before the hourly run calls it a failure. The replica is about a second
 // behind when it works: ten minutes is a replica that stopped.
 const replicaMayBeBehind = 10 * time.Minute
 
-// replicaGap returns how far the live replica of a database is behind: the
-// time between the last change of the database and the newest file of its
-// replica. A database that did not change since the replica got its last
-// file has no gap.
-func replicaGap(changed time.Time, replica []s3Object) time.Duration {
-	var newest time.Time
-	for _, object := range replica {
-		if object.LastModified.After(newest) {
-			newest = object.LastModified
+// replicaPosition is how far a database and its replica are, in the count
+// that Litestream keeps: the number of the last transaction it wrote down
+// here, and of the last one that is in the bucket.
+type replicaPosition struct{ Local, Replica uint64 }
+
+// saveReplicaState writes down the position of every replica. The replica
+// daemon calls it every few seconds. A replica that has every transaction of
+// its database is in sync. For one that has not, the state keeps the moment
+// it was first seen behind, so a short delay and a replica that stopped are
+// two different things.
+func saveReplicaState(positions map[string]replicaPosition, now time.Time) error {
+	db, err := openServerDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	behind := map[string]string{}
+	rows, err := tx.Query("SELECT db, behind_since FROM replica_state WHERE behind_since IS NOT NULL")
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var path, since string
+		if err := rows.Scan(&path, &since); err != nil {
+			return err
+		}
+		behind[path] = since
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM replica_state"); err != nil {
+		return err
+	}
+	stamp := now.UTC().Format(time.RFC3339)
+	for path, pos := range positions {
+		var since any
+		if pos.Replica < pos.Local {
+			since = cmp.Or(behind[path], stamp)
+		}
+		rel, _ := filepath.Rel(root()+"/var/matcha", path)
+		app, _, _ := strings.Cut(rel, string(filepath.Separator))
+		if _, err := tx.Exec("INSERT INTO replica_state (db, app, local_txid, replica_txid, behind_since, checked_at) VALUES (?, ?, ?, ?, ?, ?)",
+			path, app, pos.Local, pos.Replica, since, stamp); err != nil {
+			return err
 		}
 	}
-	if changed.Before(newest) {
-		return 0
-	}
-	return changed.Sub(newest)
+	return tx.Commit()
 }
 
-// replicaBehind returns the databases of an app whose live replica is behind
-// by more than replicaMayBeBehind, each with a line that says how far.
-func replicaBehind(name string, s3 *s3Config) ([]string, error) {
-	dbs, err := findDatabases(appDir(name))
+// replicasBehind returns one line for each database whose replica has been
+// behind for longer than replicaMayBeBehind. With an app, only its databases.
+func replicasBehind(app string, now time.Time) ([]string, error) {
+	db, err := openServerDB()
 	if err != nil {
 		return nil, err
 	}
+	defer db.Close()
+	rows, err := db.Query("SELECT db, app, local_txid, replica_txid, behind_since FROM replica_state WHERE behind_since IS NOT NULL AND (app = ? OR ? = '') ORDER BY db", app, app)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 	var behind []string
-	for _, rel := range dbs {
-		// A change is in the -wal file first, and in the database after a checkpoint.
-		var changed time.Time
-		for _, file := range []string{rel, rel + "-wal"} {
-			if info, err := os.Stat(filepath.Join(appDir(name), file)); err == nil && info.ModTime().After(changed) {
-				changed = info.ModTime()
-			}
-		}
-		replica, err := s3.objects(name + "/live/" + rel + "/")
-		if err != nil {
+	for rows.Next() {
+		var path, name, since string
+		var local, replica uint64
+		if err := rows.Scan(&path, &name, &local, &replica, &since); err != nil {
 			return nil, err
 		}
-		if gap := replicaGap(changed, replica); gap > replicaMayBeBehind {
-			behind = append(behind, fmt.Sprintf("%s of %s is %s behind", rel, name, age(gap)))
+		from, err := time.Parse(time.RFC3339, since)
+		if err != nil || now.Sub(from) <= replicaMayBeBehind {
+			continue
 		}
+		rel, _ := filepath.Rel(appDir(name), path)
+		behind = append(behind, fmt.Sprintf("the live replica of %s (%s) is behind since %s UTC: %d transactions are not in the bucket", name, rel, from.UTC().Format("15:04"), local-replica))
 	}
-	return behind, nil
+	return behind, rows.Err()
 }

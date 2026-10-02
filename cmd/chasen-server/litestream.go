@@ -115,6 +115,7 @@ func serverReplicate() error {
 		return err
 	}
 	registered := map[string]os.FileInfo{}
+	replicas := map[string]*litestream.DB{} // by the path of the database
 	for {
 		current := map[string]os.FileInfo{}
 		clients := map[string]*lss3.ReplicaClient{}
@@ -145,6 +146,7 @@ func serverReplicate() error {
 					slog.Error("cannot stop the replica", "db", path, "error", err)
 				}
 				delete(registered, path)
+				delete(replicas, path)
 			}
 		}
 		for path, info := range current {
@@ -157,7 +159,18 @@ func serverReplicate() error {
 				slog.Error("cannot start the replica", "db", path, "error", err)
 				continue
 			}
-			registered[path] = info
+			registered[path], replicas[path] = info, db
+		}
+
+		// Write down how far each replica is, for the hourly check and for `status`.
+		positions := map[string]replicaPosition{}
+		for path, db := range replicas {
+			if local, err := db.Pos(); err == nil {
+				positions[path] = replicaPosition{Local: uint64(local.TXID), Replica: uint64(db.Replica.Pos().TXID)}
+			}
+		}
+		if err := saveReplicaState(positions, time.Now()); err != nil {
+			slog.Error("cannot save the state of the replica", "error", err)
 		}
 
 		select {
