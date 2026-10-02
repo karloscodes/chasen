@@ -24,6 +24,14 @@ The server creates the bucket when it does not exist, then writes and deletes a 
 
 For a monitor that alerts when backups stop, run `chasen-server settings heartbeat_url <url>` on the server. The server calls the URL after each hourly backup that worked.
 
+**An app with no backups.** Some data is not worth a copy: a demo that makes its data again at each start. Say so in the `chasen.yml` of that app, and deploy it:
+
+```yaml
+backup: false
+```
+
+Chasen then makes no snapshot of the app, keeps no live replica of it, and does not restore it from the bucket on a new server. `chasen status` shows `Backup: off`. The backups it made before stay until their retention ends. `chasen backup` still makes one when you ask for it.
+
 Without a bucket, the snapshots stay on the server and there is no live replica. `setup` warns you about this.
 
 Chasen calls `heartbeat_url` each hour, only when every snapshot worked and the live replica runs. Point a monitor at it, so that you know when backups stop.

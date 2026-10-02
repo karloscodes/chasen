@@ -826,6 +826,10 @@ func prepareData(name, image string, volumes []string, cfg serverConfig) error {
 	if err := prepareVolumes(name, image, volumes); err != nil {
 		return err
 	}
+	if !backedUp(name) {
+		fmt.Printf("%s: no backup. chasen.yml says backup: false\n", name)
+		return nil
+	}
 	dbs, err := findDatabases(appDir(name))
 	if err != nil {
 		return err
@@ -1077,11 +1081,14 @@ func serverStatus(name string) error {
 	if stamps := localBackups(name); len(stamps) > 0 {
 		last = stamps[0]
 	}
-	fmt.Printf("Backup:   %s\n", last)
 	replica := "off"
 	if replicaPID() != 0 {
 		replica = "live"
 	}
+	if !backedUp(name) {
+		last, replica = "off (backup: false in chasen.yml)", "off"
+	}
+	fmt.Printf("Backup:   %s\n", last)
 	fmt.Printf("Replica:  %s\n", replica)
 	return nil
 }

@@ -81,7 +81,8 @@ func appSettings(app appFile) (protocol.Settings, error) {
 	for _, name := range app.Secrets {
 		env[name] = secrets[name]
 	}
-	return protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes}, nil
+	return protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes,
+		NoBackup: app.Backup != nil && !*app.Backup}, nil
 }
 
 // commitHash matches the full hash of a git commit.

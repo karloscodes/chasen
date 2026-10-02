@@ -157,6 +157,9 @@ port: 3000
 health: /_health
 health_timeout: 90
 volumes: [/app/storage]
+
+# For an app whose data needs no backup, like a demo that makes its data again at each start.
+backup: false
 ```
 
 ## Secrets

@@ -61,6 +61,12 @@ type Settings struct {
 	// domain of the server>. An app that runs keeps its domains.
 	Domain string `json:"domain,omitempty"`
 
+	// NoBackup turns the backups of the app off: no snapshots, no live
+	// replica, and no restore from the bucket at a deploy. It is `backup:
+	// false` in chasen.yml, for an app whose data is made again at each
+	// start, like a demo.
+	NoBackup bool `json:"no_backup,omitempty"`
+
 	Env           map[string]string `json:"env"`
 	Port          int               `json:"port,omitempty"`
 	Health        string            `json:"health,omitempty"`

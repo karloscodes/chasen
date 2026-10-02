@@ -107,6 +107,9 @@ func serverReplicate() error {
 			slog.Error("cannot read the apps", "error", err)
 		}
 		for name := range apps {
+			if !backedUp(name) {
+				continue
+			}
 			dbs, err := findDatabases(appDir(name))
 			if err != nil {
 				slog.Error("cannot read the data directory", "app", name, "error", err)

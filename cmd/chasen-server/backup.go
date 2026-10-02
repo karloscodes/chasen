@@ -240,6 +240,15 @@ func printBackup(name string, cfg serverConfig) error {
 	return nil
 }
 
+// backedUp reports an app whose data Chasen backs up. An app says no with
+// `backup: false` in chasen.yml: a demo that makes its data again at each
+// start. Then it has no snapshots, no live replica, and no restore from the
+// bucket at a deploy.
+func backedUp(name string) bool {
+	settings, err := loadSettings(name)
+	return err != nil || !settings.NoBackup
+}
+
 // backupAll backs up every app. `serve` runs it each hour. It calls the heartbeat
 // URL only when every backup worked, so a monitor can alert when backups stop.
 func backupAll() error {
@@ -254,6 +263,9 @@ func backupAll() error {
 
 	var failed []string
 	for _, name := range matcha.ListAppsSorted(apps) {
+		if !backedUp(name) {
+			continue
+		}
 		if err := printBackup(name, cfg); err != nil {
 			fmt.Fprintf(os.Stderr, "%s: backup failed: %v\n", name, err)
 			failed = append(failed, name)

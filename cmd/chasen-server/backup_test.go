@@ -2,6 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"github.com/karloscodes/chasen/protocol"
+	"github.com/karloscodes/matcha"
 	"os"
 	"path/filepath"
 	"slices"
@@ -142,4 +144,47 @@ func TestRetentionOfHourlyBackups(t *testing.T) {
 	if slices.Contains(expired(stamps), timeStamp(2026, 60, 23)) {
 		t.Error("the newest backup expired")
 	}
+}
+
+func TestAppWithNoBackup(t *testing.T) {
+	// server makes a server with two apps that have a database each: a shop,
+	// and a demo that says backup: false.
+	server := func(t *testing.T) {
+		t.Helper()
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		if err := saveServerConfig(serverConfig{Domain: "example.com", Token: "token"}); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"shop", "demo"} {
+			saveApp(name, matcha.AppConfig{Image: "chasen.invalid/" + name + ":1", Domain: name + ".example.com"})
+			os.MkdirAll(dataDir(name), 0755)
+			query(t, filepath.Join(dataDir(name), "db.sqlite3"), "CREATE TABLE rows (name); INSERT INTO rows VALUES ('one')")
+		}
+		if err := saveSettings("demo", protocol.Settings{NoBackup: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Run("the hourly backup leaves it out, and backs up the others", func(t *testing.T) {
+		server(t)
+
+		err := backupAll()
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if shop, demo := localBackups("shop"), localBackups("demo"); len(shop) != 1 || len(demo) != 0 {
+			t.Errorf("backups: shop %v, demo %v, want one of the shop and none of the demo", shop, demo)
+		}
+	})
+
+	t.Run("a backup that the owner asks for is still made", func(t *testing.T) {
+		server(t)
+
+		_, err := backupApp("demo", serverConfig{})
+
+		if err != nil || len(localBackups("demo")) != 1 {
+			t.Errorf("err = %v, backups %v, want the backup that was asked for", err, localBackups("demo"))
+		}
+	})
 }
