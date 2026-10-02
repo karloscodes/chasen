@@ -77,6 +77,21 @@ func replicaClient(s3 *s3Config, name, rel string) *lss3.ReplicaClient {
 	return c
 }
 
+// The retention of the live replica. The replica has one job: bring a
+// database back to its newest state when the server is lost. The history is
+// the job of the snapshots, which keep 6 months. So the replica keeps the
+// least that does its job: one full copy each day, at 00:00 UTC, and full
+// copies for one day. After each full copy Litestream deletes every file from
+// before the oldest full copy that it keeps, so the replica holds one full
+// copy and the changes of one day, and for a moment two.
+//
+// These are the defaults of Litestream today. They are written here so that
+// a new version of the library cannot change what a bucket costs.
+const (
+	replicaFullCopyEvery   = 24 * time.Hour
+	replicaKeepsFullCopies = 24 * time.Hour
+)
+
 // serverReplicate is the daemon. It replicates each database of each deployed
 // app. Every few seconds it looks for databases that are new, gone, or replaced.
 func serverReplicate() error {
@@ -95,6 +110,7 @@ func serverReplicate() error {
 	defer stop()
 
 	store := litestream.NewStore(nil, litestream.DefaultCompactionLevels)
+	store.SnapshotInterval, store.SnapshotRetention = replicaFullCopyEvery, replicaKeepsFullCopies
 	if err := store.Open(ctx); err != nil {
 		return err
 	}

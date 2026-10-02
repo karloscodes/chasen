@@ -52,16 +52,16 @@ Both layers have a limit. Neither one grows forever.
 
 1. Each change of the database becomes a small file, about one each second while the app writes. Those files stay 5 minutes.
 2. Every 30 seconds the small files are merged into one. Every 5 minutes those are merged, and every hour again. A page that changed 100 times in an hour is in the hourly file one time.
-3. Once a day Litestream writes a full copy of the database.
+3. Once a day, at 00:00 UTC, Litestream writes a full copy of the database.
 4. After each full copy, it deletes the full copies that are older than one day, and every file of changes from before the oldest full copy that it keeps.
 
-So the replica holds one or two full copies and the changes of about two days. Its size follows how much of the database changes in a day, not how long the app has run: after two days it stops growing. `chasen bucket` shows the age of the oldest file, so you can see the cleanup work.
+So the replica holds one full copy and the changes of one day, and for a moment at midnight two. Its size follows how much of the database changes in a day, not how long the app has run: after the first midnight it stops growing. This retention is fixed. The replica has one job, the newest state of a database when the server is lost. The history is the job of the snapshots. `chasen bucket` shows the age of the oldest file, so you can see the cleanup work.
 
 Three things make a replica larger than you expect:
 
 - **An app that writes the same pages over and over.** A database of 40 MB that writes 4 GB of changes in a day has a replica of several GB. Fix the app: write in transactions, not one commit for each row.
 - **A restart of the server** (an update, a restore) adds one full copy. It goes away with the next daily cleanup.
-- **Files of an app that is gone.** Chasen does not delete the files of an app that you removed, or that you set to `backup: false`. Delete its folder in the bucket by hand.
+- **Files of an app that is gone.** Chasen does not delete the files of an app that you removed. Delete its folder in the bucket by hand.
 
 **An app with no backups.** Some data is not worth a copy: a demo that makes its data again at each start. Say so in the `chasen.yml` of that app, and deploy it:
 
@@ -69,7 +69,7 @@ Three things make a replica larger than you expect:
 backup: false
 ```
 
-Chasen then makes no snapshot of the app, keeps no live replica of it, and does not restore it from the bucket on a new server. `chasen status` shows `Backup: off`. The backups it made before stay until their retention ends. `chasen backup` still makes one when you ask for it.
+Chasen then makes no snapshot of the app, keeps no live replica of it, and does not restore it from the bucket on a new server. `chasen status` shows `Backup: off`. At the next hourly run, the live replica of the app leaves the bucket: a replica that nothing updates is a copy of an old state. The snapshots from before stay. `chasen backup` still makes one when you ask for it.
 
 Without a bucket, the snapshots stay on the server and there is no live replica. `setup` warns you about this.
 

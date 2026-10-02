@@ -249,6 +249,29 @@ func backedUp(name string) bool {
 	return err != nil || !settings.NoBackup
 }
 
+// forgetBackups cleans up after an app that turned its backups off: its
+// live replica leaves the bucket. A replica that nothing updates is a copy
+// of an old state, and it would stay there forever. The snapshots from
+// before stay: they are backups that somebody may want.
+func forgetBackups(name string, cfg serverConfig) error {
+	if cfg.Backup.S3 == nil {
+		return nil
+	}
+	keys, err := cfg.Backup.S3.list(name + "/live/")
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if err := cfg.Backup.S3.delete(key); err != nil {
+			return err
+		}
+	}
+	if len(keys) > 0 {
+		fmt.Printf("%s: removed its live replica from the bucket (%d files). chasen.yml says backup: false\n", name, len(keys))
+	}
+	return nil
+}
+
 // backupAll backs up every app. `serve` runs it each hour. It calls the heartbeat
 // URL only when every backup worked, so a monitor can alert when backups stop.
 func backupAll() error {
@@ -264,6 +287,10 @@ func backupAll() error {
 	var failed []string
 	for _, name := range matcha.ListAppsSorted(apps) {
 		if !backedUp(name) {
+			// No new backups. What it has from before must not stay forever.
+			if err := forgetBackups(name, cfg); err != nil {
+				fmt.Fprintf(os.Stderr, "%s: cannot remove its old backups: %v\n", name, err)
+			}
 			continue
 		}
 		if err := printBackup(name, cfg); err != nil {

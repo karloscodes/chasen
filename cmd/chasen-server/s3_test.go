@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/karloscodes/chasen/protocol"
+	"github.com/karloscodes/matcha"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,6 +73,30 @@ func TestOffsiteBackup(t *testing.T) {
 		left, _ := s3.list("prune/snapshots/")
 		if len(left) != 1 || left[0] != "prune/snapshots/20260101T103000Z/db.sqlite3.gz" {
 			t.Errorf("offsite backups after prune = %v, want only the 10:30 backup", left)
+		}
+	})
+
+	t.Run("an app that turned its backups off loses its live replica in the bucket, and keeps its snapshots", func(t *testing.T) {
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		if err := saveServerConfig(cfg); err != nil {
+			t.Fatal(err)
+		}
+		saveApp("demo", matcha.AppConfig{Image: "chasen.invalid/demo:1", Domain: "demo.example.com"})
+		saveSettings("demo", protocol.Settings{NoBackup: true})
+		file := filepath.Join(t.TempDir(), "file")
+		os.WriteFile(file, []byte("x"), 0600)
+		for _, key := range []string{"demo/live/storage/db.sqlite3/0001/a.ltx", "demo/live/storage/db.sqlite3/0009/b.ltx", "demo/snapshots/20260101T100000Z/db.sqlite3.gz"} {
+			if err := s3.putFile(key, file); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		backupAll() // it reports that no replica runs in this test: the cleanup is what counts here
+
+		live, _ := s3.list("demo/live/")
+		snapshots, _ := s3.list("demo/snapshots/")
+		if len(live) != 0 || len(snapshots) != 1 {
+			t.Errorf("after the hourly run: replica files %v, snapshots %v, want no replica and the snapshot", live, snapshots)
 		}
 	})
 }
