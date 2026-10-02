@@ -81,6 +81,8 @@ func runServer(args []string) error {
 		return serverReplicate()
 	case "serve":
 		return serverServe()
+	case "connect":
+		return serverConnect()
 	case "list":
 		return serverList()
 	case "load":

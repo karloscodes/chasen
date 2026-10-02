@@ -31,4 +31,6 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
+      # The end-to-end test starts a real SSH server, for the SSH way to a server.
+      - run: test -x /usr/sbin/sshd || (sudo apt-get update -q && sudo apt-get install -y -q openssh-server)
       - run: bin/e2e -test.v

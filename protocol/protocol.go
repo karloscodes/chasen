@@ -137,10 +137,10 @@ type Client struct {
 	Server string // sent as ServerHeader, when the user chose a server
 }
 
-// Do sends one command and returns the response as it is.
-func (c Client) Do(ctx context.Context, command string, args []string, stdin io.Reader) (*http.Response, error) {
-	query := url.Values{"arg": args}
-	req, err := http.NewRequestWithContext(ctx, "POST", c.URL+"/v1/"+url.PathEscape(command)+"?"+query.Encode(), stdin)
+// request sends one request to the API, with the login.
+func (c Client) request(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+	client, address := c.api()
+	req, err := http.NewRequestWithContext(ctx, method, address+path, body)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,13 @@ func (c Client) Do(ctx context.Context, command string, args []string, stdin io.
 	if c.Server != "" {
 		req.Header.Set(ServerHeader, c.Server)
 	}
-	return http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
+	return resp, c.errSSH(err)
+}
+
+// Do sends one command and returns the response as it is.
+func (c Client) Do(ctx context.Context, command string, args []string, stdin io.Reader) (*http.Response, error) {
+	return c.request(ctx, "POST", "/v1/"+url.PathEscape(command)+"?"+url.Values{"arg": args}.Encode(), stdin)
 }
 
 // Run sends one command, writes its output to out as it arrives, and returns
@@ -183,12 +189,7 @@ func (c Client) Run(ctx context.Context, command string, args []string, stdin io
 // Placement asks the cloud where an app goes. A plain server does not know
 // the question: then ok is false.
 func (c Client) Placement(ctx context.Context, app string) (p Placement, ok bool, err error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.URL+"/v1/placement?app="+url.QueryEscape(app), nil)
-	if err != nil {
-		return p, false, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.Token)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.request(ctx, "GET", "/v1/placement?app="+url.QueryEscape(app), nil)
 	if err != nil {
 		return p, false, err
 	}

@@ -20,6 +20,8 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go vet ./... && go test ./...
+      # The end-to-end test starts a real SSH server, for the SSH way to a server.
+      - run: test -x /usr/sbin/sshd || (sudo apt-get update -q && sudo apt-get install -y -q openssh-server)
       - run: bin/e2e -test.v
 
   release:

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -423,6 +425,27 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("the CLI reaches the server through SSH, with no address on the web", func(t *testing.T) {
+		address := sshServer(t, root, os.Getenv("CHASEN_BIN"))
+
+		out := must(app, bin, "add", "server", strings.TrimPrefix(address, "ssh://"))
+
+		if !strings.Contains(out, "Logged in to "+address) {
+			t.Errorf("add server = %q, want a login through SSH, with the token that the server gave", out)
+		}
+		if out := must(app, bin, "list"); !strings.Contains(out, "example") {
+			t.Errorf("list through SSH = %q, want the app", out)
+		}
+		if out := must(app, bin, "run", "sh", "-c", "echo through-ssh"); !strings.Contains(out, "through-ssh") {
+			t.Errorf("run through SSH = %q, want the output of the command", out)
+		}
+		if out := must(app, bin, "history"); !strings.Contains(out, "run sh -c echo through-ssh") {
+			t.Errorf("history = %q, want the run: a command through SSH is a command of the API", out)
+		}
+		// The tests after this one use the address on the web again.
+		must(app, bin, "use", api)
+	})
+
 	t.Run("a folder with an image and no Dockerfile deploys the newest image, and the server names its version", func(t *testing.T) {
 		// The release of another repository: the image of the app, pushed as latest.
 		commit := strings.TrimSpace(must(app, "git", "rev-parse", "HEAD"))
@@ -630,4 +653,72 @@ func (b *lockedBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buf.String()
+}
+
+// sshServer starts a real SSH server on this machine, for the user root, and
+// puts an `ssh` first on the PATH that logs in to it with a key of the test.
+// A command through this SSH finds the chasen-server of the test, and the
+// root of the test. It returns the SSH address of the server.
+func sshServer(t *testing.T, chasenRoot, binDir string) string {
+	t.Helper()
+	sshd, err := exec.LookPath("sshd")
+	if err != nil {
+		sshd = "/usr/sbin/sshd"
+	}
+	client, clientErr := exec.LookPath("ssh")
+	if _, err := os.Stat(sshd); err != nil || clientErr != nil {
+		t.Fatal("the test of the SSH way needs ssh and sshd on this machine: install openssh-server")
+	}
+	dir := t.TempDir()
+	hostKey, clientKey := filepath.Join(dir, "host_key"), filepath.Join(dir, "client_key")
+	for _, key := range []string{hostKey, clientKey} {
+		if out, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput(); err != nil {
+			t.Fatalf("ssh-keygen: %s", out)
+		}
+	}
+	public, _ := os.ReadFile(clientKey + ".pub")
+	os.WriteFile(filepath.Join(dir, "authorized_keys"), public, 0600)
+	os.MkdirAll("/run/sshd", 0755) // sshd wants this directory
+
+	// A free port: ask for one, and give it back.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+	listener.Close()
+
+	args := []string{"-D", "-e", "-p", port, "-f", "/dev/null", "-h", hostKey,
+		"-o", "ListenAddress=127.0.0.1", "-o", "AuthorizedKeysFile=" + filepath.Join(dir, "authorized_keys"),
+		"-o", "StrictModes=no", "-o", "PasswordAuthentication=no", "-o", "PermitRootLogin=yes", "-o", "PidFile=" + filepath.Join(dir, "sshd.pid"),
+		// What a real server has by itself: chasen-server on the PATH, and its files in /etc/chasen.
+		"-o", "SetEnv=CHASEN_ROOT=" + chasenRoot + " PATH=" + binDir + ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+	if _, err := os.Stat("/etc/pam.d/sshd"); err == nil {
+		args = append(args, "-o", "UsePAM=yes") // a root account with no password is locked without it
+	}
+	var log lockedBuffer
+	daemon := exec.Command(sshd, args...)
+	daemon.Stdout, daemon.Stderr = &log, &log
+	if err := daemon.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		daemon.Process.Kill()
+		daemon.Wait()
+		t.Logf("sshd:\n%s", log.String())
+	})
+	for range 50 {
+		if conn, err := net.Dial("tcp", "127.0.0.1:"+port); err == nil {
+			conn.Close()
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	script := "#!/bin/sh\nexec " + client + " -i " + clientKey + " -o IdentitiesOnly=yes -o IdentityAgent=none -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \"$@\"\n"
+	wrapper := t.TempDir()
+	os.WriteFile(filepath.Join(wrapper, "ssh"), []byte(script), 0755)
+	os.Chmod(wrapper, 0755)
+	t.Setenv("PATH", wrapper+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return "ssh://root@127.0.0.1:" + port
 }

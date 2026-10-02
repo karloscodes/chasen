@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -66,11 +67,11 @@ type Shell struct{ ws *websocket.Conn }
 // Shell opens a shell in the container of an app. cols and rows are the size
 // of the terminal of the user.
 func (c Client) Shell(app string, cols, rows int) (*Shell, error) {
-	address, err := url.Parse(c.URL)
+	_, origin := c.api()
+	address, err := url.Parse(origin)
 	if err != nil {
 		return nil, err
 	}
-	origin := address.String()
 	address.Scheme = strings.Replace(address.Scheme, "http", "ws", 1) // https becomes wss
 	address.Path = ShellPath
 	address.RawQuery = url.Values{"arg": {app}, "cols": {strconv.Itoa(cols)}, "rows": {strconv.Itoa(rows)}}.Encode()
@@ -82,13 +83,24 @@ func (c Client) Shell(app string, cols, rows int) (*Shell, error) {
 	if c.Server != "" {
 		config.Header.Set(ServerHeader, c.Server)
 	}
-	ws, err := websocket.DialConfig(config)
+	var ws *websocket.Conn
+	if IsSSH(c.URL) {
+		// The shell has a connection of its own, through ssh, for as long as it is open.
+		var conn net.Conn
+		if conn, err = dialSSH(c.URL); err == nil {
+			if ws, err = websocket.NewClient(config, conn); err != nil {
+				conn.Close()
+			}
+		}
+	} else {
+		ws, err = websocket.DialConfig(config)
+	}
 	// The answer was not a WebSocket: an older server, or a token it refuses.
-	if dial := (*websocket.DialError)(nil); errors.As(err, &dial) && dial.Err == websocket.ErrBadStatus {
+	if dial := (*websocket.DialError)(nil); (errors.As(err, &dial) && dial.Err == websocket.ErrBadStatus) || err == websocket.ErrBadStatus {
 		return nil, fmt.Errorf("%s refused the shell. It needs chasen-server 0.5 or newer, and a valid login", c.URL)
 	}
 	if err != nil {
-		return nil, err
+		return nil, c.errSSH(err)
 	}
 	ws.MaxPayloadBytes = 1 << 20
 	return &Shell{ws}, nil
@@ -134,15 +146,7 @@ func (c Client) Download(ctx context.Context, app, backup string) (*http.Respons
 	if backup != "" {
 		query.Add("arg", backup)
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", c.URL+DownloadPath+"?"+query.Encode(), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.Token)
-	if c.Server != "" {
-		req.Header.Set(ServerHeader, c.Server)
-	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.request(ctx, "GET", DownloadPath+"?"+query.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}

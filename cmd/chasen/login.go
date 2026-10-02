@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/karloscodes/chasen/oauth"
+	"github.com/karloscodes/chasen/protocol"
 )
 
 // credentials is the saved login: the API of the cloud or of a server, and the token.
@@ -80,6 +81,9 @@ func apiAddress(name string) string {
 		return cmp.Or(os.Getenv("CHASEN_CLOUD"), cloudURL)
 	case strings.Contains(name, "://"):
 		return strings.TrimRight(name, "/")
+	case strings.Contains(name, "@"):
+		// root@203.0.113.5 is a server that the CLI reaches through SSH.
+		return "ssh://" + name
 	}
 	return "https://api." + name
 }
@@ -160,7 +164,7 @@ func login(args []string) error {
 // has its API on https://api.example.com.
 func addServer(args []string) error {
 	if len(args) != 2 || args[0] != "server" {
-		return errors.New("usage: chasen add server <domain>")
+		return errors.New("usage: chasen add server <domain>, or chasen add server <user>@<host> to reach it through SSH")
 	}
 	return connect(apiAddress(args[1]))
 }
@@ -171,6 +175,9 @@ func connect(target string) error {
 	server, err := url.Parse(strings.TrimRight(target, "/"))
 	if err != nil || server.Host == "" {
 		return fmt.Errorf("invalid address %q", target)
+	}
+	if protocol.IsSSH(server.String()) {
+		return connectSSH(server.String())
 	}
 	// The token goes in each request. Plain http is only for a server on this machine or in a test.
 	host := server.Hostname()
@@ -191,6 +198,36 @@ func connect(target string) error {
 		return err
 	}
 
+	saved := loadLogins()
+	saved.Tokens[creds.URL] = creds.Token
+	saved.Current = creds.URL
+	if err := saved.save(); err != nil {
+		return err
+	}
+	fmt.Println("Logged in to", creds.URL)
+	return nil
+}
+
+// connectSSH logs in to a server through SSH. Who can log in to the server
+// with SSH, as root or with sudo, owns it: the server gives its token to
+// that person, and no browser is needed.
+func connectSSH(address string) error {
+	creds := credentials{URL: address, Token: os.Getenv("CHASEN_TOKEN")}
+	if creds.Token == "" {
+		ssh, err := protocol.SSHCommand(address, "chasen-server token")
+		if err != nil {
+			return err
+		}
+		ssh.Stdin, ssh.Stderr = os.Stdin, os.Stderr
+		out, err := ssh.Output()
+		if err != nil {
+			return fmt.Errorf("cannot get the token of the server through SSH (%w). The server needs chasen-server, set up, and the SSH user must be root or have sudo with no password", err)
+		}
+		creds.Token = strings.TrimSpace(string(out))
+	}
+	if err := remote(creds, nil, io.Discard, "list"); err != nil {
+		return err
+	}
 	saved := loadLogins()
 	saved.Tokens[creds.URL] = creds.Token
 	saved.Current = creds.URL
