@@ -351,6 +351,35 @@ func (t *tui) lastLine(width int) string {
 	return spread(width, cells, nil)
 }
 
+// splash is the screen while a server answers for the first time: at the
+// start, and after a switch to another server. The mark and the name in the
+// middle, the server that opens, and the way to another one.
+func (t *tui) splash(width, height int) []string {
+	type part struct{ text, color string }
+	block := [][]part{}
+	for _, line := range whisk {
+		block = append(block, []part{{line, colorAccent}})
+	}
+	block = append(block, nil, []part{{"chasen", colorAccent + ";" + colorBold}}, nil,
+		[]part{{spinner[t.frame%len(spinner)] + " ", colorAccent}, {"Opening " + t.server, ""}})
+	if len(t.servers) > 1 {
+		block = append(block, nil, []part{{"s", colorAccent}, {"  another server", colorDim}})
+	}
+	lines := make([]string, max(0, (height-len(block))/2))
+	for _, parts := range block {
+		size := 0
+		for _, p := range parts {
+			size += utf8.RuneCountInString(p.text)
+		}
+		line := strings.Repeat(" ", max(0, (width-size)/2))
+		for _, p := range parts {
+			line += paint(p.text, p.color)
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
 // body is everything between the two rules.
 func (t *tui) body(width, height int) []string {
 	var lines []string
@@ -358,12 +387,7 @@ func (t *tui) body(width, height int) []string {
 	case t.overlay != nil:
 		lines = t.overlayLines(t.overlay, width, height)
 	case !t.appsLoaded && t.appsErr == "":
-		// The first moment: the mark, while the server answers.
-		lines = []string{"", ""}
-		for _, line := range whisk {
-			lines = append(lines, "   "+paint(line, colorAccent))
-		}
-		lines = append(lines, "", "   "+paint(spinner[t.frame%len(spinner)], colorAccent)+paint(" Asking "+t.server+" for its apps", colorDim))
+		lines = t.splash(width, height)
 	case t.appsErr != "":
 		lines = []string{""}
 		for _, line := range wrap(t.appsErr, width-4) {

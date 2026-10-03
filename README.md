@@ -22,19 +22,54 @@ No server yet? [Chasen cloud](https://chasenhq.com/cloud/) creates one for you a
 ## How it works
 
 ```
-your machine                          the server
-chasen  ── HTTPS + token ──▶  chasen-server (API, in a container behind the proxy)
-                                ├─ docker pull         the image of your commit, from ghcr.io or Docker Hub
-                                ├─ matcha              proxy, HTTPS, deploy without downtime
-                                ├─ backups             checked snapshots each hour
-                                └─ Litestream          live replica to an S3 bucket
+your computer                               your server
+chasen deploy                               chasen-server, one binary, in a container
+  builds the image of your commit             pulls the image, backs up the databases,
+  pushes it to a registry                     starts the new version next to the old one,
+  talks to the server through SSH  ───────▶   moves the traffic when /up answers
+                                              hourly checked backups, a live replica to S3,
+                                              the history of every deploy, alerts
 ```
 
-- `chasen` is the client on your machine. `chasen-server` runs on the server.
-- The client calls the HTTPS API of the server at `https://api.<base domain>`. `chasen login` is an OAuth 2.0 device login: you approve it in a browser, and the client gets a token of its own. The API streams the output of each command back, so a deploy shows each step as it runs.
-- `chasen deploy` builds the image of the commit where it runs (your computer, or CI) and pushes it to a registry. The server pulls it, also from a private registry. A server never builds an app: a build would take the memory and the CPU of the live apps.
-- [matcha](https://github.com/karloscodes/matcha) is the deploy engine. It runs kamal-proxy, gets the Let's Encrypt certificates, and swaps containers without downtime. Chasen apps and matcha apps share one proxy on the same server.
-- [Litestream](https://litestream.io) is inside `chasen-server`. The server needs Docker and nothing else.
+- `chasen` is the CLI on your computer. It is all you run.
+- It reaches the server through your own `ssh`: your keys, your `~/.ssh/config`. A server with a base domain also answers on the web at `https://api.<domain>`, for CI and for a login with a browser. Both ways speak [one protocol](docs/protocol.md).
+- `chasen deploy` builds the image where it runs, your computer or CI, and the server pulls it. A server never builds: a build would take the memory and the CPU of the live apps.
+- Under it are [kamal-proxy](https://github.com/basecamp/kamal-proxy) for HTTPS and deploys without downtime, and [Litestream](https://litestream.io) for the live replica, both inside `chasen-server`. The server needs Docker, and installs it when it has none.
+
+## The server part
+
+Most deploy tools run Docker commands through SSH and leave. Chasen puts one small program there, `chasen-server`, because an app with its data in a SQLite file needs someone at home:
+
+- **Backups that run without you.** A checked snapshot of every database each hour, kept for six months, and a live replica that is a second behind. A backup before each deploy. `chasen verify` restores them next to the real files to prove they work.
+- **One deploy at a time.** The server locks an app while it changes. Two terminals, or a terminal and CI, cannot deploy over each other.
+- **A memory of what happened.** Every deploy, restart, and restore is in the history, with its output, also while it runs. A deploy from CI shows up live on your screen.
+- **Alerts.** It tells you when an app is down, a backup is late, the disk fills up, or SSH still takes passwords.
+- **It updates itself** each night, and goes back to the old version when the new one does not answer.
+
+It runs in a container, with the Docker socket, and changes nothing else on the machine.
+
+## The screen
+
+`chasen` with no command opens the screen of your server: your apps and their state, the history, the backups, the domains, and the logs, live. The top line shows the load of the server and its alerts.
+
+The keys do what the CLI does: `r` restarts, `b` backs up, `enter` on a backup restores it, `:` runs any command for the chosen app and lists them as you type, `!` shows the alerts, and `s` goes to another server. Each action shows the command line that does the same, so the screen also teaches the CLI. It has no deploy key: a deploy belongs to the directory of the app.
+
+On [Omarchy](https://omarchy.org), it takes the colors of your theme and changes with it.
+
+## How Chasen differs from Kamal
+
+[Kamal](https://kamal-deploy.org) and Chasen share an idea and a proxy: build an image, put it on a server you own, swap containers with kamal-proxy. They are for different jobs.
+
+| | Kamal | Chasen |
+|---|---|---|
+| Made for | A team that runs an app on several servers, with roles, accessories, and its own database servers | One person with one server and many small apps, each with its data in SQLite |
+| Configuration | `config/deploy.yml` with the servers, the registry, the proxy, and the accessories | None for an app on GitHub that follows [the standard](STANDARD.md). `chasen.yml` only for what differs |
+| On the server | The containers and a few files. Nothing of Kamal runs between deploys | `chasen-server` runs all the time: backups, the live replica, history, alerts |
+| Data | Yours to back up | Hourly checked snapshots and a live replica to S3, built in. `chasen restore` and `chasen download` |
+| Watching it | `kamal app logs`, `kamal app details` | The screen: every app, its history, backups, logs, and the alerts of the server |
+| Many apps on one server | Each app has its own `deploy.yml` and its own deploy | One server holds them all. `chasen list` shows them, and the screen moves between them |
+
+When your app needs several servers or Postgres, use Kamal. When it is one app or ten on a single machine, and the data is a SQLite file you cannot lose, use Chasen.
 
 ## Documents
 

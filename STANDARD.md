@@ -4,8 +4,6 @@ Two things in this document are not built yet: the `release:` command, and backu
 
 An app that follows the standard, in a repository on GitHub, deploys with no configuration. Each rule has a default, and `chasen.yml` can change it. An app that breaks a rule does not get traffic: the deploy fails and the old version stays.
 
-The defaults match [ONCE](https://github.com/basecamp/once) from 37signals where that costs nothing. So an app that runs on ONCE, and a new Rails 8 app with its default Dockerfile, deploys on Chasen with no changes.
-
 ## Summary
 
 | # | Rule | Default | Override in `chasen.yml` |
@@ -96,8 +94,8 @@ In both ways, Chasen makes a checked backup of every database before the migrati
 | Variable | Value | Same as |
 |---|---|---|
 | `PORT` | the port of rule 2: from `port:`, from `EXPOSE`, or 8080 | Heroku |
-| `BASE_URL` | `https://` + the main domain of the app | ONCE |
-| `SECRET_KEY_BASE` | a random secret, made once for each app and kept across deploys | ONCE, Rails |
+| `BASE_URL` | `https://` + the main domain of the app | |
+| `SECRET_KEY_BASE` | a random secret, made once for each app and kept across deploys | Rails |
 | `PRIVATE_KEY` | the same secret | matcha |
 | `STORAGE_DIR` | the first storage path of rule 5 | |
 | `DATABASE_PATH` | `$STORAGE_DIR/db.sqlite3`: a suggestion for an app with one database | |
@@ -120,7 +118,7 @@ The engine also sets four variables with the name of the app in front, for an ap
 - A missing variable that the app needs is an error at start, with the name of the variable in the message. Do not start with a silent default for a secret.
 - A change of a variable takes effect at the next deploy, as a new container. Chasen never changes the environment of a running container.
 
-**Names to use for common settings**, so apps and addons agree (the ONCE names): `SMTP_ADDRESS`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAILER_FROM_ADDRESS`.
+**Names to use for common settings**, so apps and addons agree: `SMTP_ADDRESS`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAILER_FROM_ADDRESS`.
 
 Chasen removes names it sets today: `APP_HOST` and `APP_URL` (use `BASE_URL`), and `DATA_DIR` (use `STORAGE_DIR`).
 
@@ -145,7 +143,7 @@ Secrets travel with the deploy on purpose. Nothing that matters lives only on th
 ## Backups
 
 - Every SQLite file in the storage gets hourly snapshots and the live replica.
-- Other files in the storage persist, but they have no backup yet. This is the largest gap in the standard: ONCE backs up the whole volume.
+- Other files in the storage persist, but they have no backup yet. This is the largest gap in the standard.
 - The app needs no backup hook. A snapshot of a SQLite file is consistent while the app writes.
 
 ## Limits an app must fit

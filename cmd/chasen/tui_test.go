@@ -426,6 +426,14 @@ func TestScreen(t *testing.T) {
 		sc.shows("alerts · refreshed every 1m", "ERROR    blog is down: its container is exited", "chasen -a blog logs shows why", "WARNING  SSH accepts passwords", "Checked at 14:00 UTC.")
 	})
 
+	t.Run("while a server answers, the mark, the server that opens, and the way to another one", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+		sc.tui.servers = []string{"example.com", "example.org"}
+		sc.tui.appsLoaded, sc.tui.apps = false, nil
+
+		sc.shows("chasen", "Opening example.com", "s  another server", whisk[0])
+	})
+
 	t.Run(": shows the commands it runs, and narrows them as the user types", func(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 
