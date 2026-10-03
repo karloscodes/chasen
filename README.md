@@ -84,6 +84,7 @@ The docs are on [chasenhq.com/docs](https://chasenhq.com/docs/). Their source is
 | [Domains](docs/domains.md) | Custom domains, and Cloudflare in front |
 | [Deploy from GitHub Actions](docs/github-actions.md) | `git push` as the deploy |
 | [Commands, files, and limits](docs/reference.md) | Every command, the files on the server, and what Chasen does not do |
+| [Chasen on Omarchy](docs/omarchy.md) | The launcher, the module of the top bar, and the theme |
 | [The server protocol](docs/protocol.md) | The HTTP API between the CLI and the server |
 
 [`example/`](example/) is the smallest app that follows the standard.

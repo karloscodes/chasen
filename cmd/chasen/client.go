@@ -65,6 +65,10 @@ var tagFlag string
 // app at its first deploy.
 var domainFlag string
 
+// waybarFlag is `alerts --waybar`: the alerts of every server, as the JSON
+// of a Waybar module.
+var waybarFlag bool
+
 // serverFlag is the cloud server from `--on <id>`, `--new`, or `--new=<type>@<location>`, in the
 // form of protocol.ServerHeader.
 var serverFlag string
@@ -87,6 +91,11 @@ options:
 			tagFlag = args[i+1]
 		case args[i] == "--domain" && hasValue:
 			domainFlag = strings.ToLower(args[i+1])
+		case args[i] == "--waybar":
+			waybarFlag = true
+			args = slices.Delete(args, i, i+1)
+			i--
+			continue
 		case args[i] == "--new" || strings.HasPrefix(args[i], "--new="):
 			serverFlag = strings.Replace(strings.TrimPrefix(args[i], "--"), "=", ":", 1)
 			args = slices.Delete(args, i, i+1)
@@ -105,6 +114,11 @@ options:
 	}
 
 	switch args[0] {
+	case "alerts":
+		// The module of the top bar asks every server, with no current one.
+		if waybarFlag {
+			return waybarAlerts(os.Stdout)
+		}
 	case "login":
 		return login(args[1:])
 	case "add":

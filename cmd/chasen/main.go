@@ -70,6 +70,7 @@ Run these in the directory of your app:
   load                   Show the load, the memory, and the disk of the server
   alerts                 What is wrong with the server, or puts it at risk: apps that are down,
                          late backups, a full disk, SSH with passwords, no firewall, no updates
+                         --waybar: the alerts of every server, for the top bar of Omarchy
   bucket                 Show where the backups of the server go
   bucket --endpoint <url> --name <bucket> --access-key-id <id> [--region <region>]
                          Send the backups to an S3 bucket too, and start the live replica.

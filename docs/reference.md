@@ -35,7 +35,7 @@
 | `chasen remove` | Stop the app. Keeps the data and the backups |
 | `chasen list` | List all apps on the server |
 | `chasen load` | Show how busy the server is: the load, the memory in use, and the disk of the apps |
-| `chasen alerts` | Show what is wrong with the server, or puts it at risk. See "Alerts" below |
+| `chasen alerts` | Show what is wrong with the server, or puts it at risk. See "Alerts" below. `--waybar`: the alerts of every server, for [the top bar of Omarchy](omarchy.md) |
 | `chasen bucket` | Show where the backups of the server go. With `--endpoint`, `--name`, and `--access-key-id`: send them to an S3 bucket too |
 
 On the server, as root:
