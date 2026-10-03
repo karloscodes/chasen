@@ -1,49 +1,104 @@
 package main
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
+	"strings"
 )
 
-// The screen takes the colors of the Omarchy theme when the computer has one,
-// and follows it when the theme changes: Omarchy keeps the colors of the
-// current theme in one file. CHASEN_THEME=ansi uses the 16 colors of the
-// terminal instead, so the screen follows any other terminal theme.
+// The themes of the screen:
+//
+//   - omarchy: the colors of the current Omarchy theme. Omarchy keeps them in
+//     one file, and the screen follows it when the theme changes.
+//   - chasen: the amber of the Chasen mark.
+//   - terminal: the 16 colors of the terminal, so any terminal theme applies.
+//
+// t in the screen goes to the next one and remembers it. CHASEN_THEME wins
+// over the choice. Without either, it is omarchy when the computer has it,
+// and chasen otherwise.
 
-// omarchyColors is the colors file of the current Omarchy theme. Older
-// versions of Omarchy keep the theme in ~/.config.
-func omarchyColors() []string {
-	home, _ := os.UserHomeDir()
-	state := os.Getenv("XDG_STATE_HOME")
-	if state == "" {
-		state = filepath.Join(home, ".local", "state")
+// The colors of the chasen theme, as the terminal can show them.
+var chasenColors = [3]string{colorAccent, colorDim, colorBad}
+
+// themeChoice is the theme that t chose, or "" for the default.
+var themeChoice = loadThemeChoice()
+
+func themePath() string { return filepath.Join(filepath.Dir(credentialsPath()), "theme") }
+
+func loadThemeChoice() string {
+	data, _ := os.ReadFile(themePath())
+	return strings.TrimSpace(string(data))
+}
+
+// themes are the themes this computer can show, in the order of t.
+func themes() []string {
+	if omarchyColorsFile() != "" {
+		return []string{"omarchy", "chasen", "terminal"}
 	}
-	return []string{
+	return []string{"chasen", "terminal"}
+}
+
+// currentTheme is the theme that the screen shows now.
+func currentTheme() string {
+	chosen := cmp.Or(os.Getenv("CHASEN_THEME"), themeChoice)
+	if chosen == "ansi" {
+		chosen = "terminal" // the first name of this theme
+	}
+	if slices.Contains(themes(), chosen) {
+		return chosen
+	}
+	return themes()[0]
+}
+
+// nextTheme goes to the next theme, remembers it, and returns its name.
+func nextTheme() string {
+	list := themes()
+	themeChoice = list[(slices.Index(list, currentTheme())+1)%len(list)]
+	os.MkdirAll(filepath.Dir(themePath()), 0700)
+	os.WriteFile(themePath(), []byte(themeChoice+"\n"), 0600)
+	themeRead = "" // the next look reads the colors again
+	followTheme()
+	return themeChoice
+}
+
+// omarchyColorsFile is the colors file of the current Omarchy theme, or "".
+// Older versions of Omarchy keep the theme in ~/.config.
+func omarchyColorsFile() string {
+	home, _ := os.UserHomeDir()
+	state := cmp.Or(os.Getenv("XDG_STATE_HOME"), filepath.Join(home, ".local", "state"))
+	for _, path := range []string{
 		filepath.Join(state, "omarchy", "current", "theme", "colors.toml"),
 		filepath.Join(home, ".config", "omarchy", "current", "theme", "colors.toml"),
+	} {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
 	}
+	return ""
 }
 
 var (
 	themeColor = regexp.MustCompile(`(?m)^\s*([a-z_]+)\s*=\s*"#([0-9a-fA-F]{6})"`)
-	themeRead  string // the content of the colors file at the last look
+	themeRead  string // the content of the Omarchy colors file at the last look
 )
 
-// followTheme sets the colors from the theme, when the theme changed since the
-// last call. The screen calls it once a second.
+// followTheme sets the colors of the current theme. The screen calls it once
+// a second, so it follows a switch of the Omarchy theme.
 func followTheme() {
-	if os.Getenv("CHASEN_THEME") == "ansi" {
+	switch currentTheme() {
+	case "terminal":
 		colorAccent, colorDim, colorBad = "33", "90", "31"
-		return
-	}
-	for _, path := range omarchyColors() {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		if string(data) == themeRead {
+		themeRead = ""
+	case "chasen":
+		colorAccent, colorDim, colorBad = chasenColors[0], chasenColors[1], chasenColors[2]
+		themeRead = ""
+	case "omarchy":
+		data, err := os.ReadFile(omarchyColorsFile())
+		if err != nil || string(data) == themeRead {
 			return
 		}
 		themeRead = string(data)
@@ -66,7 +121,6 @@ func followTheme() {
 				}
 			}
 		}
-		return
 	}
 }
 

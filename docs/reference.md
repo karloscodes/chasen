@@ -121,6 +121,7 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 | `o` | Open the app in the browser |
 | `s` | Go to another server that you are logged in to |
 | `!` | Show the alerts of the server, with their fix |
+| `t` | Go to the next theme of colors |
 | `g` | Load everything again |
 | `?` | Show the keys |
 | `q` | Close |
@@ -135,7 +136,13 @@ A restart, a restore, and the removal of a domain ask first. Each action is a co
 
 **The alerts of the server** are in the top line, and `!` shows them with their fix. They refresh every minute.
 
-**The colors follow your theme.** On [Omarchy](https://omarchy.org), the screen takes the accent and the red of the current theme, and changes with it when you switch themes. With `CHASEN_THEME=ansi`, it uses the 16 colors of your terminal, so any terminal theme applies. Without either, it uses the amber of Chasen. The screen has no color when `NO_COLOR` is set.
+**The colors follow your theme.** `t` goes to the next theme, and the screen remembers it:
+
+- `omarchy`: on [Omarchy](https://omarchy.org), the accent and the red of the current theme. The screen changes with it when you switch themes. This is the default when you have Omarchy.
+- `chasen`: the amber of Chasen. The default everywhere else.
+- `terminal`: the 16 colors of your terminal, so any terminal theme applies.
+
+`CHASEN_THEME=terminal` (or `chasen`, `omarchy`) wins over the choice. The screen has no color when `NO_COLOR` is set.
 
 ## Alerts
 

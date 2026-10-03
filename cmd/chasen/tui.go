@@ -762,6 +762,8 @@ func (t *tui) key(key string) bool {
 		return false
 	case "?":
 		t.overlay = &overlay{title: "keys", lines: helpLines, headings: true}
+	case "t":
+		t.message = "Theme: " + nextTheme() + ". t goes to the next one: " + strings.Join(themes(), ", ") + "."
 	case "!":
 		if t.noAlerts {
 			t.message = "This server has no alerts. chasen update, and the next update of the server, bring them."
@@ -1173,6 +1175,8 @@ The screen
   g    load everything again
   !    the alerts of the server: what is wrong, and what puts it at risk.
        They refresh every minute
+  t    the next theme: Omarchy, when you have it, the amber of Chasen, or the
+       colors of your terminal. The screen remembers it
   s    go to another server
   q    close
 

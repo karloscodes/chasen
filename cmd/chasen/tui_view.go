@@ -33,6 +33,7 @@ var colorsOn = os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb"
 func init() {
 	if c := os.Getenv("COLORTERM"); c == "truecolor" || c == "24bit" {
 		colorAccent = "38;2;245;184;61"
+		chasenColors[0] = colorAccent
 	}
 }
 
