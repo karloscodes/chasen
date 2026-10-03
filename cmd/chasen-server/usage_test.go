@@ -37,7 +37,7 @@ The live replica is files of changes. What it holds now:
   merged each 5 minutes      1 file   45.0 MB
   merged each hour           0 files  0
   full copies, one each day  1 file   2.0 MB   kept 1 day
-Its oldest file is 5 hours old. After each daily full copy, the files from before the oldest full copy are deleted: the replica holds one full copy and the changes of one day, not more.
+Its oldest file is 5 hours old. After each daily full copy, the full copy of the day before and the files of changes from before it are deleted: the replica holds one full copy and the changes of one to two days, not more. The first cleanup is at the second midnight.
 LAST COPIED CHANGE is the newest file of the replica. An app that writes all the time shows seconds. To prove that a replica restores: chasen verify
 `
 		if got != want {

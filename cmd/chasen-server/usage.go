@@ -12,9 +12,9 @@ import (
 // small file (level 0), and merges the files of a level into one file of the
 // next level: every 30 seconds, every 5 minutes, every hour. Once a day it
 // writes a full copy of the database (level 9). After each full copy it
-// deletes the full copies that are older than one day, and then every file
-// from before the oldest full copy that it keeps. So the replica holds one
-// full copy and the changes of one day, and it does not grow past that.
+// deletes the full copy of the day before, and every file of changes from
+// before that full copy. So the replica holds one full copy and the changes
+// of one to two days, and it does not grow past that.
 var replicaLevels = []struct{ level, what, kept string }{
 	{"0000", "changes, as they happen", "kept 5 minutes"},
 	{"0001", "merged each 30 seconds", ""},
@@ -104,7 +104,7 @@ func bucketUsage(objects []s3Object, now time.Time) string {
 		fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n", l.what, count(levelFiles[l.level], "file"), megabytes(levelSize[l.level]), l.kept)
 	}
 	w.Flush()
-	fmt.Fprintf(&out, "Its oldest file is %s old. After each daily full copy, the files from before the oldest full copy are deleted: the replica holds one full copy and the changes of one day, not more.\nLAST COPIED CHANGE is the newest file of the replica. An app that writes all the time shows seconds. To prove that a replica restores: chasen verify\n", age(now.Sub(oldest)))
+	fmt.Fprintf(&out, "Its oldest file is %s old. After each daily full copy, the full copy of the day before and the files of changes from before it are deleted: the replica holds one full copy and the changes of one to two days, not more. The first cleanup is at the second midnight.\nLAST COPIED CHANGE is the newest file of the replica. An app that writes all the time shows seconds. To prove that a replica restores: chasen verify\n", age(now.Sub(oldest)))
 	return trimLines(out.String())
 }
 

@@ -69,9 +69,9 @@ Both layers have a limit. Neither one grows forever.
 1. Each change of the database becomes a small file, about one each second while the app writes. Those files stay 5 minutes.
 2. Every 30 seconds the small files are merged into one. Every 5 minutes those are merged, and every hour again. A page that changed 100 times in an hour is in the hourly file one time.
 3. Once a day, at 00:00 UTC, Litestream writes a full copy of the database.
-4. After each full copy, it deletes the full copies that are older than one day, and every file of changes from before the oldest full copy that it keeps.
+4. After each full copy, it deletes the full copy of the day before, and every file of changes from before that full copy.
 
-So the replica holds one full copy and the changes of one day, and for a moment at midnight two. Its size follows how much of the database changes in a day, not how long the app has run: after the first midnight it stops growing. This retention is fixed. The replica has one job, the newest state of a database when the server is lost. The history is the job of the snapshots. `chasen bucket` shows the age of the oldest file, so you can see the cleanup work.
+So the replica holds one full copy and the changes of one to two days. Its size follows how much of the database changes in a day, not how long the app has run. The first cleanup is at the second midnight, because the first one has no older full copy to delete: after that, the replica stops growing. This retention is fixed. The replica has one job, the newest state of a database when the server is lost. The history is the job of the snapshots. `chasen bucket` shows the age of the oldest file, so you can see the cleanup work.
 
 Three things make a replica larger than you expect:
 

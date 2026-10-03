@@ -81,9 +81,12 @@ func replicaClient(s3 *s3Config, name, rel string) *lss3.ReplicaClient {
 // database back to its newest state when the server is lost. The history is
 // the job of the snapshots, which keep 6 months. So the replica keeps the
 // least that does its job: one full copy each day, at 00:00 UTC, and full
-// copies for one day. After each full copy Litestream deletes every file from
-// before the oldest full copy that it keeps, so the replica holds one full
-// copy and the changes of one day, and for a moment two.
+// copies for one day. After each full copy Litestream deletes the full copy
+// of the day before, and every file of changes from before that full copy:
+// it keeps the changes since the full copy that it deleted, in case a restore
+// that started earlier still reads them. So the replica holds one full copy
+// and the changes of one to two days. The first cleanup is at the second
+// midnight, because the first one has no older full copy to delete.
 //
 // These are the defaults of Litestream today. They are written here so that
 // a new version of the library cannot change what a bucket costs.
