@@ -30,9 +30,8 @@ chasen deploy root@203.0.113.5 --domain shop.example.com
 # The server is ready.
 # Logged in to ssh://root@203.0.113.5
 # Starting the registry of chasen on this computer. The image goes from here to the server, through SSH.
-# Building 127.0.0.1:5555/shop:3f9a2c1d...
-# Pushing 127.0.0.1:5555/shop:3f9a2c1d...
-# Pulling 127.0.0.1:31337/shop:3f9a2c1d...
+# Building shop 3f9a2c1
+# Pulling the image from your computer, through SSH
 # Port 3000 (EXPOSE in the image). Health path /up. Storage /storage.
 # Starting shop 3f9a2c1
 #

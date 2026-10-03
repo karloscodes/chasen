@@ -292,7 +292,13 @@ func buildImage(image, version, platform string) error {
 			fmt.Printf("The server is %s and this computer is %s: the build runs under emulation, and takes longer.\n", strings.TrimPrefix(platform, "linux/"), runtime.GOARCH)
 		}
 	}
-	fmt.Println("Building", image)
+	// An image of this computer is named by its app and version: its address
+	// in the local registry says nothing to a person.
+	if isLocalImage(image) {
+		fmt.Println("Building", strings.TrimPrefix(image[:strings.LastIndex(image, ":")], localRegistry+"/"), version)
+	} else {
+		fmt.Println("Building", image)
+	}
 	archive := exec.Command("git", "archive", "--format=tar", "HEAD")
 	archive.Stderr = os.Stderr
 	files, err := archive.StdoutPipe()
@@ -337,7 +343,9 @@ func pushImage(image string, registry *protocol.Registry, from string) error {
 		}
 		push = append(with, push...)
 	}
-	fmt.Println("Pushing", image)
+	if !isLocalImage(image) {
+		fmt.Println("Pushing", image)
+	}
 	var said strings.Builder
 	pushing := exec.Command("docker", push...)
 	pushing.Stderr = io.MultiWriter(os.Stderr, &said)

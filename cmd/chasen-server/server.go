@@ -697,7 +697,12 @@ func fetchImage(settings protocol.Settings, files io.Reader, as string) error {
 	// The name of the image can be on the server already: another tool runs
 	// its apps from it. Then the name stays, and it keeps the image it had.
 	before, missing := docker("image", "inspect", "--format", "{{.Id}}", settings.Image)
-	fmt.Println("Pulling", settings.Image)
+	// An image on the loopback comes from the computer of the deploy, through SSH.
+	if strings.HasPrefix(settings.Image, "127.0.0.1:") {
+		fmt.Println("Pulling the image from your computer, through SSH")
+	} else {
+		fmt.Println("Pulling", settings.Image)
+	}
 	pull := exec.Command("docker", "--config", config, "pull", "-q", settings.Image)
 	if out, err := pull.CombinedOutput(); err != nil {
 		hint := "Is the image pushed? A private image needs `registry:` in chasen.yml"
