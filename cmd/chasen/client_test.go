@@ -104,7 +104,7 @@ func TestServers(t *testing.T) {
 
 		err := chooseServer(nil, strings.NewReader("2\n"), &out)
 
-		if !strings.Contains(out.String(), "  2  https://api.two.example.com") || !strings.Contains(out.String(), "Use which server?") {
+		if !strings.Contains(out.String(), " 2  https://api.two.example.com") || !strings.Contains(out.String(), "Use which server?") {
 			t.Errorf("use showed:\n%s", out.String())
 		}
 		if creds, _ := loadCredentials(""); err != nil || creds.URL != "https://api.two.example.com" {
