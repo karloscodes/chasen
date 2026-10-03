@@ -144,9 +144,9 @@ type tui struct {
 	alerts        []alertRow
 	alertsChecked string // the last line: when the server looked
 	noAlerts      bool   // the server, or the cloud, has no alerts command: do not ask again
-	frame   int  // for the spinner
-	events  chan any
-	now     func() time.Time
+	frame         int    // for the spinner
+	events        chan any
+	now           func() time.Time
 }
 
 // The events of the loop.

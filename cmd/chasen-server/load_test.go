@@ -25,7 +25,7 @@ func TestLoad(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := regexp.MustCompile(`^Load:     [0-9.]+ [0-9.]+ [0-9.]+ \(\d+ cores\)\nMemory:   [0-9.]+ GB of [0-9.]+ GB \(\d+%\)\nDisk:     [0-9.]+ GB of [0-9.]+ GB \(\d+%\)\n$`)
+		want := regexp.MustCompile(`^Load:     [0-9.]+ [0-9.]+ [0-9.]+ \(\d+ cores, (amd64|arm64)\)\nMemory:   [0-9.]+ GB of [0-9.]+ GB \(\d+%\)\nDisk:     [0-9.]+ GB of [0-9.]+ GB \(\d+%\)\n$`)
 		if !want.Match(out) {
 			t.Errorf("serverLoad printed:\n%s", out)
 		}

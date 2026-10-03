@@ -103,5 +103,5 @@ A directory with an `index.html` and no `Dockerfile` needs no image and no regis
 | `the server does not accept the token` | `CHASEN_TOKEN` is not the token of this server | Run `chasen-server token` on the server and copy it again |
 | `the registry refused the login`, or `no login for ghcr.io` | The job cannot push | Add `packages: write` under `permissions:`, and `GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}` in `env:` of the deploy step |
 | `denied` at the push | The package exists and belongs to another repository | In the settings of the package on GitHub, give this repository write access |
-| `cannot pull ...` | The server cannot reach the registry, or the image is for another architecture | The build is for `linux/amd64`. For an ARM server, set `DOCKER_DEFAULT_PLATFORM: linux/arm64` in `env:` |
+| `cannot pull ...` | The server cannot reach the registry, or the image is for another CPU type | The build is for the CPU that the server reports. A server older than Chasen 0.8 reports none: set `DOCKER_DEFAULT_PLATFORM: linux/arm64` in `env:` for an ARM server |
 | The deploy fails after `Starting` | The app did not answer `/up` in time | The old version still has the traffic. Run `chasen logs`, or `chasen check` on your computer |

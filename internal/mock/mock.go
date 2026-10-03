@@ -259,7 +259,7 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 	case "load":
 		// Numbers that move, so the screen has something to show.
 		beat := float64(time.Now().Unix()%20) / 20
-		fmt.Fprintf(out, "Load:     %.2f %.2f %.2f (4 cores)\nMemory:   %.1f GB of 7.6 GB (%d%%)\nDisk:     31 GB of 75 GB (41%%)\n",
+		fmt.Fprintf(out, "Load:     %.2f %.2f %.2f (4 cores, amd64)\nMemory:   %.1f GB of 7.6 GB (%d%%)\nDisk:     31 GB of 75 GB (41%%)\n",
 			0.2+beat, 0.4+beat/2, 0.5, 2.1+beat, int((2.1+beat)*100/7.6))
 		return 0
 	case "alerts":

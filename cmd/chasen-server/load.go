@@ -23,7 +23,8 @@ func serverLoad() error {
 	if len(averages) < 3 {
 		return fmt.Errorf("/proc/loadavg has an unknown format: %q", load)
 	}
-	fmt.Printf("Load:     %s (%d cores)\n", strings.Join(averages[:3], " "), runtime.NumCPU())
+	// The CPU type too: the CLI builds the image of an app for it.
+	fmt.Printf("Load:     %s (%d cores, %s)\n", strings.Join(averages[:3], " "), runtime.NumCPU(), runtime.GOARCH)
 
 	meminfo, err := os.ReadFile("/proc/meminfo")
 	if err != nil {

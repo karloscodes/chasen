@@ -131,7 +131,7 @@ If the firewall of the server lets in only the addresses of Cloudflare, every na
 
 - One container for each app, with 512 MB of memory unless `memory:` in `chasen.yml` says more. No worker process yet.
 - SQLite only. Uploaded files persist across deploys, but they have no backup yet.
-- The build is for `linux/amd64`. For an ARM server, set `DOCKER_DEFAULT_PLATFORM=linux/arm64`.
+- The build is for the CPU of the server, `amd64` or `arm64`. When your computer has another one, the build runs under emulation and takes longer.
 - `setup` does not harden the server. `chasen alerts` reports what is missing, with the fix: SSH with keys only, a firewall, and security updates.
 
 ## Updates

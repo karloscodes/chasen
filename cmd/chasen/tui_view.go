@@ -252,7 +252,7 @@ func (t *tui) alertCells() []cell {
 
 var (
 	percent  = regexp.MustCompile(`\((\d+)%\)`)
-	loadLine = regexp.MustCompile(`^([0-9.]+) .*\((\d+) cores\)`)
+	loadLine = regexp.MustCompile(`^([0-9.]+) .*\((\d+) cores[,)]`)
 )
 
 // statCells shows the load, the memory, and the disk of the server in a few

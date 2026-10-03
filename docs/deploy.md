@@ -59,7 +59,7 @@ registry:                 # the login of the registry
 - **In CI it is the same command.** [Deploy from GitHub Actions](github-actions.md) has the workflow, the two secrets it needs, and what to do when it fails. With it, `git push` is the deploy.
 - **The login of the registry** is used for the push, and it goes with the deploy for the pull. The server does not keep it. In GitHub Actions it is the token of the job, so there is no long-lived token to store.
 - **`chasen deploy --tag <tag>`** deploys an image that is already in the registry, and builds nothing. This is the rollback (`--tag <older commit>`), and the way to deploy an image that another system built.
-- **The architecture.** The build is for `linux/amd64`, like most servers. For another server, set `DOCKER_DEFAULT_PLATFORM`.
+- **The CPU type.** The build is for the CPU of the server, which the server tells the CLI: `amd64` or `arm64`. When your computer has another one, the build runs under emulation and takes longer. `DOCKER_DEFAULT_PLATFORM` wins over it.
 
 ## An image that another repository releases
 

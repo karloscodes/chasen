@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -168,7 +169,7 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 	}
 	settings.Registry = registry
 	if build {
-		if err := buildImage(settings.Image, version); err != nil {
+		if err := buildImage(settings.Image, version, serverPlatform(creds)); err != nil {
 			return err
 		}
 		// The image is the contract: review what it says before it leaves this computer.
@@ -219,10 +220,25 @@ func deployWebsite(creds credentials, app appFile, settings protocol.Settings, c
 	return archive.Wait()
 }
 
+// serverPlatform is the platform of the server, for the build: the server
+// says its CPU type in chasen load. A server that does not say, or a server
+// that does not exist yet, is amd64, like most servers.
+func serverPlatform(creds credentials) string {
+	var out strings.Builder
+	if code, err := protocol.Client(creds).Run(context.Background(), "load", nil, nil, &out); err == nil && code == 0 {
+		if m := cpuType.FindStringSubmatch(out.String()); m != nil {
+			return "linux/" + m[1]
+		}
+	}
+	return "linux/amd64"
+}
+
+var cpuType = regexp.MustCompile(`cores, (amd64|arm64)\)`)
+
 // buildImage builds the image of the commit, where chasen runs (your
 // computer, or CI). The build gets the files of the commit, not the working
 // directory, so the image is what its tag says.
-func buildImage(image, version string) error {
+func buildImage(image, version, platform string) error {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return errNoDocker
 	}
@@ -234,9 +250,13 @@ func buildImage(image, version string) error {
 			build = append(build, "--label", "org.opencontainers.image.source=https://github.com/"+m[1]+"/"+m[2])
 		}
 	}
-	// The image must run on the server. Most servers are amd64, and a Mac is not.
+	// The image must run on the server, which can have another CPU than this
+	// computer: an ARM server, or a Mac and an amd64 server.
 	if os.Getenv("DOCKER_DEFAULT_PLATFORM") == "" {
-		build = append(build, "--platform", "linux/amd64")
+		build = append(build, "--platform", platform)
+		if platform != "linux/"+runtime.GOARCH {
+			fmt.Printf("The server is %s and this computer is %s: the build runs under emulation, and takes longer.\n", strings.TrimPrefix(platform, "linux/"), runtime.GOARCH)
+		}
 	}
 	fmt.Println("Building", image)
 	archive := exec.Command("git", "archive", "--format=tar", "HEAD")

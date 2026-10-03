@@ -216,7 +216,7 @@ func TestEndToEnd(t *testing.T) {
 	t.Run("load shows the load, the memory, and the disk of the machine, through the API", func(t *testing.T) {
 		out := must(app, bin, "load")
 
-		for _, want := range []string{"Load:", "cores)", "Memory:", "Disk:", "%)"} {
+		for _, want := range []string{"Load:", "cores, amd64)", "Memory:", "Disk:", "%)"} {
 			if !strings.Contains(out, want) {
 				t.Errorf("load = %q, want %q in it", out, want)
 			}
