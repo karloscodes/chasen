@@ -109,10 +109,11 @@ func TestBackup(t *testing.T) {
 func TestRetention(t *testing.T) {
 	stamps := []string{
 		"20261001T125900Z", // newest
-		"20261001T120000Z", // same hour as the newest
+		"20261001T120000Z", // same hour as the newest: a day keeps every backup, like the one before a deploy
 		"20261001T100000Z", // another hour of the same day
 		"20260930T230000Z", // yesterday
-		"20260930T010000Z", // yesterday, another hour
+		"20260930T010500Z", // yesterday, more than a day before the newest
+		"20260930T010000Z", // the same hour as that one: only the newest of the hour stays
 		"20260801T000000Z", // two months ago
 		"20250101T000000Z", // last year
 		"manual-copy",      // not a chasen backup
@@ -120,7 +121,7 @@ func TestRetention(t *testing.T) {
 
 	drop := expired(stamps)
 
-	want := []string{"20261001T120000Z"}
+	want := []string{"20260930T010000Z"}
 	if !slices.Equal(drop, want) {
 		t.Errorf("expired = %v, want %v", drop, want)
 	}

@@ -342,7 +342,9 @@ func backupAll() error {
 }
 
 // expired returns the stamps that the retention rules do not keep.
-// The rules keep the newest backup of each of the last 24 hours, 7 days,
+// The rules keep every backup of the 24 hours before the newest one: so the
+// backup before a deploy stays for a day, also when another one comes in the
+// same hour. Then the newest backup of each of the last 24 hours, 7 days,
 // 4 weeks, and 6 months that have a backup.
 func expired(stamps []string) []string {
 	rules := []struct {
@@ -360,6 +362,17 @@ func expired(stamps []string) []string {
 	slices.Reverse(sorted)
 
 	keep := map[string]bool{}
+	var newest time.Time
+	for _, stamp := range sorted {
+		if t, err := time.Parse(stampLayout, stamp); err == nil {
+			if newest.IsZero() {
+				newest = t
+			}
+			if newest.Sub(t) < 24*time.Hour {
+				keep[stamp] = true
+			}
+		}
+	}
 	for _, rule := range rules {
 		seen := map[string]bool{}
 		for _, stamp := range sorted {

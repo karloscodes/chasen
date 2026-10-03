@@ -4,7 +4,7 @@ Chasen keeps two kinds of copy of every SQLite database of your apps. You set no
 
 | | When | Kept | Where |
 |---|---|---|---|
-| **Snapshots** | Every hour, and before each deploy | 6 months: one for each of the last 24 hours, 7 days, 4 weeks, and 6 months | On the server, and in your bucket |
+| **Snapshots** | Every hour, and before each deploy | 6 months: every snapshot of the last day, like the one before each deploy, then one for each of the last 7 days, 4 weeks, and 6 months | On the server, and in your bucket |
 | **Live replica** | Every change, about one second later | The newest state | In your bucket |
 
 The snapshots are your history: go back to how the data was yesterday. The live replica is for the day the server dies: you lose about one second of data.
