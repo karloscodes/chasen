@@ -46,7 +46,10 @@ Your app also follows [the standard](../STANDARD.md): it listens on the port of 
 cd shop
 chasen deploy root@203.0.113.5 --domain shop.example.com
 # chasen-server is not on this server yet. Installing it.
-# Setting up the server: Docker, the proxy, and the API. This can take a minute.
+# Setting up the server.
+#   Installing Docker. This takes a minute or two.
+#   Starting the proxy.
+#   Starting the API.
 # The server is ready.
 # Logged in to ssh://root@203.0.113.5
 # Building ghcr.io/you/shop:3f9a2c1d...

@@ -469,7 +469,16 @@ func serverSetup(args []string) error {
 
 	// matcha.Setup restarts the proxy, so run it only when the proxy is down.
 	// With CHASEN_ROOT, the first deploy starts the proxy under that root instead.
+	// Each step says so when it starts, on stderr: the CLI shows these lines
+	// while it sets up a server through SSH.
 	if out, _ := docker("ps", "-q", "--filter", "name=^matcha-proxy$"); out == "" && root() == "" {
+		if taken := portsTaken(); taken != "" {
+			return fmt.Errorf("%s. The proxy of Chasen needs ports 80 and 443. Stop that program and keep it from starting again (for example: systemctl disable --now nginx), or use a server with no web server", taken)
+		}
+		if _, err := exec.LookPath("docker"); err != nil {
+			fmt.Fprintln(os.Stderr, "Installing Docker. This takes a minute or two.")
+		}
+		fmt.Fprintln(os.Stderr, "Starting the proxy.")
 		if err := matcha.Setup(); err != nil {
 			return err
 		}
@@ -495,6 +504,7 @@ func serverSetup(args []string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Fprintln(os.Stderr, "Starting the API.")
 	if err := startAgent(self); err != nil {
 		return err
 	}
@@ -511,7 +521,7 @@ func serverSetup(args []string) error {
 		fmt.Println("Chasen is ready. This server has no base domain: the CLI reaches it through SSH, and an app gets its domain at its first deploy.")
 		fmt.Println("\nOn your machine, run:\n  chasen add server <user>@<address of this server>\n  chasen deploy --domain shop.example.com     # in the directory of an app")
 		if cfg.Backup.S3 == nil {
-			fmt.Println("\nBackups stay on this server. For offsite copies too, run: chasen-server bucket --endpoint <url> --name <bucket> --access-key-id <id>")
+			fmt.Println("\nBackups stay on this server. For offsite copies too, run on your computer: chasen bucket --endpoint <url> --name <bucket> --access-key-id <id>")
 		}
 		return nil
 	}
@@ -520,7 +530,7 @@ func serverSetup(args []string) error {
 		fmt.Printf("Point a wildcard A record for *.%s to this server.\n", cfg.Domain)
 	}
 	if cfg.Backup.S3 == nil {
-		fmt.Println("Backups stay on this server. For offsite copies too, run: chasen-server bucket --endpoint <url> --name <bucket> --access-key-id <id>")
+		fmt.Println("Backups stay on this server. For offsite copies too, run on your computer: chasen bucket --endpoint <url> --name <bucket> --access-key-id <id>")
 	}
 	if routed {
 		target := cfg.Domain
@@ -532,6 +542,43 @@ func serverSetup(args []string) error {
 	fmt.Printf("Server token (the login page asks for it): %s\n", cfg.Token)
 	return nil
 }
+
+// portsTaken names the programs that listen on port 80 or 443, like "Port 80
+// is taken by nginx", or "" when both are free. It asks ss, which every
+// Ubuntu and Debian has; without it, the engine still finds a taken port.
+func portsTaken() string {
+	out, err := exec.Command("ss", "-Hltnp", "sport = :80 or sport = :443").Output()
+	if err != nil {
+		return ""
+	}
+	return listeners(string(out))
+}
+
+// listeners reads the output of ss -Hltnp.
+func listeners(ss string) string {
+	var taken []string
+	for _, line := range strings.Split(strings.TrimSpace(ss), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 4 {
+			continue
+		}
+		port := f[3][strings.LastIndex(f[3], ":")+1:]
+		program := "another program"
+		if m := ssProgram.FindStringSubmatch(line); m != nil {
+			program = m[1]
+		}
+		if said := "port " + port + " is taken by " + program; !slices.Contains(taken, said) {
+			taken = append(taken, said)
+		}
+	}
+	if len(taken) == 0 {
+		return ""
+	}
+	text := strings.Join(taken, ", and ")
+	return strings.ToUpper(text[:1]) + text[1:]
+}
+
+var ssProgram = regexp.MustCompile(`users:\(\("([^"]+)"`)
 
 // An app name becomes a container name, a directory, and a DNS label.
 func checkAppName(name string) error { return protocol.CheckAppName(name) }

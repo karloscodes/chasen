@@ -279,8 +279,10 @@ func serverToken(address string) (string, error) {
 			return "", fmt.Errorf("the install of chasen-server failed:\n%s%s\nTo do it by hand, log in to the server and run: %s", out, problem, strings.TrimSpace(installScript))
 		}
 	}
-	fmt.Println("Setting up the server: Docker, the proxy, and the API. This can take a minute.")
-	if out, problem, err := onServer(address, "chasen-server setup", ""); err != nil {
+	fmt.Println("Setting up the server.")
+	// The setup says each step on stderr as it starts: show those lines now,
+	// so a minute of Docker install is not a minute of silence.
+	if out, problem, err := onServerShowing(address, "chasen-server setup", indent{os.Stdout}); err != nil {
 		return "", fmt.Errorf("the setup of the server failed:\n%s%s\nLog in to the server and run: chasen-server setup", out, problem)
 	}
 	out, problem, err = onServer(address, "chasen-server login", "")
@@ -294,14 +296,39 @@ func serverToken(address string) (string, error) {
 // onServer runs one command on a server through SSH, as root. input goes to
 // the command. The output and the errors of the command come back.
 func onServer(address, command, input string) (out, problem string, err error) {
+	return runOnServer(address, command, input, nil)
+}
+
+// onServerShowing is onServer for a command that says what it does on
+// stderr: those lines also go to show as they come.
+func onServerShowing(address, command string, show io.Writer) (out, problem string, err error) {
+	return runOnServer(address, command, "", show)
+}
+
+func runOnServer(address, command, input string, show io.Writer) (out, problem string, err error) {
 	ssh, err := protocol.SSHCommand(address, command)
 	if err != nil {
 		return "", "", err
 	}
 	var stdout, stderr strings.Builder
 	ssh.Stdin, ssh.Stdout, ssh.Stderr = strings.NewReader(input), &stdout, &stderr
+	if show != nil {
+		ssh.Stderr = io.MultiWriter(&stderr, show)
+	}
 	err = ssh.Run()
 	return stdout.String(), stderr.String(), err
+}
+
+// indent writes each line two spaces in, under the line that announced it.
+type indent struct{ w io.Writer }
+
+func (i indent) Write(p []byte) (int, error) {
+	for _, line := range strings.SplitAfter(string(p), "\n") {
+		if line != "" {
+			io.WriteString(i.w, "  "+line)
+		}
+	}
+	return len(p), nil
 }
 
 func lastLineOf(text string) string {
