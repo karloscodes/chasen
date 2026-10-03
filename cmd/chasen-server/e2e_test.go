@@ -563,10 +563,13 @@ func TestEndToEnd(t *testing.T) {
 
 		// An app with no image in chasen.yml goes from this computer to the
 		// server through SSH, with no registry on the internet and no login.
-		t.Cleanup(func() {
-			docker("rm", "-f", "chasen-registry")
-			docker("volume", "rm", "chasen-registry")
-		})
+		// The registry of a developer stays: the test removes only one that it made.
+		if _, err := docker("inspect", "chasen-registry"); err != nil {
+			t.Cleanup(func() {
+				docker("rm", "-f", "chasen-registry")
+				docker("volume", "rm", "chasen-registry")
+			})
+		}
 		direct := filepath.Join(t.TempDir(), "direct")
 		must(".", "cp", "-r", "example", direct)
 		os.WriteFile(filepath.Join(direct, "chasen.yml"), []byte("name: direct\n"), 0644)
