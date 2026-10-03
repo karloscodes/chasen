@@ -55,7 +55,9 @@ func overviewAll(w io.Writer) error {
 	views := make([]serverView, len(addresses))
 	var wg sync.WaitGroup
 	for i, address := range addresses {
-		wg.Go(func() { views[i] = askServer(barName(address), credentials{URL: address, Token: saved.Tokens[address]}) })
+		wg.Go(func() {
+			views[i] = askServer(barName(address), credentials{URL: address, Token: saved.Tokens[address]})
+		})
 	}
 	wg.Wait()
 

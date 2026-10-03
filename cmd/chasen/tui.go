@@ -103,12 +103,12 @@ type prompt struct {
 // hits is where the things that the mouse can choose are on the screen, in
 // the lines and columns of the terminal, from 1. The drawing fills it in.
 type hits struct {
-	left     int      // the width of the side of the apps
-	appTop   int      // the line of the first app that shows
-	appFirst int      // which app that is
-	tabs     [][2]int // the first and the last column of each tab name
-	rowTop   int      // the line of the first row of the tab
-	rowFirst int      // which row that is
+	left     int       // the width of the side of the apps
+	appTop   int       // the line of the first app that shows
+	appFirst int       // which app that is
+	tabs     [][2]int  // the first and the last column of each tab name
+	rowTop   int       // the line of the first row of the tab
+	rowFirst int       // which row that is
 	tree     []treeRef // with several servers: what each line of the list is, from appTop
 }
 
@@ -757,10 +757,9 @@ func (t *tui) handle(event any) bool {
 		if t.frame%480 == 0 {
 			t.loadAlerts()
 		}
-		// Every second, follow what runs now, and the colors of the theme.
+		// Every second, follow what runs now.
 		if t.frame%8 == 0 {
 			t.follow()
-			followTheme()
 		}
 	case appsEvent:
 		t.appsLoaded = true
@@ -1300,8 +1299,8 @@ The screen
   g    load everything again
   !    the alerts of the server: what is wrong, and what puts it at risk.
        They refresh every minute
-  t    the next theme: the amber of Chasen, monochrome, Omarchy when you
-       have it, or the colors of your terminal. The screen remembers it
+  t    the next theme: the amber of Chasen, monochrome, or the colors of
+       your terminal, which follow Omarchy. The screen remembers it
   s    go to another server
   q    close
 

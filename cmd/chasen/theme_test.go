@@ -1,57 +1,22 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
 func TestScreenColors(t *testing.T) {
 	// Each case gets a computer of its own, and the colors come back after it.
-	computer := func(t *testing.T, omarchy string) string {
-		accent, dim, bad, read, choice := colorAccent, colorDim, colorBad, themeRead, themeChoice
-		t.Cleanup(func() { colorAccent, colorDim, colorBad, themeRead, themeChoice = accent, dim, bad, read, choice })
-		themeChoice, themeRead = "", ""
-		state := t.TempDir()
-		t.Setenv("XDG_STATE_HOME", state)
+	computer := func(t *testing.T) {
+		accent, dim, bad, choice := colorAccent, colorDim, colorBad, themeChoice
+		t.Cleanup(func() { colorAccent, colorDim, colorBad, themeChoice = accent, dim, bad, choice })
+		themeChoice = ""
 		t.Setenv("HOME", t.TempDir())
 		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 		t.Setenv("CHASEN_THEME", "")
-		path := filepath.Join(state, "omarchy", "current", "theme", "colors.toml")
-		if omarchy != "" {
-			os.MkdirAll(filepath.Dir(path), 0755)
-			os.WriteFile(path, []byte(omarchy), 0644)
-		}
-		return path
 	}
-	const tokyoNight = "mode = \"dark\"\naccent = \"#7aa2f7\"\nmuted = \"#414868\"\ndark_foreground = \"#565f89\"\nred = \"#f7768e\"\n"
 
-	t.Run("on Omarchy, take the accent, the dim text, and the red of its theme", func(t *testing.T) {
-		computer(t, tokyoNight)
-		themeChoice = "omarchy"
-
-		followTheme()
-
-		if colorAccent != "38;2;122;162;247" || colorDim != "38;2;86;95;137" || colorBad != "38;2;247;118;142" {
-			t.Errorf("colors = %q, %q, %q", colorAccent, colorDim, colorBad)
-		}
-	})
-
-	t.Run("follow the theme when Omarchy switches it", func(t *testing.T) {
-		path := computer(t, tokyoNight)
-		themeChoice = "omarchy"
-		followTheme()
-
-		os.WriteFile(path, []byte("accent = \"#205EA6\"\n"), 0644)
-		followTheme()
-
-		if colorAccent != "38;2;32;94;166" {
-			t.Errorf("accent = %q, want the one of the new theme", colorAccent)
-		}
-	})
-
-	t.Run("the Chasen colors are the default, also on Omarchy", func(t *testing.T) {
-		computer(t, tokyoNight)
+	t.Run("the Chasen colors are the default", func(t *testing.T) {
+		computer(t)
 
 		followTheme()
 
@@ -61,12 +26,12 @@ func TestScreenColors(t *testing.T) {
 	})
 
 	t.Run("t goes through the themes and remembers the choice", func(t *testing.T) {
-		computer(t, tokyoNight)
+		computer(t)
 
-		first, second, third, fourth := nextTheme(), nextTheme(), nextTheme(), nextTheme()
+		first, second, third := nextTheme(), nextTheme(), nextTheme()
 
-		if first != "monochrome" || second != "omarchy" || third != "terminal" || fourth != "chasen" {
-			t.Errorf("t gave %s, %s, %s, %s, want monochrome, omarchy, terminal, chasen", first, second, third, fourth)
+		if first != "monochrome" || second != "terminal" || third != "chasen" {
+			t.Errorf("t gave %s, %s, %s, want monochrome, terminal, chasen", first, second, third)
 		}
 		nextTheme()
 		if loadThemeChoice() != "monochrome" || colorAccent != "1" || colorDim != "2" {
@@ -74,14 +39,16 @@ func TestScreenColors(t *testing.T) {
 		}
 	})
 
-	t.Run("CHASEN_THEME=ansi uses the colors of the terminal", func(t *testing.T) {
-		computer(t, tokyoNight)
-		t.Setenv("CHASEN_THEME", "ansi")
+	t.Run("terminal uses the 16 colors of the terminal, also under its names of before", func(t *testing.T) {
+		for _, name := range []string{"terminal", "ansi", "omarchy"} {
+			computer(t)
+			t.Setenv("CHASEN_THEME", name)
 
-		followTheme()
+			followTheme()
 
-		if colorAccent != "33" || colorDim != "90" || colorBad != "31" {
-			t.Errorf("colors = %q, %q, %q", colorAccent, colorDim, colorBad)
+			if colorAccent != "33" || colorDim != "90" || colorBad != "31" {
+				t.Errorf("CHASEN_THEME=%s: colors = %q, %q, %q", name, colorAccent, colorDim, colorBad)
+			}
 		}
 	})
 }

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,18 +29,14 @@ func TestRecordTheScreen(t *testing.T) {
 	if path == "" {
 		t.Skip("set CHASEN_RECORD to the file of the frames")
 	}
-	// A computer with Omarchy, so the themes include it, and no saved choice.
-	state, config := t.TempDir(), t.TempDir()
-	t.Setenv("XDG_STATE_HOME", state)
-	t.Setenv("XDG_CONFIG_HOME", config)
+	// A computer with no saved choice of theme.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("CHASEN_THEME", "")
 	t.Setenv("COLORTERM", "truecolor")
-	os.MkdirAll(filepath.Join(state, "omarchy/current/theme"), 0755)
-	os.WriteFile(filepath.Join(state, "omarchy/current/theme/colors.toml"), []byte(tokyoNightColors), 0644)
 	keep := [3]string{colorAccent, colorDim, colorBad}
 	colorAccent, chasenColors[0] = "38;2;245;184;61", "38;2;245;184;61"
-	themeChoice, themeRead = "", ""
+	themeChoice = ""
 	t.Cleanup(func() { colorAccent, colorDim, colorBad = keep[0], keep[1], keep[2]; chasenColors[0] = keep[0] })
 
 	now := time.Date(2026, 10, 2, 10, 19, 0, 0, time.UTC)
@@ -105,8 +100,7 @@ func TestRecordTheScreen(t *testing.T) {
 	press("↓", "every server is in the list: down goes on to the next one", "esc", "left", "down")
 	press("↑", "and back", "up")
 	press("t", "theme: monochrome", "t")
-	press("t", "theme: the one of Omarchy", "t")
-	press("t", "theme: the colors of your terminal", "t")
+	press("t", "theme: the colors of your terminal, which follow Omarchy", "t")
 	press("t", "theme: chasen", "t")
 	press("?", "every key", "?")
 
@@ -119,8 +113,6 @@ func TestRecordTheScreen(t *testing.T) {
 	}
 	t.Logf("%d frames in %s", len(frames), path)
 }
-
-const tokyoNightColors = "mode = \"dark\"\naccent = \"#7aa2f7\"\nbackground = \"#1a1b26\"\nforeground = \"#a9b1d6\"\nmuted = \"#414868\"\ndark_foreground = \"#565f89\"\nred = \"#f7768e\"\n"
 
 // The colors of a code of the terminal, for the frames: the 16 colors of a
 // common dark terminal, and the scale of 256.

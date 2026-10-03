@@ -33,4 +33,4 @@ It runs `chasen alerts --waybar` once a minute. That asks every server that you 
 
 ## In the colors of your theme
 
-The screen has the theme of Omarchy built in: press `t` in it until it says `omarchy`. It takes the accent and the red of the current theme, and changes with it when you switch themes. The screen remembers the choice.
+Press `t` in the screen until it says `terminal`. The screen then uses the colors of your terminal, and Omarchy sets those colors for each theme, so the screen changes with every theme you switch to. The screen remembers the choice.

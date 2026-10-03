@@ -142,10 +142,9 @@ A restart, a restore, and the removal of a domain ask first. Each action is a co
 
 - `chasen`: the amber of Chasen. The default.
 - `monochrome`: no color, only bold and dim.
-- `omarchy`: on [Omarchy](https://omarchy.org), the accent and the red of the current theme. The screen changes with it when you switch themes.
-- `terminal`: the 16 colors of your terminal, so any terminal theme applies.
+- `terminal`: the 16 colors of your terminal, so the theme of your terminal applies. On [Omarchy](https://omarchy.org), each theme sets those colors, so the screen changes with it.
 
-`CHASEN_THEME=monochrome` (or `chasen`, `omarchy`, `terminal`) wins over the choice. The screen has no color when `NO_COLOR` is set.
+`CHASEN_THEME=monochrome` (or `chasen`, `terminal`) wins over the choice. The screen has no color when `NO_COLOR` is set.
 
 ## Alerts
 
