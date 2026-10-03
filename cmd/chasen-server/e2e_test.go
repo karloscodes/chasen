@@ -649,7 +649,7 @@ func TestEndToEnd(t *testing.T) {
 		must(app, bin, "logout")
 
 		// The test logged in two times: the server by its address, and by its name.
-		if out := must(app, bin, "servers"); strings.Count(out, "\n") != 1 || !strings.Contains(out, "* http") {
+		if out := must(app, bin, "servers"); strings.Count(out, "\n") != 1 || !strings.HasPrefix(out, "* 1  http") {
 			t.Errorf("servers after one logout = %q, want one login, and it is the current one", out)
 		}
 		must(app, bin, "logout")
