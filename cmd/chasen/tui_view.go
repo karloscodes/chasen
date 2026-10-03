@@ -213,6 +213,10 @@ func (t *tui) firstLine(width int) string {
 		count = itoa(len(t.apps)) + " apps "
 	}
 	left := []cell{{" chasen", colorAccent + ";" + colorBold}, {"  " + t.server, ""}}
+	// The way to the other servers sits next to the name of this one.
+	if len(t.servers) > 1 {
+		left = append(left, cell{"  s", colorAccent}, cell{" switch", colorDim})
+	}
 	// In the corner: how busy the server is, then the count of the apps. A
 	// narrow window drops the notice of a new release first, then the numbers.
 	right := []cell{{count, colorDim}}
@@ -313,7 +317,7 @@ func (t *tui) keys() [][2]string {
 		if len(t.alerts) > 0 {
 			keys = append(keys, [2]string{"!", "alerts"})
 		}
-		return append(keys, [2]string{"?", "keys"}, [2]string{"q", "close"})
+		return append(keys, [2]string{"t", "theme"}, [2]string{"?", "keys"}, [2]string{"q", "close"})
 	}
 	switch t.tab {
 	case tabHistory:

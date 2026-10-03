@@ -434,6 +434,13 @@ func TestScreen(t *testing.T) {
 		sc.shows("chasen", "Opening example.com", "s  another server", whisk[0])
 	})
 
+	t.Run("with more than one server, the way to switch is next to the name of the server", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+		sc.tui.servers = []string{"example.com", "example.org"}
+
+		sc.shows("example.com  s switch")
+	})
+
 	t.Run(": shows the commands it runs, and narrows them as the user types", func(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 
