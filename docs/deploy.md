@@ -39,26 +39,25 @@ A server with a base domain (`chasen-server setup --domain example.com`, with a 
 
 ## The image
 
-An app is an image in a registry.
+`chasen deploy` builds the image of the current git commit with your Docker, for the CPU of the server, and the server pulls it. The tag is the full hash of the commit. Where the image goes between the two depends on how the CLI reaches the server:
 
-**A repository on GitHub needs no setting.** When the git origin is `github.com/you/shop`, the image goes to `ghcr.io/you/shop`, and Chasen uses the login that is already on your computer: `docker login ghcr.io` (with your GitHub name and a token that has the `write:packages` scope), or the `gh` CLI (`gh auth login -s write:packages`). In CI it is `GHCR_TOKEN` or `GITHUB_TOKEN`. For every other registry, `docker login` is enough too.
+- **Through SSH (the default): from your computer.** The image goes to a small registry in Docker on your computer, `chasen-registry`, which listens only on `127.0.0.1:5555`. For the time of the deploy, SSH opens a port on the server that leads back to it, and the server pulls through that port. No registry on the internet, no login, no token. The next deploy sends only the layers that changed. The SSH server must allow port forwarding, which is its default (`AllowTcpForwarding yes`).
+- **On the web (CI with a token, the cloud): through a registry.** A repository on GitHub needs no setting: when the git origin is `github.com/you/shop`, the image goes to `ghcr.io/you/shop`. Chasen uses the login that is already on your computer: `docker login ghcr.io` (with your GitHub name and a classic token that has the `write:packages` scope), or the `gh` CLI (`gh auth login -s write:packages`). In CI it is `GHCR_TOKEN` or `GITHUB_TOKEN`.
 
-For another registry, or another name, `chasen.yml` says it, without a tag:
+To use a registry also through SSH, or another registry, `chasen.yml` names the image, without a tag:
 
 ```yaml
 name: shop
 image: you/shop           # Docker Hub. Or registry.example.com/you/shop
-registry:                 # the login of the registry
+registry:                 # the login of the registry, when docker login is not enough
   username: you
   password: REGISTRY_TOKEN   # the name of a secret, not its value
 ```
 
-`chasen deploy` then does three things: it builds the image of the current git commit with your Docker, pushes it to the registry, and tells the server to pull it. The tag is the full hash of the commit.
-
 - **The build gets the files of the commit**, not your working directory. So the image is what its tag says.
 - **In CI it is the same command.** [Deploy from GitHub Actions](github-actions.md) has the workflow, the two secrets it needs, and what to do when it fails. With it, `git push` is the deploy.
 - **The login of the registry** is used for the push, and it goes with the deploy for the pull. The server does not keep it. In GitHub Actions it is the token of the job, so there is no long-lived token to store.
-- **`chasen deploy --tag <tag>`** deploys an image that is already in the registry, and builds nothing. This is the rollback (`--tag <older commit>`), and the way to deploy an image that another system built.
+- **`chasen deploy --tag <tag>`** deploys an image that is already in the registry, also the one on your computer, and builds nothing. This is the way to deploy an image that another system built.
 - **The CPU type.** The build is for the CPU of the server, which the server tells the CLI: `amd64` or `arm64`. When your computer has another one, the build runs under emulation and takes longer. `DOCKER_DEFAULT_PLATFORM` wins over it.
 
 ## An image that another repository releases

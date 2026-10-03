@@ -43,6 +43,8 @@ Run these in the directory of your app:
                          --on <id> uses one of your servers, --new creates one (--new=cx33, --new=@ash)
   check                  Test the current git commit against the standard. Changes nothing live
   restart                Start the app again with the env and the secrets of now. Same image
+  rollback               Start the version before the current one again, in seconds: the server
+                         keeps its image. The data stays as it is. Again goes forward
   secrets edit           Change the secrets of the app in your editor. They stay in the repository,
                          encrypted, in chasen.secrets.enc. The key is chasen.key, or CHASEN_KEY in CI
   secrets                List the names of the secrets. secrets show prints the values too

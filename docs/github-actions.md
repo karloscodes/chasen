@@ -4,7 +4,7 @@ With this setup, a push to `main` deploys your app. The workflow runs the same `
 
 You need a server that runs `chasen-server` (or a Chasen cloud account), and an app that deploys from your computer.
 
-A workflow logs in with a token, so the server needs its address on the web: a base domain, set with `chasen-server setup --domain example.com` ([Get started](getting-started.md) has the steps). A server that you reach only through SSH works too: give the job an SSH key for the server and run `chasen add server <user>@<host>` before the deploy.
+There are two ways for the job to reach the server. With an address on the web (a base domain, set with `chasen-server setup --domain example.com`), the job logs in with a token and the image goes through `ghcr.io`: the steps below. A server that you reach only through SSH works too, with no registry: see [Through SSH](#through-ssh).
 
 ## 1. Nothing to configure for the image
 
@@ -85,11 +85,50 @@ jobs:
 
 Add `workflow_dispatch:` under `on:` to get a "Run workflow" button.
 
-To go back to an older version, deploy its image again. It is still in the registry, so nothing is built:
+To go back to the version before, run `chasen rollback`: the server kept its image, so it takes seconds. For an older one, deploy its image again. It is still in the registry, so nothing is built:
 
 ```bash
 chasen deploy --tag <the full hash of the older commit>
 ```
+
+## Through SSH
+
+A server with no address on the web takes the deploy through SSH, the same way as from your computer. The image goes from the Docker of the job to the server, so the job needs no registry and no `packages: write`.
+
+Make three secrets once:
+
+```bash
+ssh root@203.0.113.5 chasen-server login | gh secret set CHASEN_TOKEN   # a login of its own for the job
+ssh-keyscan 203.0.113.5 | gh secret set SSH_KNOWN_HOSTS                  # the key of the server
+gh secret set SSH_KEY < ~/.ssh/deploy_key                                # a key that logs in to the server
+```
+
+Then the workflow:
+
+```yaml
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: curl -fsSL https://chasenhq.com/cli | sh
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - run: chasen deploy
+        env:
+          CHASEN_URL: ssh://root@203.0.113.5
+          CHASEN_TOKEN: ${{ secrets.CHASEN_TOKEN }}
+          CHASEN_KEY: ${{ secrets.CHASEN_KEY }}   # only when the app has chasen.secrets.enc
+```
+
+The token is a login like the one of your computer: `chasen logout` with it ends it, and the token of the server never leaves the server. Do not run `chasen add server` in the job: each run would add a new login.
 
 ## A website with no Dockerfile
 

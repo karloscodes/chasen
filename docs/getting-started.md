@@ -6,9 +6,8 @@ Chasen puts your app on one server that you own. `chasen` is the CLI on your com
 
 - **A server** with Ubuntu or Debian that you can log in to with SSH, as root or as a user that runs `sudo` with no password. Ports 80 and 443 are open for your apps. A small server is enough to start.
 - **A domain for your app**, with a DNS record that points to the server: `shop.example.com`. The server itself needs no name.
-- **Docker on your computer.** `chasen deploy` builds the image of your app there.
-- **An image registry.** A repository on GitHub already has one, `ghcr.io`. Docker Hub and others work too.
-- **An app with a `Dockerfile`**, in a git repository. A plain website with an `index.html` needs no Dockerfile, no Docker, and no registry.
+- **Docker on your computer.** `chasen deploy` builds the image of your app there, and sends it to the server through SSH. You need no registry and no token. If the image is already in a registry, you need no Docker either: see [An image in a registry](#an-image-in-a-registry).
+- **An app with a `Dockerfile`**, in a git repository. A plain website with an `index.html` needs no Dockerfile and no Docker.
 
 ## 1. Install the CLI
 
@@ -18,29 +17,7 @@ On your computer (macOS or Linux):
 curl -fsSL https://chasenhq.com/cli | sh
 ```
 
-## 2. Log in to the registry
-
-Your app needs a place for its image. When the git origin of the app is on GitHub, that place is `ghcr.io/<owner>/<repository>`. Chasen finds the name by itself. It needs a login to push there, and it uses the one that Docker already has:
-
-```bash
-docker login ghcr.io
-# Username: your GitHub name
-# Password: a GitHub token with the write:packages scope (github.com/settings/tokens)
-```
-
-If you use the GitHub CLI, this does the same with no token to copy: `gh auth login -s write:packages`.
-
-That is all: an app on GitHub needs no `chasen.yml`.
-
-For Docker Hub or another registry, run `docker login` for it, and name the image in `chasen.yml`, in the root of the app:
-
-```yaml
-image: you/shop          # where the image goes. No tag
-```
-
-Your app also follows [the standard](../STANDARD.md): it listens on the port of its `EXPOSE` line (or on `$PORT`), answers `GET /up` with `200`, and keeps its SQLite files in `/storage`.
-
-## 3. Deploy
+## 2. Deploy
 
 ```bash
 cd shop
@@ -52,15 +29,17 @@ chasen deploy root@203.0.113.5 --domain shop.example.com
 #   Starting the API.
 # The server is ready.
 # Logged in to ssh://root@203.0.113.5
-# Building ghcr.io/you/shop:3f9a2c1d...
-# Pushing ghcr.io/you/shop:3f9a2c1d...
-# Pulling ghcr.io/you/shop:3f9a2c1d...
+# Starting the registry of chasen on this computer. The image goes from here to the server, through SSH.
+# Building 127.0.0.1:5555/shop:3f9a2c1d...
+# Pushing 127.0.0.1:5555/shop:3f9a2c1d...
+# Pulling 127.0.0.1:31337/shop:3f9a2c1d...
 # Port 3000 (EXPOSE in the image). Health path /up. Storage /storage.
-# shop: backup 20261001T120000Z (on the server only)
 # Starting shop 3f9a2c1
 #
 # Deployed shop 3f9a2c1
 #   https://shop.example.com
+#
+# ✓ https://shop.example.com answers from here.
 ```
 
 This one command does everything. The first time, it also makes the machine a Chasen server:
@@ -69,7 +48,9 @@ This one command does everything. The first time, it also makes the machine a Ch
 2. It downloads `chasen-server`, one binary, checks its checksum, installs Docker when the server has none, and starts the proxy and the API. It changes nothing else on the server.
 3. It gets a login for this computer.
 
-Then it builds the image of the current git commit, pushes it, and tells the server to pull it. The server backs up the databases, starts the new version next to the old one, and moves the traffic when `/up` answers. If the new version does not answer in 30 seconds, the old one keeps the traffic.
+Then it builds the image of the current git commit with your Docker, for the CPU of the server. The image goes to a small registry on your computer (the container `chasen-registry`, which listens only on your computer), and the server pulls it from there through SSH. Nothing goes to the internet, and the next deploy sends only the layers that changed.
+
+The server backs up the databases, starts the new version next to the old one, and moves the traffic when `/up` answers. If the new version does not answer in 30 seconds, the old one keeps the traffic, and the deploy says why. At the end, the CLI asks the address of the app from your computer and says whether it answers, or what to fix: DNS, a firewall, or the certificate.
 
 **After the first time, the command is `chasen deploy`.** The computer knows the server, and the app has its domain. Every command goes to the server through SSH, so the server needs no name in DNS and no certificate of its own, and the only open ports are SSH and the ports 80 and 443 of your apps.
 
@@ -78,6 +59,24 @@ Then it builds the image of the current git commit, pushes it, and tells the ser
 - **Several servers:** name the server in the command each time, or in `chasen.yml` (`server: root@203.0.113.5`).
 
 To test an app before it gets traffic, run `chasen check`.
+
+## 3. The defaults, and how to change them
+
+An app needs no `chasen.yml` when it follows [the standard](../STANDARD.md). Each rule has a default. When your app does something else, write the difference in `chasen.yml`, in the root of the app:
+
+| What | The default | In `chasen.yml` |
+|---|---|---|
+| The name of the app | the name of the directory | `name: shop` |
+| The port the app listens on | the `EXPOSE` of the image, else 8080. The app also gets it as `$PORT` | `port: 3000` |
+| The health check | `GET /up` answers `200` within 30 seconds | `health: /healthz` and `health_timeout: 90` |
+| Where the data is | the `VOLUME` of the image, else `/storage` (also at `/rails/storage`) | `volumes: [/app/data]` |
+| The memory | 512 MB | `memory: 1g` |
+| Backups | hourly snapshots, and the live replica when the server has a bucket | `backup: false`, for data the app makes again at each start |
+| The server | the current one: `chasen servers` lists them | `server: root@203.0.113.5` |
+| The image | built here, and sent through SSH | `image: ghcr.io/you/shop`: see below |
+| Settings and secrets | none | `env:` for settings. Secrets go in `chasen secrets edit` |
+
+You do not need to guess: when a deploy fails, it says what the app did, and the line to write. [Deploy](deploy.md#chasenyml) has every key.
 
 ## 4. Add a backup bucket (optional)
 
@@ -90,15 +89,42 @@ chasen bucket --endpoint https://<your-store> --name chasen-backups --access-key
 
 The server creates the bucket when it does not exist, and tests it before it saves the settings. Then the snapshots go to the bucket too, and the live replica starts.
 
+## An image in a registry
+
+The default needs no registry. Use one when:
+
+- **The server is on the web**, with a base domain and a token: GitHub Actions, or the [cloud](https://chasenhq.com/cloud/). There is no SSH to send the image through, so the image goes to `ghcr.io/<owner>/<repository>`, from the git origin of the app on GitHub. [Deploy from GitHub Actions](github-actions.md) has the steps.
+- **You want the image in a registry anyway.** Name it in `chasen.yml`, and Chasen pushes it there, also through SSH: `image: ghcr.io/you/shop`, or `image: you/shop` for Docker Hub. No tag: the tag is the commit.
+- **The image is not yours to build**: an app that someone else releases, and you have no code of. Make a directory with only a `chasen.yml`, and no `Dockerfile`:
+
+```yaml
+name: analytics
+image: someone/analytics   # deploys the newest one. For one version: chasen deploy --tag 2.7.6
+port: 8080
+volumes: [/app/storage]
+```
+
+`chasen deploy` in that directory pulls the image on the server. It builds nothing, so it needs no Docker on your computer.
+
+**The login to the registry.** A public image needs none. For a private one, Chasen uses the login that Docker already has, and sends it with the deploy, so the server can pull:
+
+```bash
+docker login ghcr.io
+# Username: your GitHub name
+# Password: a classic GitHub token with the write:packages scope (github.com/settings/tokens)
+```
+
+If you use the GitHub CLI, this does the same with no token to copy: `gh auth login -s write:packages`. In CI, Chasen takes `GHCR_TOKEN` or `GITHUB_TOKEN`.
+
 ## What comes next
 
 | You want | Command |
 |---|---|
-| One more domain for the app | `chasen domains add shop.com` |
+| A second address for the same app, like `www.shop.example.com` or an old name | `chasen domains add www.shop.example.com` |
 | See what runs | `chasen status`, `chasen logs`, `chasen history` |
 | Give the app a secret | `chasen secrets edit`, then `chasen restart` |
 | Change a setting | Edit `chasen.yml`, then `chasen restart` |
-| Go back to an older version | `chasen deploy --tag <the full hash of the older commit>` |
+| Go back to the version before | `chasen rollback`: in seconds, with the same data |
 | Restore the data | `chasen backups`, then `chasen restore` |
 | Deploy on every `git push` | [Deploy from GitHub Actions](github-actions.md) |
 

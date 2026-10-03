@@ -16,6 +16,7 @@
 | `chasen deploy` | Build the image of the current git commit, push it, and deploy it. Or deploy a static website. In a folder with an `image:` in `chasen.yml` and no `Dockerfile`: deploy the newest image, with no build. `--tag <tag>` deploys an image that is already in the registry. `--domain <domain>` gives a new app its domain. In the cloud: `--on <id>` or `--new[=type@location]` picks the server of a new app |
 | `chasen check` | Test the current git commit against the standard. Changes nothing live |
 | `chasen restart` | Start the app again with the env and secrets of `chasen.yml`, from the image it has |
+| `chasen rollback` | Start the version before the current one again, in seconds: the server keeps its image. The data stays as it is: `chasen restore` brings back a backup. A second rollback goes forward again |
 | `chasen secrets edit` | Change the secrets of the app in your editor. They stay in the repository, encrypted |
 | `chasen secrets` | List the names of the secrets. `chasen secrets show` prints the values too |
 | `chasen status` | Show the version, the state, the URLs, the last backup, and the replica |

@@ -48,13 +48,20 @@ func deploy(creds credentials, app appFile, command string) error {
 		return fmt.Errorf("the settings of the deploy: %w", err)
 	}
 
-	// An app on GitHub needs no chasen.yml: its image is ghcr.io/<owner>/<repository>.
+	// An app with a Dockerfile and no image: to a server through SSH, the
+	// image goes from this computer, with no registry on the internet. To a
+	// server on the web (CI with a token, the cloud), it goes to ghcr.io of
+	// the GitHub origin of the app.
 	if app.Image == "" && noDockerfile == nil {
-		origin, _ := exec.Command("git", "remote", "get-url", "origin").Output()
-		if app.Image = originImage(string(origin)); app.Image == "" {
-			return errors.New(noImage)
+		if protocol.IsSSH(creds.URL) {
+			app.Image = localRegistry + "/" + app.Name
+		} else {
+			origin, _ := exec.Command("git", "remote", "get-url", "origin").Output()
+			if app.Image = originImage(string(origin)); app.Image == "" {
+				return errors.New(noImage)
+			}
+			fmt.Printf("No image in chasen.yml: chasen uses %s, from the git origin.\n", app.Image)
 		}
-		fmt.Printf("No image in chasen.yml: chasen uses %s, from the git origin.\n", app.Image)
 	}
 	if app.Image == "" {
 		return deployWebsite(creds, app, settings, command)
@@ -168,6 +175,12 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 		return err
 	}
 	settings.Registry = registry
+	local := isLocalImage(app.Image)
+	if local && build {
+		if err := startLocalRegistry(); err != nil {
+			return err
+		}
+	}
 	if build {
 		if err := buildImage(settings.Image, version, serverPlatform(creds)); err != nil {
 			return err
@@ -183,6 +196,16 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 		if err := pushImage(settings.Image, registry, from); err != nil {
 			return err
 		}
+	}
+	// The server pulls an image of this computer through a port of its own
+	// loopback, which leads back here for as long as the deploy runs.
+	if local {
+		port, closeTunnel, err := registryTunnel(creds.URL)
+		if err != nil {
+			return err
+		}
+		defer closeTunnel()
+		settings.Image = fmt.Sprintf("127.0.0.1:%d/%s:%s", port, app.Image[len(localRegistry)+1:], tag)
 	}
 	var printed strings.Builder
 	if err := remote(creds, settings.Body(nil), io.MultiWriter(os.Stdout, &printed), command, app.Name, version); err != nil {

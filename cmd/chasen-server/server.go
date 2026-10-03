@@ -136,6 +136,8 @@ func runServer(args []string) error {
 		return serverEnable(name, args)
 	case "restart":
 		return serverRestart(name)
+	case "rollback":
+		return serverRollback(name)
 	case "domains":
 		return serverDomains(name, args)
 	case "status":
@@ -879,6 +881,54 @@ func serverRestart(name string) error {
 		return err
 	}
 	fmt.Printf("Restarted %s with the new configuration\n", name)
+	return nil
+}
+
+// serverRollback starts the version before the current one again, from the
+// image that the server kept: no build and no pull, so it takes seconds. The
+// data stays as it is; chasen restore brings back the data of before a
+// deploy. A second rollback goes forward again.
+func serverRollback(name string) error {
+	app, err := loadApp(name)
+	if err != nil {
+		return err
+	}
+	if !isBuilt(name, app.Image) {
+		return fmt.Errorf("%s runs an image that Chasen did not build. Deploy the version you want: chasen deploy --tag <version>", name)
+	}
+	current := app.Image[strings.LastIndex(app.Image, ":")+1:]
+	// Docker lists the newest first, and a deploy keeps two versions.
+	tags, _ := docker("images", imageRepo(name), "--format", "{{.Tag}}")
+	previous := ""
+	for _, tag := range strings.Fields(tags) {
+		if tag != current {
+			previous = tag
+			break
+		}
+	}
+	if previous == "" {
+		return fmt.Errorf("the server keeps no version of %s before %s. Deploy an older commit: chasen deploy --tag <its full hash>", name, current)
+	}
+	settings, err := loadSettings(name)
+	if err != nil {
+		return err
+	}
+	image := imageRepo(name) + ":" + previous
+	sh, err := appShape(image, settings)
+	if err != nil {
+		return err
+	}
+	if err := prepareVolumes(name, image, sh.Volumes); err != nil {
+		return err
+	}
+	app.Image = image
+	app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes, settings.Memory
+	app.Env = appEnv(settings, strings.Split(app.Domain, ","), previous, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
+	fmt.Printf("Starting %s %s again, the version before %s\n", name, previous, current)
+	if err := apply(name, app); err != nil {
+		return err
+	}
+	fmt.Printf("\nRolled back %s to %s. The data is as it was: chasen restore brings back a backup.\n", name, previous)
 	return nil
 }
 

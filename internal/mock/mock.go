@@ -29,6 +29,7 @@ const stampLayout = "20060102T150405Z"
 
 type app struct {
 	name, version, state string
+	previous             string // the version before, which rollback starts again
 	domains              []string
 	backups              []string // the stamps, newest first
 	history              []entry
@@ -388,6 +389,21 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 		a.state = "Up 1 second (healthy)"
 		a.end(index, "succeeded")
 		s.mu.Unlock()
+	case "rollback":
+		if a.previous == "" {
+			s.mu.Unlock()
+			return fail("the server keeps no version of %s before %s. Deploy an older commit: chasen deploy --tag <its full hash>", name, a.version)
+		}
+		index, kept := s.begin(a, "rollback")
+		back := a.previous
+		s.mu.Unlock()
+		out = io.MultiWriter(out, kept)
+		say(900*time.Millisecond, "Starting %s %s again, the version before %s", name, back, a.version)
+		s.mu.Lock()
+		a.previous, a.version, a.state = a.version, back, "Up 1 second (healthy)"
+		a.end(index, "succeeded")
+		s.mu.Unlock()
+		say(0, "\nRolled back %s to %s. The data is as it was: chasen restore brings back a backup.", name, back)
 	case "restore":
 		index, kept := s.begin(a, "restore")
 		s.mu.Unlock()
@@ -512,7 +528,7 @@ func (s *Server) deploy(ctx context.Context, out io.Writer, command, name, versi
 	if hasData {
 		a.backups = append([]string{time.Now().UTC().Format(stampLayout)}, a.backups...)
 	}
-	a.version, a.state = version, "Up 1 second (healthy)"
+	a.previous, a.version, a.state = a.version, version, "Up 1 second (healthy)"
 	domains := slices.Clone(a.domains)
 	s.mu.Unlock()
 	fmt.Fprintf(out, "\n%s %s %s\n", verb, name, version)

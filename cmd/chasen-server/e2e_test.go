@@ -323,6 +323,28 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("rollback starts the version before, from the image the server kept, and again goes forward", func(t *testing.T) {
+		version := func() string {
+			_, rest, _ := strings.Cut(must(app, bin, "status"), "Version:")
+			return strings.Fields(rest)[0]
+		}
+		newest := version()
+
+		out := must(app, bin, "rollback")
+
+		older := version()
+		if !strings.Contains(out, "Rolled back example to "+older) || older == newest || strings.Contains(out, "Pulling") {
+			t.Errorf("rollback = %q, now %s, want the version before %s, with no pull", out, older, newest)
+		}
+		must(app, bin, "rollback")
+		if now := version(); now != newest {
+			t.Errorf("the second rollback runs %s, want %s again", now, newest)
+		}
+		if out := must(app, bin, "history"); !strings.Contains(out, "rollback") {
+			t.Errorf("history = %q, want the rollbacks", out)
+		}
+	})
+
 	t.Run("restart applies new configuration and secrets, from the same image", func(t *testing.T) {
 		// The change is in the working directory only: a restart needs no commit.
 		// The secret key of the app comes as a secret too: then it is the owner's key, not one the server made.
@@ -496,6 +518,29 @@ func TestEndToEnd(t *testing.T) {
 		if out := must(app, bin, "history"); !strings.Contains(out, "run sh -c echo through-ssh") {
 			t.Errorf("history = %q, want the run: a command through SSH is a command of the API", out)
 		}
+
+		// An app with no image in chasen.yml goes from this computer to the
+		// server through SSH, with no registry on the internet and no login.
+		t.Cleanup(func() {
+			docker("rm", "-f", "chasen-registry")
+			docker("volume", "rm", "chasen-registry")
+		})
+		direct := filepath.Join(t.TempDir(), "direct")
+		must(".", "cp", "-r", "example", direct)
+		os.WriteFile(filepath.Join(direct, "chasen.yml"), []byte("name: direct\n"), 0644)
+		must(direct, "git", "init", "-q")
+		must(direct, "git", "add", "-A")
+		must(direct, "git", "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-qm", "direct")
+
+		out = must(direct, bin, "deploy")
+
+		if !strings.Contains(out, "Deployed direct") || strings.Contains(out, "ghcr.io") {
+			t.Errorf("deploy through SSH = %q, want the image of this computer, and no registry", out)
+		}
+		if got := get("direct.localhost"); !strings.HasPrefix(got, "hits=1 ") {
+			t.Errorf("GET direct.localhost = %q, want the app", got)
+		}
+		must(direct, bin, "remove")
 		// The tests after this one use the address on the web again, and they count the logins.
 		must(app, bin, "logout")
 		must(app, bin, "use", api)

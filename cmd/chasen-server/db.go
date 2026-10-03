@@ -113,7 +113,7 @@ const (
 // command that changes nothing.
 func recordedAction(command string, args []string) string {
 	switch {
-	case command == "deploy" || command == "enable" || command == "restart" || command == "restore" || command == "remove":
+	case command == "deploy" || command == "enable" || command == "restart" || command == "rollback" || command == "restore" || command == "remove":
 		return strings.TrimSpace(command + " " + strings.Join(args, " "))
 	case command == "domains" && len(args) > 0:
 		return "domains " + strings.Join(args, " ")
