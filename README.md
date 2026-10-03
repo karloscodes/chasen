@@ -109,6 +109,10 @@ The two programs share one contract: [`protocol`](protocol/protocol.go) for the 
 
 A tag `v*` makes a release: GitHub Actions builds the CLI for macOS and Linux and the server for Linux, and attaches them to the release with `checksums.txt`. The install scripts download the newest release.
 
+## Contributing
+
+Report a problem with `chasen report`. Pull requests are small, pass all the tests, and show that they work: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 [Apache 2.0](LICENSE)
