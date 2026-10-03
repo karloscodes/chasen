@@ -151,7 +151,7 @@ func serverCheck(name, version string) error {
 		report(false, "a restart is not safe: %s", problem)
 	}
 
-	// Rule 10: the app stops on SIGTERM. Docker kills it after 10 seconds.
+	// Rule 10: the app stops on SIGTERM. A deploy kills it after 30 seconds, and a fast stop keeps deploys fast.
 	start := time.Now()
 	docker("stop", "-t", "10", container)
 	stopped := time.Since(start)

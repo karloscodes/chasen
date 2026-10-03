@@ -138,7 +138,7 @@ Secrets travel with the deploy on purpose. Nothing that matters lives only on th
 ## 6. Logs and signals
 
 - **Logs.** Write them to stdout and stderr, one event per line. `chasen logs` shows them. Do not write log files into the storage.
-- **Stop.** On `SIGTERM`, finish the open requests and exit within 10 seconds. After that the container is killed. An app that ignores `SIGTERM` adds 10 seconds to every deploy.
+- **Stop.** On `SIGTERM`, finish the open requests and exit within 10 seconds. A job that runs in the app may take longer: the container is killed 30 seconds after `SIGTERM`, like the job roles of Kamal. An app that ignores `SIGTERM` adds 30 seconds to every deploy.
 
 ## Backups
 
