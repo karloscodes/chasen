@@ -67,7 +67,11 @@ func serverServe() error {
 		}
 	}()
 	go func() {
-		for range time.Tick(time.Hour) {
+		// At the start of each hour, by the clock. A tick from the start of
+		// the API moved with each restart: updates less than an hour apart
+		// skipped every backup.
+		for {
+			time.Sleep(time.Until(time.Now().Truncate(time.Hour).Add(time.Hour)))
 			if err := run(self, "backup"); err != nil {
 				log.Print("hourly backup failed: ", err)
 			}
