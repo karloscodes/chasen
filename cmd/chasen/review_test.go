@@ -117,7 +117,7 @@ Error: chasen.yml: the volumes /a/data and /b/data end in the same name. Rename 
 
 		want := "Warning: chasen.yml: the value of STRIPE_SECRET_KEY is in env, as plain text, and chasen.yml goes into git\n" +
 			"  If it is a secret, add the name to `secrets:` and take the value out of the file.\n" +
-			"  https://chasenhq.com/docs/standard/#5-secrets\n\n" +
+			"  https://chasenhq.com/docs/secrets/\n\n" +
 			"1 warning. A warning does not stop the deploy.\n\n"
 		if output != want || stopped {
 			t.Errorf("stopped = %v, output:\n%s", stopped, output)
