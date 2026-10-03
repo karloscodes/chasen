@@ -182,9 +182,9 @@ func (t *tui) commandHelp(width int, typed string, room int) []string {
 			found = append(found, c)
 		}
 	}
-	about := "for " + t.app() + ". enter runs it, and a command that changes something asks first. esc closes"
+	about := "for " + t.app() + " · enter runs it · esc closes"
 	if t.app() == "" {
-		about = "enter runs it. esc closes"
+		about = "enter runs it · esc closes"
 	}
 	lines := []string{spread(width, []cell{{" commands ", colorAccent}, {about, colorDim}}, nil)}
 	if len(found) == 0 {
@@ -308,12 +308,8 @@ func (t *tui) keys() [][2]string {
 		return [][2]string{{"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
 	case !t.inPane:
 		// The line drops the keys at its end when the window is narrow: the
-		// ones that are hard to guess come first.
-		keys := [][2]string{{"↑↓", "app"}, {":", "command"}, {"s", "servers"}, {"t", "theme"}}
-		if len(t.alerts) > 0 {
-			keys = append(keys, [2]string{"!", "alerts"})
-		}
-		return append(keys, [2]string{"r", "restart"}, [2]string{"b", "backup"}, [2]string{"o", "open"}, [2]string{"→", "its " + tabNames[t.tab]}, [2]string{"?", "keys"}, [2]string{"q", "close"})
+		// ones that are hard to guess come first. s and ! are in the top line.
+		return [][2]string{{"↑↓", "app"}, {":", "command"}, {"t", "theme"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"→", "its " + tabNames[t.tab]}, {"?", "keys"}, {"q", "close"}}
 	}
 	switch t.tab {
 	case tabHistory:
@@ -705,7 +701,7 @@ func marked(line, filter string) []cell {
 func (t *tui) overlayLines(o *overlay, width, height int) []string {
 	state := cell{}
 	switch {
-	case o.pick != nil || (!o.running && len(o.lines) > 0 && o.cancel == nil):
+	case o.pick != nil || o.draw != nil || (!o.running && len(o.lines) > 0 && o.cancel == nil):
 	case o.running:
 		state = cell{spinner[t.frame%len(spinner)] + " running ", colorAccent}
 	case o.failed:
@@ -735,6 +731,11 @@ func (t *tui) overlayLines(o *overlay, width, height int) []string {
 	}
 
 	room := height - len(lines)
+	if o.draw != nil {
+		drawn := o.draw(width)
+		start := min(o.scroll, max(0, len(drawn)-room))
+		return append(lines, drawn[start:min(len(drawn), start+room)]...)
+	}
 	start := max(0, len(o.lines)-room)
 	if !o.follow {
 		start = min(o.scroll, start)

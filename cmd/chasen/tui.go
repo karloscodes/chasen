@@ -79,6 +79,9 @@ type overlay struct {
 	// live is the history entry that the overlay follows while it runs:
 	// the app and the id.
 	live [2]string
+	// draw makes the lines of an overlay that paints its own, for the width of
+	// the window, in place of lines.
+	draw func(width int) []string
 	// choices makes the overlay a list to pick from.
 	choices []string
 	cursor  int
@@ -401,26 +404,42 @@ func (t *tui) loadApps() {
 }
 
 // alertsTitle is the title of the overlay of the alerts.
-const alertsTitle = "alerts · refreshed every 1m"
+const alertsTitle = "alerts"
 
-// alertLines are the alerts for their overlay: each one with its fix under it.
-func (t *tui) alertLines() []string {
-	var lines []string
-	for _, a := range t.alerts {
-		level := "WARNING"
-		if a.error {
-			level = "ERROR  "
+var checkedAt = regexp.MustCompile(`Checked at (\d\d:\d\d UTC)\.(?: Quiet: ([^.]+)\.)?`)
+
+// alertView draws the alerts: when the server looked, then each alert with a
+// dot of its color, what is wrong, and the fix under it, wrapped to the window.
+func (t *tui) alertView(width int) []string {
+	note := "Refreshes every minute. The same: chasen alerts"
+	if m := checkedAt.FindStringSubmatch(t.alertsChecked); m != nil {
+		note = "Checked at " + m[1] + ", refreshes every minute. The same: chasen alerts"
+		if m[2] != "" {
+			note += ". Turned off: " + m[2]
 		}
-		lines = append(lines, level+"  "+a.what)
-		if a.fix != "" {
-			lines = append(lines, "         "+a.fix)
+	}
+	lines := []string{" " + paint(note, colorDim), ""}
+	if t.alertsChecked == "" {
+		return append(lines, " "+paint(spinner[t.frame%len(spinner)], colorAccent)+paint(" Asking the server", colorDim))
+	}
+	if len(t.alerts) == 0 {
+		return append(lines, " "+paint("✓", colorAccent)+" No alerts. Nothing is wrong, and nothing puts the server at risk.")
+	}
+	const indent = "             "
+	for _, a := range t.alerts {
+		level, color := "warning", colorAccent
+		if a.error {
+			level, color = "error  ", colorBad
+		}
+		what := wrap(a.what, width-len(indent)-2)
+		lines = append(lines, " "+paint("●", color)+" "+paint(level, color)+"   "+paint(what[0], colorBold))
+		for _, more := range what[1:] {
+			lines = append(lines, indent+paint(more, colorBold))
+		}
+		for _, line := range wrap(a.fix, width-len(indent)-2) {
+			lines = append(lines, indent+paint(line, colorDim))
 		}
 		lines = append(lines, "")
-	}
-	if t.alertsChecked != "" {
-		lines = append(lines, t.alertsChecked)
-	} else {
-		lines = append(lines, "Asking the server...")
 	}
 	return lines
 }
@@ -685,9 +704,7 @@ func (t *tui) handle(event any) bool {
 		if !e.failed {
 			t.alerts, t.alertsChecked = parseAlerts(e.output)
 		}
-		if o := t.overlay; o != nil && o.title == alertsTitle {
-			o.lines = t.alertLines()
-		}
+
 	case statsEvent:
 		// A server from before the load command answers with an error.
 		t.noStats = e.failed
@@ -763,12 +780,14 @@ func (t *tui) key(key string) bool {
 	case "?":
 		t.overlay = &overlay{title: "keys", lines: helpLines, headings: true}
 	case "t":
-		t.message = "Theme: " + nextTheme() + ". t goes to the next one: " + strings.Join(themes(), ", ") + "."
+		name := nextTheme()
+		list := themes()
+		t.message = "Theme: " + name + ". Next with t: " + list[(slices.Index(list, name)+1)%len(list)] + "."
 	case "!":
 		if t.noAlerts {
 			t.message = "This server has no alerts. chasen update, and the next update of the server, bring them."
 		} else {
-			t.overlay = &overlay{title: alertsTitle, lines: t.alertLines()}
+			t.overlay = &overlay{title: alertsTitle, draw: t.alertView}
 		}
 	case "g":
 		t.loadApps()

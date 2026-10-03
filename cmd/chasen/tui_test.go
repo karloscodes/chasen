@@ -423,7 +423,10 @@ func TestScreen(t *testing.T) {
 		sc.shows("! 1 error  1 warning")
 		sc.press("!")
 
-		sc.shows("alerts · refreshed every 1m", "ERROR    blog is down: its container is exited", "chasen -a blog logs shows why", "WARNING  SSH accepts passwords", "Checked at 14:00 UTC.")
+		sc.shows("Checked at 14:00 UTC, refreshes every minute", "● error     blog is down: its container is exited", "\n             chasen -a blog logs shows why", "● warning   SSH accepts passwords")
+		if strings.Contains(sc.text(), "✓ done") {
+			t.Error("the alerts show the state of a command")
+		}
 	})
 
 	t.Run("while a server answers, the mark, the server that opens, and the way to another one", func(t *testing.T) {
@@ -438,6 +441,9 @@ func TestScreen(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 
 		sc.shows("example.com  s servers", "t theme")
+		if strings.Count(sc.text(), "s servers") != 1 {
+			t.Error("s servers is in the screen two times")
+		}
 	})
 
 	t.Run(": shows the commands it runs, and narrows them as the user types", func(t *testing.T) {

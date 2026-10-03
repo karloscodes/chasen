@@ -163,7 +163,20 @@ A restart, a restore, and the removal of a domain ask first. Each action is a co
 | An update waits for a reboot for more than a day | warning | `reboot` |
 | The nightly update of `chasen-server` is off | warning | `auto_update` |
 
-The server looks when you ask: nothing runs in the background. Chasen does not fix these for you: the operating system is yours. When an alert does not apply, turn it off by its name on the server, for example when the firewall of your provider protects the server: `chasen-server settings quiet_alerts firewall`.
+The server looks when you ask: nothing runs in the background. Chasen does not fix these for you: the operating system is yours.
+
+### Keep SSH off the internet
+
+A firewall that lets in only SSH, 80, and 443 is good. Better: SSH only from your own private network, so the internet sees ports 80 and 443 and nothing else. Chasen needs nothing for it: the address of a server is an SSH host, so `chasen deploy deploy@shop-server` works with the names of the network.
+
+| Network | What it is |
+|---|---|
+| [Tailscale](https://tailscale.com) | The easiest: install it on the server and your computer, and log in. Free for personal use. The apps are open source; the service that connects them is not |
+| [Headscale](https://github.com/juanfont/headscale) | An open source server for the Tailscale apps, that you run yourself |
+| [NetBird](https://netbird.io) | An open source private network, as a service or on your own server |
+| [WireGuard](https://www.wireguard.com) | No service at all: it is in the Linux kernel. One file on the server and one on your computer. Best for one server and a few computers |
+
+When the network works, let SSH in only from it. With ufw and Tailscale: `ufw allow in on tailscale0 to any port 22 && ufw delete allow OpenSSH`. Keep a way back before you close the door: the console of your provider. When an alert does not apply, turn it off by its name on the server, for example when the firewall of your provider protects the server: `chasen-server settings quiet_alerts firewall`.
 
 ## Several servers
 

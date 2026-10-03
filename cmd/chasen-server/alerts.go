@@ -235,7 +235,7 @@ func sshAlerts() []alert {
 		return nil // no SSH server
 	}
 	return []alert{{"ssh", false, "SSH accepts passwords: a bot can guess one",
-		"Log in with a key, then add PasswordAuthentication no to /etc/ssh/sshd_config and run: systemctl reload ssh"}}
+		"Log in with a key, then add PasswordAuthentication no to /etc/ssh/sshd_config and run: systemctl reload ssh. Better still, SSH only from a private network: https://chasenhq.com/docs/reference/#keep-ssh-off-the-internet"}}
 }
 
 // sshdSetting returns the value of a setting of sshd, as sshd reads it: the
@@ -288,7 +288,7 @@ func firewallAlerts() []alert {
 		return nil
 	}
 	return []alert{{"firewall", false, "no firewall runs on this server: every port that a program opens is open to the internet",
-		"Let in SSH, 80, and 443: ufw allow OpenSSH && ufw allow 80,443/tcp && ufw enable. When the firewall of your provider does it, run: chasen-server settings quiet_alerts firewall"}}
+		"Let in SSH, 80, and 443: ufw allow OpenSSH && ufw allow 80,443/tcp && ufw enable. SSH only from a private network is better: https://chasenhq.com/docs/reference/#keep-ssh-off-the-internet. When the firewall of your provider does it, run: chasen-server settings quiet_alerts firewall"}}
 }
 
 // updateAlerts reports a Debian or Ubuntu server that does not install its
