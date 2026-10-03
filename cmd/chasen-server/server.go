@@ -71,6 +71,8 @@ func runServer(args []string) error {
 		}
 	case "alerts":
 		return serverAlerts()
+	case "overview":
+		return serverOverview(args)
 	case "bucket":
 		return serverBucket(args)
 	case "settings":

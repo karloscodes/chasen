@@ -345,6 +345,18 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("overview gives the state and the version of each app in one call", func(t *testing.T) {
+		out := must(app, bin, "overview")
+
+		if !strings.Contains(out, "APP") || !strings.Contains(out, "example") || !strings.Contains(out, "Up ") {
+			t.Errorf("overview = %q, want the app with its state", out)
+		}
+		data := must(app, bin, "overview", "--json")
+		if !strings.Contains(data, `"app":"example"`) || !strings.Contains(data, `"up":true`) {
+			t.Errorf("overview --json = %q, want the app as JSON, up", data)
+		}
+	})
+
 	t.Run("restart applies new configuration and secrets, from the same image", func(t *testing.T) {
 		// The change is in the working directory only: a restart needs no commit.
 		// The secret key of the app comes as a secret too: then it is the owner's key, not one the server made.

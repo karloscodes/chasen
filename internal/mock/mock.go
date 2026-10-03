@@ -263,6 +263,39 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 		fmt.Fprintf(out, "Load:     %.2f %.2f %.2f (4 cores, amd64)\nMemory:   %.1f GB of 7.6 GB (%d%%)\nDisk:     31 GB of 75 GB (41%%)\n",
 			0.2+beat, 0.4+beat/2, 0.5, 2.1+beat, int((2.1+beat)*100/7.6))
 		return 0
+	case "overview":
+		// Each app with its state, its version, and the change that runs now.
+		type row struct {
+			App     string `json:"app"`
+			State   string `json:"state"`
+			Up      bool   `json:"up"`
+			Version string `json:"version"`
+			Running string `json:"running,omitempty"`
+			Since   string `json:"since,omitempty"`
+		}
+		s.mu.Lock()
+		var rows []row
+		for _, a := range s.apps {
+			r := row{App: a.name, State: a.state, Up: strings.HasPrefix(a.state, "Up"), Version: a.version}
+			for _, e := range a.history {
+				if e.result == "running" {
+					r.Running, r.Since = e.action, e.at.UTC().Format(time.RFC3339)
+				}
+			}
+			rows = append(rows, r)
+		}
+		s.mu.Unlock()
+		if len(args) == 1 && args[0] == "--json" {
+			json.NewEncoder(out).Encode(rows)
+			return 0
+		}
+		w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "APP\tSTATE\tVERSION\tNOW")
+		for _, r := range rows {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.App, r.State, r.Version, r.Running)
+		}
+		w.Flush()
+		return 0
 	case "alerts":
 		// Two warnings, so the screen has its alerts to show.
 		fmt.Fprint(out, "WARNING  SSH accepts passwords: a bot can guess one\n         Log in with a key, then add PasswordAuthentication no to /etc/ssh/sshd_config and run: systemctl reload ssh\nWARNING  a reboot waits since 2 days: the server runs an old kernel, for linux-image-6.8.0-45-generic\n         Run reboot on the server: about one minute of downtime.\n\n2 warnings. Checked at 10:19 UTC.\n")

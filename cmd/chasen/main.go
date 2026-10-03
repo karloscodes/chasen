@@ -68,6 +68,8 @@ Run these in the directory of your app:
   remove                 Stop the app. Keeps the data and the backups
   list                   List all apps on the server
   load                   Show the load, the memory, and the disk of the server
+  overview               Each app of the server: its state, its version, and the change that runs now
+                         --json: every server you are logged in to, with its apps and alerts
   alerts                 What is wrong with the server, or puts it at risk: apps that are down,
                          late backups, a full disk, SSH with passwords, no firewall, no updates
                          --waybar: the alerts of every server, for the top bar of Omarchy

@@ -65,6 +65,9 @@ var tagFlag string
 // app at its first deploy.
 var domainFlag string
 
+// jsonFlag is `overview --json`: every server with its apps, as JSON.
+var jsonFlag bool
+
 // waybarFlag is `alerts --waybar`: the alerts of every server, as the JSON
 // of a Waybar module.
 var waybarFlag bool
@@ -91,6 +94,11 @@ options:
 			tagFlag = args[i+1]
 		case args[i] == "--domain" && hasValue:
 			domainFlag = strings.ToLower(args[i+1])
+		case args[i] == "--json" && len(args) > 0 && args[0] == "overview":
+			jsonFlag = true
+			args = slices.Delete(args, i, i+1)
+			i--
+			continue
 		case args[i] == "--waybar":
 			waybarFlag = true
 			args = slices.Delete(args, i, i+1)
@@ -118,6 +126,10 @@ options:
 		// The module of the top bar asks every server, with no current one.
 		if waybarFlag {
 			return waybarAlerts(os.Stdout)
+		}
+	case "overview":
+		if jsonFlag {
+			return overviewAll(os.Stdout)
 		}
 	case "login":
 		return login(args[1:])
@@ -169,7 +181,7 @@ options:
 
 func runCommand(creds credentials, args []string) error {
 	switch cmd := args[0]; cmd {
-	case "list", "load", "alerts":
+	case "list", "load", "alerts", "overview":
 		return remote(creds, nil, os.Stdout, cmd)
 	case "bucket":
 		return bucket(creds, args[1:])
