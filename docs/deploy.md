@@ -143,6 +143,42 @@ chasen deploy
 
 When CI pushes your images to a registry, deploy the image that is there, with no build: `chasen deploy --tag <the full hash of the commit>`.
 
+## Background jobs
+
+Chasen has no job system of its own, and your app needs no code for Chasen. Keep the queue that your framework has, and follow three rules:
+
+1. **The queue is in the database of the app, in the storage.** Solid Queue for Rails 8, River or goqite for Go, or a `jobs` table and a loop. So Chasen backs up the queue with the data, and a restore brings back both from the same second: no job points to a row that is gone.
+2. **The worker runs in the process of the app.** For Rails 8, set `SOLID_QUEUE_IN_PUMA=true`. In Go, start a goroutine. One container, one memory limit, and `chasen logs` shows the requests and the jobs together.
+3. **A job can run twice.** A deploy sends `SIGTERM`, and Docker stops the old container 10 seconds later. A job that it cuts off goes back to the queue and runs again. During a deploy, the old and the new container also run together for a few seconds, and both take jobs from the queue: a real queue locks each job in the database, and a plain timer can run twice.
+
+| You need | Use |
+|---|---|
+| A command on a schedule | `cron:` in `chasen.yml`, below |
+| A command one time, by hand | `chasen run bin/rails jobs:retry_all` |
+| Work that uses the CPU for minutes | There is no worker container yet. Tell us: [report a problem](https://github.com/karloscodes/chasen/issues) |
+
+## Cron jobs
+
+A cron job is a command that the server runs in the container of your app, on a schedule. Put it in `chasen.yml`:
+
+```yaml
+cron:
+  - schedule: "0 4 * * *"          # each day at 04:00 UTC
+    run: bin/rails demo:reset
+  - schedule: "*/15 * * * *"       # every 15 minutes
+    run: sh -c 'bin/sync >> /storage/sync.log'
+```
+
+Then run `chasen deploy`, or `chasen restart` to change only the schedule. The jobs travel with the settings of the app, like `env:`.
+
+- **The schedule** has the 5 fields of cron: minute, hour, day of the month, month, and day of the week. The time is UTC. `@hourly`, `@daily`, `@weekly`, and `@monthly` work too.
+- **The command** runs like `chasen run`: in the container that runs now, with the env and the storage of the app. There is no shell: for pipes, `>>`, or `$VARIABLES`, write `sh -c '...'`.
+- **The history** keeps each run as `cron <command>`, with its output and whether it succeeded: `chasen history`. It keeps the newest 20 runs of each job.
+- **A job that still runs** does not start again: that run is skipped.
+- **A restart of the API**, like the nightly update, skips no run. After the server was off for more than 10 minutes, the runs that it missed do not run.
+
+An app has 20 jobs at most. For work that is not on a schedule, see [Background jobs](#background-jobs).
+
 ## The review before a deploy
 
 `chasen deploy` and `chasen check` review the app before they send anything. The review has two parts:
@@ -197,59 +233,13 @@ memory: 1g              # the most memory the app may use. The default is 512m
 
 # For an app whose data needs no backup, like a demo that makes its data again at each start.
 backup: false
+
+# Commands on a schedule, in UTC. See Cron jobs.
+cron:
+  - schedule: "0 4 * * *"
+    run: bin/rails demo:reset
 ```
 
 ## Secrets
 
-A secret is a value that must not be in git as plain text, and not in the image: an API key, a password. Chasen keeps the secrets of an app the way Rails keeps its credentials: one encrypted file in the repository, and one key outside it.
-
-```bash
-chasen secrets edit
-```
-
-The command opens the secrets in your editor (`$VISUAL`, then `$EDITOR`). An editor with a window works with its plain name: for VS Code, Cursor, Zed, and Sublime Text, Chasen adds the option that makes the command wait until you close the file (`EDITOR=code` is enough). The secrets are lines of `NAME=value`:
-
-```
-STRIPE_KEY=sk_live_...
-SMTP_PASSWORD=...
-```
-
-When you close the editor, Chasen encrypts them into `chasen.secrets.enc`. Commit that file. Every secret in it goes to the app at the next deploy, as an environment variable: there is no list to keep in `chasen.yml`.
-
-The first `chasen secrets edit` makes the key and prints it:
-
-| File | What it is | In git |
-|---|---|---|
-| `chasen.secrets.enc` | the secrets, encrypted | yes |
-| `chasen.key` | the key that opens them | no: Chasen adds it to `.gitignore` |
-
-Save the key in a password manager. If you lose it, nobody can read the secrets. On another computer, put the key back in `chasen.key`. In CI, give it as `CHASEN_KEY`.
-
-One key at the top of a repository opens the secrets of every app in it: Chasen looks for `chasen.key` in the directory of the app, then in each directory above it.
-
-```bash
-chasen secrets         # the names
-chasen secrets show    # the names and the values
-chasen restart         # give the app the secrets of now, with no build
-```
-
-**The secret key of the app.** At the first deploy of a new app that has a secrets file, Chasen makes `SECRET_KEY_BASE` and saves it in that file. So the key that signs the sessions of the app is in your repository too, and a new server gives the app the same one. Commit the file after the first deploy.
-
-Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a new server needs one `chasen deploy` to get the configuration, the secrets, and the data back. On the server, the values are in a database that only root can read.
-
-### Secrets from another tool
-
-You have a secret manager already? Keep it. `secrets:` in `chasen.yml` lists the names, and `secrets_command` is any command that prints `KEY=VALUE` lines:
-
-```yaml
-secrets: [STRIPE_KEY, SMTP_PASSWORD]
-secrets_command: op inject -i .env.tpl
-```
-
-| Tool | `secrets_command` |
-|---|---|
-| 1Password | `op inject -i .env.tpl` |
-| fnox | `fnox export` |
-| sops | `sops -d secrets.enc.env` |
-
-Chasen takes each name from the output of the command, then from the environment, then from `chasen.secrets.enc`. So a value in the environment wins over the file: CI can replace one secret without the key. A missing secret stops the deploy before it changes anything.
+The secrets of an app, like an API key or a password, are in one encrypted file in your repository, `chasen.secrets.enc`, and `chasen secrets edit` changes them. Every secret goes to the app at each deploy, as an environment variable. [Secrets](secrets.md) explains the file, the key, CI, and what to do when a key is lost or leaks.
