@@ -52,6 +52,8 @@ func newTestServer(t *testing.T) *testServer {
 			return
 		case "list":
 			output = apps
+		case "alerts":
+			output = "ERROR    blog is down: its container is exited\n         chasen -a blog logs shows why, and chasen -a blog restart starts it again.\nWARNING  SSH accepts passwords: a bot can guess one\n         Log in with a key, then add PasswordAuthentication no to /etc/ssh/sshd_config and run: systemctl reload ssh\n\n1 error, 1 warning. Checked at 14:00 UTC.\n"
 		case "status":
 			output = fmt.Sprintf("App:      %s\nVersion:  3f9a2c1d5e8b\nState:    Up 3 hours (healthy)\nURL:      https://%s.example.com\nURL:      https://shop.com\nBackup:   20261001T110000Z\nReplica:  live\n", name, name)
 			if name == "blog" {
@@ -413,6 +415,15 @@ func TestScreen(t *testing.T) {
 		// The wheel over the apps goes to the next app.
 		sc.press("esc", "mouse:64:6:6")
 		sc.shows("▸ ● lognorth")
+	})
+
+	t.Run("the alerts of the server are in the corner, and ! shows them with their fix", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+
+		sc.shows("! 1 error  1 warning")
+		sc.press("!")
+
+		sc.shows("alerts · refreshed every 1m", "ERROR    blog is down: its container is exited", "chasen -a blog logs shows why", "WARNING  SSH accepts passwords", "Checked at 14:00 UTC.")
 	})
 
 	t.Run(": shows the commands it runs, and narrows them as the user types", func(t *testing.T) {

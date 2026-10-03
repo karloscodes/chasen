@@ -66,6 +66,8 @@ Run these in the directory of your app:
   remove                 Stop the app. Keeps the data and the backups
   list                   List all apps on the server
   load                   Show the load, the memory, and the disk of the server
+  alerts                 What is wrong with the server, or puts it at risk: apps that are down,
+                         late backups, a full disk, SSH with passwords, no firewall, no updates
   bucket                 Show where the backups of the server go
   bucket --endpoint <url> --name <bucket> --access-key-id <id> [--region <region>]
                          Send the backups to an S3 bucket too, and start the live replica.

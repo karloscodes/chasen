@@ -263,6 +263,8 @@ func startAgent(self string) error {
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
 		"-v", self+":/usr/local/bin/chasen-server:ro",
 		"-v", etc+":"+etc, "-v", data+":"+data,
+		// The alerts read the settings of the host: SSH, the firewall, the updates.
+		"-v", "/etc:/host/etc:ro", "-v", "/run:/host/run:ro", "-e", "CHASEN_HOST=/host",
 		"-e", "CHASEN_ROOT="+root(),
 		agentImage, "chasen-server", "serve")
 	if err != nil {

@@ -155,7 +155,7 @@ options:
 
 func runCommand(creds credentials, args []string) error {
 	switch cmd := args[0]; cmd {
-	case "list", "load":
+	case "list", "load", "alerts":
 		return remote(creds, nil, os.Stdout, cmd)
 	case "bucket":
 		return bucket(creds, args[1:])
@@ -257,7 +257,7 @@ var unknownKey = regexp.MustCompile(`line (\d+): field (\S+) not found in type \
 func appFileError(err error) error {
 	message := unknownKey.ReplaceAllString(err.Error(), "line $1: unknown key `$2`")
 	message = strings.TrimPrefix(strings.ReplaceAll(message, "yaml: unmarshal errors:\n  ", ""), "yaml: ")
-	return fmt.Errorf("chasen.yml: %s\n  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes, backup.\n  %s%s", message, docsURL, docsAppFile)
+	return fmt.Errorf("chasen.yml: %s\n  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes, memory, backup.\n  %s%s", message, docsURL, docsAppFile)
 }
 
 // bucket shows where the backups of the server go, or sets the bucket: the

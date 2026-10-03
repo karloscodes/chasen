@@ -223,6 +223,15 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("alerts say what is wrong with the server, through the API", func(t *testing.T) {
+		out := must(app, bin, "alerts")
+
+		// What the machine of the test lacks is not known here: the check answers, with its time.
+		if !strings.Contains(out, "Checked at") {
+			t.Errorf("alerts = %q, want the time of the check", out)
+		}
+	})
+
 	t.Run("a private image needs the login of its registry", func(t *testing.T) {
 		t.Setenv("REGISTRY_PASSWORD", "wrong")
 

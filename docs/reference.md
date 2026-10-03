@@ -34,6 +34,7 @@
 | `chasen remove` | Stop the app. Keeps the data and the backups |
 | `chasen list` | List all apps on the server |
 | `chasen load` | Show how busy the server is: the load, the memory in use, and the disk of the apps |
+| `chasen alerts` | Show what is wrong with the server, or puts it at risk. See "Alerts" below |
 | `chasen bucket` | Show where the backups of the server go. With `--endpoint`, `--name`, and `--access-key-id`: send them to an S3 bucket too |
 
 On the server, as root:
@@ -43,7 +44,8 @@ On the server, as root:
 | `chasen-server setup --domain <domain>` | Start the proxy and the API, and the timer of the nightly update |
 | `chasen-server bucket ...` | Set the S3 bucket for offsite backups. From your computer it is `chasen bucket ...` |
 | `chasen-server update` | Install the newest release now. The timer does this each night |
-| `chasen-server check` | Report what the security of the server lacks |
+| `chasen-server check` | The same as `chasen alerts`, on the server |
+| `chasen-server settings quiet_alerts <name,name>` | Turn alerts off by their name: `firewall` when the firewall of your provider does that job. An empty value turns them all on again |
 | `chasen-server list` | List all apps |
 | `chasen-server quiet-hour` | Print the hour of the day with the fewest requests in the last week, for work that takes the server away |
 | `chasen-server backup` | Back up every app now |
@@ -118,6 +120,7 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 | `a`, `x` | On the domains tab: add a domain, remove the chosen domain |
 | `o` | Open the app in the browser |
 | `s` | Go to another server that you are logged in to |
+| `!` | Show the alerts of the server, with their fix |
 | `g` | Load everything again |
 | `?` | Show the keys |
 | `q` | Close |
@@ -130,7 +133,28 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 
 A restart, a restore, and the removal of a domain ask first. Each action is a command of this page, so the screen can do nothing that the commands cannot. Without a terminal, or without a login, `chasen` prints its usage.
 
+**The alerts of the server** are in the top line, and `!` shows them with their fix. They refresh every minute.
+
 **The colors follow your theme.** On [Omarchy](https://omarchy.org), the screen takes the accent and the red of the current theme, and changes with it when you switch themes. With `CHASEN_THEME=ansi`, it uses the 16 colors of your terminal, so any terminal theme applies. Without either, it uses the amber of Chasen. The screen has no color when `NO_COLOR` is set.
+
+## Alerts
+
+`chasen alerts` says what is wrong with the server now (an error), and what puts it at risk or goes wrong soon (a warning). Each alert has its fix. The screen asks for them every minute: the top line counts them, and `!` shows them.
+
+| Alert | Level | Name |
+|---|---|---|
+| An app does not run, or starts again and again | error | `app` |
+| The newest backup of an app is more than two hours old: the hourly backup fails | error | `backups` |
+| The live replica misses changes for more than 10 minutes | error | `replica` |
+| The disk is 90% full or more (80%: a warning) | error | `disk` |
+| Less than 10% of the memory is free | warning | `memory` |
+| SSH accepts passwords | warning | `ssh` |
+| No firewall runs on the server (ufw, or nftables that drops what it does not allow) | warning | `firewall` |
+| The server does not install its security updates by itself (Debian and Ubuntu) | warning | `updates` |
+| An update waits for a reboot for more than a day | warning | `reboot` |
+| The nightly update of `chasen-server` is off | warning | `auto_update` |
+
+The server looks when you ask: nothing runs in the background. Chasen does not fix these for you: the operating system is yours. When an alert does not apply, turn it off by its name on the server, for example when the firewall of your provider protects the server: `chasen-server settings quiet_alerts firewall`.
 
 ## Several servers
 

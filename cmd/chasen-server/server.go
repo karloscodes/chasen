@@ -42,6 +42,9 @@ type serverConfig struct {
 	// AutoUpdate turns the nightly update off when it is false. Without the
 	// setting, the server updates itself.
 	AutoUpdate *bool `yaml:"auto_update,omitempty"`
+	// QuietAlerts are the alerts that the owner turned off, by their name:
+	// "firewall" when the firewall of the provider does that job.
+	QuietAlerts []string `yaml:"-"`
 }
 
 // CHASEN_ROOT moves all server state under one directory. Tests use it.
@@ -62,10 +65,12 @@ func runServer(args []string) error {
 	case "setup":
 		return serverSetup(args)
 	case "check":
-		// With no arguments: the security check of the server. With an app: the standard.
+		// With no arguments: the alerts of the server, its security among them. With an app: the standard.
 		if len(args) == 0 {
-			return matcha.Check()
+			return serverAlerts()
 		}
+	case "alerts":
+		return serverAlerts()
 	case "bucket":
 		return serverBucket(args)
 	case "settings":
@@ -240,6 +245,9 @@ func readServerConfig() (cfg serverConfig, found bool, err error) {
 		on := value == "true"
 		cfg.AutoUpdate = &on
 	}
+	if saved["quiet_alerts"] != "" {
+		cfg.QuietAlerts = strings.Split(saved["quiet_alerts"], ",")
+	}
 	if saved["s3_bucket"] != "" {
 		cfg.Backup.S3 = &s3Config{
 			Endpoint:        saved["s3_endpoint"],
@@ -255,7 +263,7 @@ func readServerConfig() (cfg serverConfig, found bool, err error) {
 // saveServerConfig replaces the settings in the database. A value that is
 // empty has no row.
 func saveServerConfig(cfg serverConfig) error {
-	values := map[string]string{"domain": cfg.Domain, "token": cfg.Token, "heartbeat_url": cfg.Backup.HeartbeatURL}
+	values := map[string]string{"domain": cfg.Domain, "token": cfg.Token, "heartbeat_url": cfg.Backup.HeartbeatURL, "quiet_alerts": strings.Join(cfg.QuietAlerts, ",")}
 	if cfg.AutoUpdate != nil {
 		values["auto_update"] = strconv.FormatBool(*cfg.AutoUpdate)
 	}
@@ -288,8 +296,8 @@ func saveServerConfig(cfg serverConfig) error {
 	return tx.Commit()
 }
 
-// serverSettings shows the settings of the server, or changes one of the two
-// that have no other command: auto_update and heartbeat_url.
+// serverSettings shows the settings of the server, or changes one of those
+// that have no other command: auto_update, heartbeat_url, and quiet_alerts.
 func serverSettings(args []string) error {
 	cfg, err := loadServerConfig()
 	if err != nil {
@@ -307,7 +315,7 @@ func serverSettings(args []string) error {
 		if cfg.Backup.HeartbeatURL != "" {
 			heartbeat = cfg.Backup.HeartbeatURL
 		}
-		fmt.Printf("domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\n", cmp.Or(cfg.Domain, "none: each app brings its domain"), update, heartbeat, bucket)
+		fmt.Printf("domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\nquiet_alerts   %s\n", cmp.Or(cfg.Domain, "none: each app brings its domain"), update, heartbeat, bucket, cmp.Or(strings.Join(cfg.QuietAlerts, ","), "none"))
 		fmt.Println("\nThe token: chasen-server token. The bucket: chasen-server bucket.")
 		return nil
 	case len(args) == 2 && args[0] == "auto_update" && (args[1] == "on" || args[1] == "off"):
@@ -336,8 +344,24 @@ func serverSettings(args []string) error {
 			fmt.Println("The server calls the URL after each hourly backup that worked.")
 		}
 		return nil
+	case len(args) == 2 && args[0] == "quiet_alerts":
+		cfg.QuietAlerts = nil
+		for _, name := range strings.Split(args[1], ",") {
+			if name = strings.TrimSpace(name); name != "" && !slices.Contains(cfg.QuietAlerts, name) {
+				cfg.QuietAlerts = append(cfg.QuietAlerts, name)
+			}
+		}
+		if err := saveServerConfig(cfg); err != nil {
+			return err
+		}
+		if len(cfg.QuietAlerts) == 0 {
+			fmt.Println("Every alert is on.")
+		} else {
+			fmt.Println("These alerts are off:", strings.Join(cfg.QuietAlerts, ", "))
+		}
+		return nil
 	}
-	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url>]")
+	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url> | quiet_alerts <name,name>]")
 }
 
 // serverBucket sets the S3 bucket for the offsite backups and the live

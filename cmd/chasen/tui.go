@@ -139,6 +139,11 @@ type tui struct {
 	// stats is the output of `chasen load`: how busy the server is.
 	stats   []string
 	noStats bool // the server is older than the load command: do not ask again
+	// alerts is what `chasen alerts` said last: what is wrong with the
+	// server, or puts it at risk. The screen asks again every minute.
+	alerts        []alertRow
+	alertsChecked string // the last line: when the server looked
+	noAlerts      bool   // the server, or the cloud, has no alerts command: do not ask again
 	frame   int  // for the spinner
 	events  chan any
 	now     func() time.Time
@@ -154,6 +159,10 @@ type (
 		err    error
 	}
 	statsEvent struct {
+		output string
+		failed bool
+	}
+	alertsEvent struct {
 		output string
 		failed bool
 	}
@@ -380,6 +389,7 @@ func (t *tui) loadApps() {
 		_, err := run(context.Background(), &out, "list")
 		t.events <- appsEvent{out.String(), err}
 	}()
+	t.loadAlerts()
 	if t.noStats {
 		return
 	}
@@ -388,6 +398,68 @@ func (t *tui) loadApps() {
 		code, err := run(context.Background(), &out, "load")
 		t.events <- statsEvent{out.String(), err != nil || code != 0}
 	}()
+}
+
+// alertsTitle is the title of the overlay of the alerts.
+const alertsTitle = "alerts · refreshed every 1m"
+
+// alertLines are the alerts for their overlay: each one with its fix under it.
+func (t *tui) alertLines() []string {
+	var lines []string
+	for _, a := range t.alerts {
+		level := "WARNING"
+		if a.error {
+			level = "ERROR  "
+		}
+		lines = append(lines, level+"  "+a.what)
+		if a.fix != "" {
+			lines = append(lines, "         "+a.fix)
+		}
+		lines = append(lines, "")
+	}
+	if t.alertsChecked != "" {
+		lines = append(lines, t.alertsChecked)
+	} else {
+		lines = append(lines, "Asking the server...")
+	}
+	return lines
+}
+
+// loadAlerts asks the server what is wrong with it.
+func (t *tui) loadAlerts() {
+	if t.noAlerts {
+		return
+	}
+	run := t.run
+	go func() {
+		var out strings.Builder
+		code, err := run(context.Background(), &out, "alerts")
+		t.events <- alertsEvent{out.String(), err != nil || code != 0}
+	}()
+}
+
+// alertRow is one alert: its level, what is wrong, and the fix.
+type alertRow struct {
+	error     bool
+	what, fix string
+}
+
+// parseAlerts reads the output of chasen alerts: a line with the level and
+// what is wrong, then an indented line with the fix, and at the end the time
+// of the check.
+func parseAlerts(output string) (alerts []alertRow, checked string) {
+	for _, line := range cleanLines(output) {
+		switch {
+		case strings.HasPrefix(line, "ERROR "), strings.HasPrefix(line, "WARNING "):
+			level, what, _ := strings.Cut(line, " ")
+			alerts = append(alerts, alertRow{level == "ERROR", strings.TrimSpace(what), ""})
+		case strings.HasPrefix(line, "         ") && len(alerts) > 0:
+			alerts[len(alerts)-1].fix = strings.TrimSpace(line)
+		case strings.TrimSpace(line) != "":
+			checked = strings.TrimSpace(line)
+		}
+	}
+	return alerts, checked
 }
 
 // load asks the server for one tab of one app. The logs are a stream, and
@@ -569,6 +641,10 @@ func (t *tui) handle(event any) bool {
 				t.load(app.Name, tabHistory)
 			}
 		}
+		// Every minute, ask for the alerts of the server.
+		if t.frame%480 == 0 {
+			t.loadAlerts()
+		}
 		// Every second, follow what runs now, and the colors of the theme.
 		if t.frame%8 == 0 {
 			t.follow()
@@ -601,6 +677,16 @@ func (t *tui) handle(event any) bool {
 			for _, app := range t.apps {
 				t.load(app.Name, tabOverview) // the state of each app, for its dot
 			}
+		}
+	case alertsEvent:
+		// A server from before the alerts command, or the cloud, answers with an error.
+		t.noAlerts = e.failed
+		t.alerts, t.alertsChecked = nil, ""
+		if !e.failed {
+			t.alerts, t.alertsChecked = parseAlerts(e.output)
+		}
+		if o := t.overlay; o != nil && o.title == alertsTitle {
+			o.lines = t.alertLines()
 		}
 	case statsEvent:
 		// A server from before the load command answers with an error.
@@ -676,6 +762,12 @@ func (t *tui) key(key string) bool {
 		return false
 	case "?":
 		t.overlay = &overlay{title: "keys", lines: helpLines, headings: true}
+	case "!":
+		if t.noAlerts {
+			t.message = "This server has no alerts. chasen update, and the next update of the server, bring them."
+		} else {
+			t.overlay = &overlay{title: alertsTitle, lines: t.alertLines()}
+		}
 	case "g":
 		t.loadApps()
 		t.show()
@@ -1079,6 +1171,8 @@ Change the app
 
 The screen
   g    load everything again
+  !    the alerts of the server: what is wrong, and what puts it at risk.
+       They refresh every minute
   s    go to another server
   q    close
 

@@ -218,10 +218,35 @@ func (t *tui) firstLine(width int) string {
 	if stats := t.statCells(); !t.cornerFits() && utf8.RuneCountInString(t.server)+60 < width {
 		right = append(stats, right...)
 	}
+	// The alerts come before everything else in the corner: ! opens them.
+	right = append(t.alertCells(), right...)
 	if t.update != "" && utf8.RuneCountInString(t.server)+100 < width {
 		right = append([]cell{{t.update + " is out: chasen update    ", colorAccent}}, right...)
 	}
 	return spread(width, left, right)
+}
+
+// alertCells counts the alerts of the server: "! 1 error  2 warnings", the
+// errors in red. No alert, no cells.
+func (t *tui) alertCells() []cell {
+	errors := 0
+	for _, a := range t.alerts {
+		if a.error {
+			errors++
+		}
+	}
+	warnings := len(t.alerts) - errors
+	if len(t.alerts) == 0 {
+		return nil
+	}
+	cells := []cell{{"! ", colorAccent}}
+	if errors > 0 {
+		cells = append(cells, cell{plural(errors, "error") + "  ", colorBad})
+	}
+	if warnings > 0 {
+		cells = append(cells, cell{plural(warnings, "warning") + "  ", colorAccent})
+	}
+	return append(cells, cell{"  ", ""})
 }
 
 var (
@@ -283,6 +308,9 @@ func (t *tui) keys() [][2]string {
 		// With more than one login, the way to the other servers is in view.
 		if len(t.servers) > 1 {
 			keys = append(keys, [2]string{"s", "servers"})
+		}
+		if len(t.alerts) > 0 {
+			keys = append(keys, [2]string{"!", "alerts"})
 		}
 		return append(keys, [2]string{"?", "keys"}, [2]string{"q", "close"})
 	}
