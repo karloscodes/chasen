@@ -4,7 +4,7 @@ Enter your app. Run `chasen deploy`. It is live.
 
 A chasen is the bamboo whisk that prepares matcha. Chasen is the tool you hold; [matcha](https://github.com/karloscodes/matcha) is the engine underneath.
 
-Chasen deploys the Docker image of an app with a SQLite database to one server. You get HTTPS, deploys without downtime, custom domains, and backups you can trust. `chasen deploy` builds the image on your computer or in CI and pushes it to a registry. The server pulls it: nothing builds on the server. There is no YAML pipeline of ours, and the server needs no name in DNS: the CLI reaches it through SSH.
+Chasen deploys the Docker image of an app with a SQLite database to one server. You get HTTPS, deploys without downtime, custom domains, and backups you can trust. `chasen deploy` builds the image on your computer or in CI and sends it to the server through SSH: no registry, no token, nothing builds on the server. There is no YAML pipeline of ours, and the server needs no name in DNS.
 
 It is free and open source, and it runs on a server you own. The site is [chasenhq.com](https://chasenhq.com), and [the docs](https://chasenhq.com/docs/) start with a step-by-step guide.
 
@@ -24,16 +24,16 @@ No server yet? [Chasen cloud](https://chasenhq.com/cloud/) creates one for you a
 ```
 your computer                               your server
 chasen deploy                               chasen-server, one binary, in a container
-  builds the image of your commit             pulls the image, backs up the databases,
-  pushes it to a registry                     starts the new version next to the old one,
-  talks to the server through SSH  ───────▶   moves the traffic when /up answers
+  builds the image of your commit             pulls the image through SSH, backs up the
+  sends it through SSH, no registry ──────▶   databases, starts the new version next to
+                                              the old one, moves the traffic when /up answers
                                               hourly checked backups, a live replica to S3,
                                               the history of every deploy, alerts
 ```
 
 - `chasen` is the CLI on your computer. It is all you run.
 - It reaches the server through your own `ssh`: your keys, your `~/.ssh/config`. A server with a base domain also answers on the web at `https://api.<domain>`, for CI and for a login with a browser. Both ways speak [one protocol](docs/protocol.md).
-- `chasen deploy` builds the image where it runs, your computer or CI, and the server pulls it. A server never builds: a build would take the memory and the CPU of the live apps.
+- `chasen deploy` builds the image where it runs, your computer or CI, and the server pulls it from there through SSH. No registry and no token, unless you want one: `ghcr.io` and Docker Hub work too. A server never builds: a build would take the memory and the CPU of the live apps.
 - Under it are [kamal-proxy](https://github.com/basecamp/kamal-proxy) for HTTPS and deploys without downtime, and [Litestream](https://litestream.io) for the live replica, both inside `chasen-server`. The server needs Docker, and installs it when it has none.
 
 ## The server part
