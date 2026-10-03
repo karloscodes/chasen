@@ -59,7 +59,9 @@ func TestOffsiteBackup(t *testing.T) {
 		t.Setenv("CHASEN_ROOT", t.TempDir())
 		file := filepath.Join(t.TempDir(), "db.gz")
 		os.WriteFile(file, []byte("x"), 0600)
-		for _, stamp := range []string{"20260101T100000Z", "20260101T103000Z"} {
+		// Two backups in one hour, more than a day before the newest: the
+		// newest of that hour stays.
+		for _, stamp := range []string{"20260101T100000Z", "20260101T103000Z", "20260102T120000Z"} {
 			if err := s3.putFile("prune/snapshots/"+stamp+"/db.sqlite3.gz", file); err != nil {
 				t.Fatal(err)
 			}
@@ -71,8 +73,8 @@ func TestOffsiteBackup(t *testing.T) {
 			t.Fatal(err)
 		}
 		left, _ := s3.list("prune/snapshots/")
-		if len(left) != 1 || left[0] != "prune/snapshots/20260101T103000Z/db.sqlite3.gz" {
-			t.Errorf("offsite backups after prune = %v, want only the 10:30 backup", left)
+		if len(left) != 2 || left[0] != "prune/snapshots/20260101T103000Z/db.sqlite3.gz" || left[1] != "prune/snapshots/20260102T120000Z/db.sqlite3.gz" {
+			t.Errorf("offsite backups after prune = %v, want the 10:30 backup and the newest", left)
 		}
 	})
 
