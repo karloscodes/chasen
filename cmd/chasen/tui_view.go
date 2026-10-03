@@ -222,7 +222,7 @@ func (t *tui) firstLine(width int) string {
 	// The alerts come before everything else in the corner: ! opens them.
 	right = append(t.alertCells(), right...)
 	if t.update != "" && utf8.RuneCountInString(t.server)+100 < width {
-		right = append([]cell{{t.update + " is out: chasen update    ", colorAccent}}, right...)
+		right = append([]cell{{t.update + " installs when you quit    ", colorAccent}}, right...)
 	}
 	return spread(width, left, right)
 }

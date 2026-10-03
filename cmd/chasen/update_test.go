@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -79,6 +80,22 @@ func TestUpdate(t *testing.T) {
 
 		if err != nil || changed {
 			t.Fatalf("updateFile = %v, %v", changed, err)
+		}
+	})
+
+	t.Run("says to use sudo when the program is in a directory of another user", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("root can write everywhere")
+		}
+		self := installed(t, "old program")
+		os.Chmod(filepath.Dir(self), 0555)
+		t.Cleanup(func() { os.Chmod(filepath.Dir(self), 0755) })
+		server := releaseServer(t, "new program", checksum([]byte("new program")))
+
+		changed, err := updateFile(self, server.URL)
+
+		if !errors.Is(err, errNeedsSudo) || changed || content(t, self) != "old program" {
+			t.Fatalf("updateFile = %v, %v, and the file is %q", changed, err, content(t, self))
 		}
 	})
 }

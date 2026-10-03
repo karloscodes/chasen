@@ -21,10 +21,11 @@ import (
 	"golang.org/x/term"
 )
 
-// The CLI does not replace itself without being asked: it runs on the machine
-// of a person, and in CI, where a program that changes between two commands
-// is a surprise. Once a day it looks for a newer release and says so in one
-// line. `chasen update` installs it.
+// The CLI updates itself for a person at a terminal: once a day it looks for
+// a newer release, and after a command that worked it installs it, with the
+// check of the checksum. Never in CI, where a program that changes between
+// two commands is a surprise, and never for a development build.
+// CHASEN_NO_UPDATE_CHECK=1 turns it off. `chasen update` installs it now.
 
 const (
 	releaseFiles  = "https://github.com/karloscodes/chasen/releases/latest/download"
@@ -56,6 +57,32 @@ func update() error {
 	installed, _ := exec.Command(self, "version").Output()
 	fmt.Printf("Updated: %s (it was %s)\n", strings.TrimSpace(string(installed)), version)
 	return nil
+}
+
+// errNeedsSudo means the file of chasen belongs to another user: root, when
+// the install used sudo.
+var errNeedsSudo = errors.New("Run: sudo chasen update")
+
+// autoUpdate installs the release latest after a command, and says so in
+// one line. When it cannot, it says what to run.
+func autoUpdate(latest string) {
+	self, err := os.Executable()
+	if err == nil {
+		self, err = filepath.EvalSymlinks(self)
+	}
+	if err != nil {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "\nUpdating chasen to %s...\n", latest)
+	changed, err := updateFile(self, strings.TrimRight(cmp.Or(os.Getenv("CHASEN_DOWNLOADS"), releaseFiles), "/"))
+	switch {
+	case errors.Is(err, errNeedsSudo):
+		fmt.Fprintf(os.Stderr, "chasen %s is out. You have %s, in %s, which needs sudo. Run: sudo chasen update\n", latest, version, filepath.Dir(self))
+	case err != nil:
+		fmt.Fprintf(os.Stderr, "chasen %s is out, and the update failed: %v. Run: chasen update\n", latest, err)
+	case changed:
+		fmt.Fprintf(os.Stderr, "Updated chasen to %s (it was %s).\n", latest, version)
+	}
 }
 
 // updateFile replaces the program file with the one of the release at base.
@@ -95,7 +122,7 @@ func updateFile(self, base string) (changed bool, err error) {
 	next := self + ".new"
 	if err := os.WriteFile(next, fresh, 0755); err != nil {
 		if errors.Is(err, fs.ErrPermission) {
-			return false, fmt.Errorf("%s belongs to another user. Run: sudo chasen update", self)
+			return false, fmt.Errorf("%s belongs to another user. %w", self, errNeedsSudo)
 		}
 		return false, err
 	}

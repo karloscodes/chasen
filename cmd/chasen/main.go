@@ -96,6 +96,9 @@ func main() {
 						fmt.Fprintln(os.Stderr, "Error:", err)
 						os.Exit(1)
 					}
+					if screen.update != "" {
+						autoUpdate(screen.update)
+					}
 					return
 				}
 			}
@@ -117,7 +120,7 @@ func main() {
 	default:
 		err = runClient(os.Args[1:])
 		if latest := newerRelease(); err == nil && latest != "" {
-			fmt.Fprintf(os.Stderr, "\nchasen %s is out. You have %s. Run: chasen update\n", latest, version)
+			autoUpdate(latest)
 		}
 	}
 

@@ -11,7 +11,7 @@
 | `chasen servers` | List the servers you are logged in to. The star marks the current one |
 | `chasen use [server]` | Make another server the current one: its number in `chasen servers`, a part of its address, or `cloud`. With nothing, it shows the list and asks |
 | `chasen logout` | Forget the login, here and on the server |
-| `chasen update` | Install the newest release of the CLI, after a check of its checksum. `chasen` tells you when there is one |
+| `chasen update` | Install the newest release of the CLI now, after a check of its checksum. At a terminal, `chasen` does it by itself once a day, after a command that works. Never in CI. `CHASEN_NO_UPDATE_CHECK=1` turns it off |
 | `chasen report` | Something is wrong with Chasen? Open a new issue on GitHub, with your version and your system filled in. It sends nothing by itself |
 | `chasen deploy` | Build the image of the current git commit, push it, and deploy it. Or deploy a static website. In a folder with an `image:` in `chasen.yml` and no `Dockerfile`: deploy the newest image, with no build. `--tag <tag>` deploys an image that is already in the registry. `--domain <domain>` gives a new app its domain. In the cloud: `--on <id>` or `--new[=type@location]` picks the server of a new app |
 | `chasen check` | Test the current git commit against the standard. Changes nothing live |
@@ -240,4 +240,4 @@ The server has no config file: the database is all of it. An older version kept 
 - One container for each app. Each container gets 512 MB of memory unless `memory:` in `chasen.yml` says more.
 - SQLite only. Files in the storage that are not SQLite databases persist, but they have no backup.
 - A server never builds an image. `chasen deploy` builds it where it runs: your computer, or CI.
-- No rollback command. Deploy the previous commit again: `chasen deploy --tag <commit>`.
+- `chasen rollback` goes back one version, to the image that the server kept. For an older version, deploy its commit again.

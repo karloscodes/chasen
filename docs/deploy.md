@@ -115,6 +115,34 @@ chasen history 5      # the full output of that deploy
 
 The server records each deploy, restore, domain change, and removal, with its output.
 
+## Roll back
+
+A version that does not answer `/up` never gets traffic: the old version keeps running, and the deploy fails. So a rollback is for a version that starts and has a bug.
+
+```bash
+chasen rollback
+# Starting shop 3f9a2c1 again, the version before 6cff7df
+# Rolled back shop to 3f9a2c1. The data is as it was: chasen restore brings back a backup.
+```
+
+It takes seconds: the server keeps the image of the version before, so nothing is built or pulled. Run it again to go forward to the newer version.
+
+**The data stays as it is.** When the bad version changed the database, bring back the backup that Chasen made just before its deploy:
+
+```bash
+chasen backups                    # the newest first
+chasen restore 20261001T120000Z
+```
+
+**An older version** than the one before: check out its commit and deploy it. The build comes from the cache of Docker, so it is fast:
+
+```bash
+git checkout 727846a
+chasen deploy
+```
+
+When CI pushes your images to a registry, deploy the image that is there, with no build: `chasen deploy --tag <the full hash of the commit>`.
+
 ## The review before a deploy
 
 `chasen deploy` and `chasen check` review the app before they send anything. The review has two parts:
