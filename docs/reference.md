@@ -130,7 +130,7 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 
 A restart, a restore, and the removal of a domain ask first. Each action is a command of this page, so the screen can do nothing that the commands cannot. Without a terminal, or without a login, `chasen` prints its usage.
 
-The screen has no color when `NO_COLOR` is set.
+**The colors follow your theme.** On [Omarchy](https://omarchy.org), the screen takes the accent and the red of the current theme, and changes with it when you switch themes. With `CHASEN_THEME=ansi`, it uses the 16 colors of your terminal, so any terminal theme applies. Without either, it uses the amber of Chasen. The screen has no color when `NO_COLOR` is set.
 
 ## Several servers
 

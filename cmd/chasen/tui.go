@@ -569,9 +569,10 @@ func (t *tui) handle(event any) bool {
 				t.load(app.Name, tabHistory)
 			}
 		}
-		// Every second, follow what runs now.
+		// Every second, follow what runs now, and the colors of the theme.
 		if t.frame%8 == 0 {
 			t.follow()
+			followTheme()
 		}
 	case appsEvent:
 		t.appsLoaded = true
@@ -1185,6 +1186,7 @@ func serverScreen(creds credentials, cwdApp string) *tui {
 
 // runScreen opens the screen in the terminal and stays until the user closes it.
 func runScreen(t *tui) error {
+	followTheme()
 	fd := int(os.Stdin.Fd())
 	before, err := term.MakeRaw(fd)
 	if err != nil {
