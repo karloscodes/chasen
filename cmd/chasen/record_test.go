@@ -56,7 +56,21 @@ func TestRecordTheScreen(t *testing.T) {
 	ui.now = func() time.Time { return now }
 	ui.servers = []string{"example.com", "example.org"}
 	run := ui.run
-	ui.change = func(server string) (runner, string, error) { return run, server, nil }
+	// The second server holds a staging copy of shop: its own list, and the
+	// answers of the mock for the rest.
+	staging := func(ctx context.Context, out io.Writer, args ...string) (int, error) {
+		if args[0] == "list" {
+			io.WriteString(out, "NAME   VERSION       DOMAINS\nshop   9d8c7b6a1f2e  shop.example.org\n")
+			return 0, nil
+		}
+		return run(ctx, out, args...)
+	}
+	ui.change = func(server string) (runner, string, error) {
+		if server == "example.org" {
+			return staging, server, nil
+		}
+		return run, server, nil
+	}
 	colorsOn = true
 	sc := &screen{t, ui}
 	followTheme()
@@ -88,8 +102,9 @@ func TestRecordTheScreen(t *testing.T) {
 	press("tab", "the domains: a adds one", "tab")
 	press(":", "run any command: the help narrows as you type", "1", ":", "r", "e")
 	press("!", "the alerts of the server, refreshed every minute", "esc", "!")
-	press("s", "your other servers", "esc", "s")
-	press("t", "theme: monochrome", "esc", "t")
+	press("↓", "every server is in the list: down goes on to the next one", "esc", "left", "down")
+	press("↑", "and back", "up")
+	press("t", "theme: monochrome", "t")
 	press("t", "theme: the one of Omarchy", "t")
 	press("t", "theme: the colors of your terminal", "t")
 	press("t", "theme: chasen", "t")

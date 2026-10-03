@@ -305,27 +305,34 @@ func TestScreen(t *testing.T) {
 		}
 	})
 
-	t.Run("s goes to another server that the user is logged in to", func(t *testing.T) {
+	t.Run("every server is in the list with its apps, and the keys go from one to the next", func(t *testing.T) {
 		one, two := newTestServer(t), newTestServer(t)
 		two.apps = "NAME   VERSION  DOMAINS\nwiki   9d8c7b6  wiki.example.org\n"
 		sc := openScreen(t, one, "shop")
 		sc.tui.servers = []string{"example.com", "example.org"}
 		sc.tui.change = func(server string) (runner, string, error) {
 			client := protocol.Client{URL: two.URL, Token: "token"}
+			if server == "example.com" {
+				client.URL = one.URL
+			}
 			return func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 				return client.Run(ctx, args[0], args[1:], nil, out)
 			}, server, nil
 		}
-		sc.shows("s servers")
+		sc.tui.loadApps()
+		sc.settle()
+		sc.shows(" servers", " example.com", "▸ ● shop", " example.org", "○ wiki")
 
+		// shop is the last app of example.com: down goes on to the first app of example.org.
+		sc.press("down")
+		sc.shows("chasen  example.org", "1 app", "▸ ● wiki", "○ blog", "○ shop")
+
+		sc.press("up")
+		sc.shows("chasen  example.com", "▸ ● shop", "○ wiki")
+
+		// s still lists the servers, for one that has no app yet.
 		sc.press("s")
 		sc.shows("servers", "▸ example.com", "example.org")
-		sc.press("down", "enter")
-
-		sc.shows("chasen  example.org", "1 app", "▸ ● wiki")
-		if text := sc.text(); strings.Contains(text, "● blog") || strings.Contains(text, "● lognorth") {
-			t.Errorf("the apps of the first server are still on the screen:\n%s", text)
-		}
 	})
 
 	t.Run("each tab and each action shows the line of the CLI that does the same", func(t *testing.T) {
@@ -437,12 +444,12 @@ func TestScreen(t *testing.T) {
 		sc.shows("chasen", "Opening example.com", "s  another server", whisk[0])
 	})
 
-	t.Run("the way to the other servers is next to the name of the server, and t is in the keys", func(t *testing.T) {
+	t.Run("t is in the keys, and one server keeps the list of apps as it was", func(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 
-		sc.shows("example.com  s servers", "t theme")
-		if strings.Count(sc.text(), "s servers") != 1 {
-			t.Error("s servers is in the screen two times")
+		sc.shows(" apps", "t theme")
+		if strings.Contains(sc.text(), "servers") {
+			t.Error("a screen with one server shows the servers")
 		}
 	})
 

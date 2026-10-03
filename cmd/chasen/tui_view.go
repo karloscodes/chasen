@@ -213,8 +213,6 @@ func (t *tui) firstLine(width int) string {
 		count = itoa(len(t.apps)) + " apps "
 	}
 	left := []cell{{" chasen", colorAccent + ";" + colorBold}, {"  " + t.server, ""}}
-	// The way to the other servers sits next to the name of this one.
-	left = append(left, cell{"  s", colorAccent}, cell{" servers", colorDim})
 	// In the corner: how busy the server is, then the count of the apps. A
 	// narrow window drops the notice of a new release first, then the numbers.
 	right := []cell{{count, colorDim}}
@@ -409,6 +407,12 @@ func (t *tui) columns(width, height int) []string {
 	for _, app := range t.apps {
 		left = max(left, utf8.RuneCountInString(app.Name)+7)
 	}
+	for _, server := range t.servers {
+		left = max(left, utf8.RuneCountInString(server)+3)
+		for _, app := range t.tree[server] {
+			left = max(left, utf8.RuneCountInString(app.Name)+7)
+		}
+	}
 	left = min(left, 30, width/3)
 	right := width - left - 3
 
@@ -417,13 +421,21 @@ func (t *tui) columns(width, height int) []string {
 		label = colorAccent
 	}
 	leftLines := []string{paint(fit(" apps", left), label), strings.Repeat(" ", left)}
-	start, end := window(len(t.apps), height-2, t.selected)
-	for i := start; i < end; i++ {
-		leftLines = append(leftLines, t.appLine(i, left))
-	}
 	// For the mouse: the body starts at line 3, the apps two lines lower, and
 	// the tab starts after the side of the apps and the line between them.
-	t.hit = hits{left: left, appTop: 5, appFirst: start}
+	if len(t.servers) > 1 && t.change != nil {
+		leftLines[0] = paint(fit(" servers", left), label)
+		refs, lines, chosen := t.treeLines(left)
+		start, end := window(len(lines), height-2, chosen)
+		leftLines = append(leftLines, lines[start:end]...)
+		t.hit = hits{left: left, appTop: 5, tree: refs[start:end]}
+	} else {
+		start, end := window(len(t.apps), height-2, t.selected)
+		for i := start; i < end; i++ {
+			leftLines = append(leftLines, t.appLine(i, left))
+		}
+		t.hit = hits{left: left, appTop: 5, appFirst: start}
+	}
 	column := left + 4
 	for _, name := range tabNames {
 		t.hit.tabs = append(t.hit.tabs, [2]int{column, column + utf8.RuneCountInString(name) - 1})
@@ -453,6 +465,36 @@ func (t *tui) columns(width, height int) []string {
 		lines[i] = l + paint(" │ ", colorDim) + r
 	}
 	return lines
+}
+
+// treeLines draws every server with its apps under it. The current server
+// has its apps with their state; the others have their names, dim, until the
+// keys go there. It returns what each line is, for the mouse, and the line of
+// the chosen app.
+func (t *tui) treeLines(width int) (refs []treeRef, lines []string, chosen int) {
+	for _, server := range t.servers {
+		color := colorDim
+		if server == t.server {
+			color = colorBold
+		}
+		refs = append(refs, treeRef{server: server})
+		lines = append(lines, paint(fit(" "+server, width), color))
+		if server == t.server {
+			for i, app := range t.apps {
+				if i == t.selected {
+					chosen = len(lines)
+				}
+				refs = append(refs, treeRef{server, app.Name})
+				lines = append(lines, t.appLine(i, width))
+			}
+			continue
+		}
+		for _, app := range t.tree[server] {
+			refs = append(refs, treeRef{server, app.Name})
+			lines = append(lines, paint(fit("   ○ "+app.Name, width), colorDim))
+		}
+	}
+	return refs, lines, chosen
 }
 
 // stateColor is the color for the state of a container.

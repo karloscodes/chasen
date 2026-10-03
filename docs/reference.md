@@ -120,7 +120,7 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 | `b` | Back up the app now |
 | `a`, `x` | On the domains tab: add a domain, remove the chosen domain |
 | `o` | Open the app in the browser |
-| `s` | Go to another server that you are logged in to |
+| `s` | List the servers that you are logged in to, and go to one |
 | `!` | Show the alerts of the server, with their fix |
 | `t` | Go to the next theme of colors |
 | `g` | Load everything again |
@@ -190,7 +190,7 @@ chasen use 2                         # change it: the number, or a part of the a
 chasen use                           # or choose from the list
 ```
 
-In the screen (`chasen` with no command), `s` switches to another server.
+In the screen (`chasen` with no command), the list on the left has every server with its apps under it. The arrow keys go from the last app of one server to the first app of the next.
 
 An app can name its server in `chasen.yml`, so `chasen deploy` always goes to the right one:
 

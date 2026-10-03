@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -108,7 +109,11 @@ type hits struct {
 	tabs     [][2]int // the first and the last column of each tab name
 	rowTop   int      // the line of the first row of the tab
 	rowFirst int      // which row that is
+	tree     []treeRef // with several servers: what each line of the list is, from appTop
 }
+
+// treeRef is a line of the list of servers and apps: a server, or an app of it.
+type treeRef struct{ server, app string }
 
 type tui struct {
 	run     runner
@@ -116,6 +121,12 @@ type tui struct {
 	cwdApp  string // the app of the current directory, or ""
 	servers []string
 	change  func(server string) (runner, string, error) // go to another server
+	// tree has the apps of the other servers, for the list on the left: the
+	// screen shows every server with its apps, and the keys go from one to
+	// the next. The apps of the current server are apps.
+	tree   map[string][]appRow
+	listed bool   // the current server answered with its apps
+	want   string // the app to choose when the apps of a new server arrive
 
 	width, height int
 	apps          []appRow
@@ -164,6 +175,11 @@ type (
 	statsEvent struct {
 		output string
 		failed bool
+	}
+	treeEvent struct {
+		server string
+		output string
+		err    error
 	}
 	alertsEvent struct {
 		output string
@@ -393,6 +409,7 @@ func (t *tui) loadApps() {
 		t.events <- appsEvent{out.String(), err}
 	}()
 	t.loadAlerts()
+	t.loadTree()
 	if t.noStats {
 		return
 	}
@@ -401,6 +418,82 @@ func (t *tui) loadApps() {
 		code, err := run(context.Background(), &out, "load")
 		t.events <- statsEvent{out.String(), err != nil || code != 0}
 	}()
+}
+
+// loadTree asks each other server for its apps, for the tree on the left.
+func (t *tui) loadTree() {
+	if len(t.servers) < 2 || t.change == nil {
+		return
+	}
+	for _, name := range t.servers {
+		if name == t.server {
+			continue
+		}
+		run, _, err := t.change(name)
+		if err != nil {
+			continue
+		}
+		go func() {
+			var out strings.Builder
+			_, err := run(context.Background(), &out, "list")
+			t.events <- treeEvent{name, out.String(), err}
+		}()
+	}
+}
+
+// switchServer makes another server the current one, with app chosen, or
+// its first app. The apps it had are in the tree, so the list does not
+// empty while the server answers.
+func (t *tui) switchServer(name, app string) {
+	run, name, err := t.change(name)
+	if err != nil {
+		t.message = err.Error()
+		return
+	}
+	if t.tree == nil {
+		t.tree = map[string][]appRow{}
+	}
+	t.tree[t.server] = t.apps
+	t.stopLogs()
+	t.run, t.server = run, name
+	t.panes, t.stats, t.noStats = map[string]*pane{}, nil, false
+	t.alerts, t.alertsChecked, t.noAlerts = nil, "", false
+	t.apps, t.appsLoaded, t.listed, t.selected = t.tree[name], len(t.tree[name]) > 0, false, 0
+	t.cursor, t.scroll, t.filter, t.want = 0, 0, "", app
+	for i, a := range t.apps {
+		if a.Name == app {
+			t.selected = i
+		}
+	}
+	if t.appsLoaded {
+		t.show()
+	}
+	t.loadApps()
+}
+
+// crossServer goes from the first or the last app of a server to the next
+// server that has apps, in the direction of by. It reports whether it went.
+func (t *tui) crossServer(by int) bool {
+	if len(t.servers) < 2 || t.change == nil {
+		return false
+	}
+	step := 1
+	if by < 0 {
+		step = -1
+	}
+	for i := slices.Index(t.servers, t.server) + step; i >= 0 && i < len(t.servers); i += step {
+		apps := t.tree[t.servers[i]]
+		if len(apps) == 0 {
+			continue
+		}
+		app := apps[0].Name
+		if step < 0 {
+			app = apps[len(apps)-1].Name
+		}
+		t.switchServer(t.servers[i], app)
+		return true
+	}
+	return false
 }
 
 // alertsTitle is the title of the overlay of the alerts.
@@ -679,11 +772,14 @@ func (t *tui) handle(event any) bool {
 			break
 		}
 		name := t.app()
-		first := t.apps == nil
+		first := !t.listed
+		t.listed = true
 		t.apps, t.appsErr = parseApps(e.output), ""
-		// Keep the same app chosen. At the start, choose the app of this directory.
+		// Keep the same app chosen. At the start, choose the app of this
+		// directory; after a switch, the app that the keys went to.
 		if first {
-			name = t.cwdApp
+			name = cmp.Or(t.want, t.cwdApp)
+			t.want = ""
 		}
 		t.selected = max(0, min(t.selected, len(t.apps)-1))
 		for i, app := range t.apps {
@@ -696,6 +792,13 @@ func (t *tui) handle(event any) bool {
 			for _, app := range t.apps {
 				t.load(app.Name, tabOverview) // the state of each app, for its dot
 			}
+		}
+	case treeEvent:
+		if e.err == nil && e.server != t.server {
+			if t.tree == nil {
+				t.tree = map[string][]appRow{}
+			}
+			t.tree[e.server] = parseApps(e.output)
 		}
 	case alertsEvent:
 		// A server from before the alerts command, or the cloud, answers with an error.
@@ -881,6 +984,9 @@ func (t *tui) pageSize() int { return max(1, t.height-8) }
 func (t *tui) move(by int) {
 	switch {
 	case !t.inPane:
+		if next := t.selected + by; (next < 0 || next >= len(t.apps)) && t.crossServer(by) {
+			return
+		}
 		before := t.selected
 		t.selected = max(0, min(t.selected+by, len(t.apps)-1))
 		if t.selected != before {
@@ -1018,6 +1124,17 @@ func (t *tui) mouse(button, x, y int) {
 				return
 			}
 		}
+		if row := y - t.hit.appTop; onApps && len(t.hit.tree) > 0 && row >= 0 && row < len(t.hit.tree) {
+			r := t.hit.tree[row]
+			t.inPane = false
+			switch {
+			case r.server != t.server:
+				t.switchServer(r.server, r.app)
+			case r.app != "":
+				t.move(slices.IndexFunc(t.apps, func(a appRow) bool { return a.Name == r.app }) - t.selected)
+			}
+			return
+		}
 		if app := t.hit.appFirst + y - t.hit.appTop; onApps && y >= t.hit.appTop && app < len(t.apps) {
 			t.inPane = false
 			t.move(app - t.selected)
@@ -1088,18 +1205,7 @@ func (t *tui) chooseServer() {
 	}
 	o := &overlay{title: "servers", choices: t.servers}
 	o.cursor = max(0, slices.Index(t.servers, t.server))
-	o.pick = func(i int) {
-		run, name, err := t.change(t.servers[i])
-		if err != nil {
-			t.message = err.Error()
-			return
-		}
-		t.stopLogs()
-		t.run, t.server = run, name
-		t.apps, t.appsLoaded, t.selected, t.panes = nil, false, 0, map[string]*pane{}
-		t.stats, t.noStats = nil, false
-		t.loadApps()
-	}
+	o.pick = func(i int) { t.switchServer(t.servers[i], "") }
 	t.overlay = o
 }
 

@@ -1,6 +1,6 @@
 # Chasen on Omarchy
 
-On [Omarchy](https://omarchy.org), Chasen fits in three places: the menu of apps, the top bar, and the colors of your theme. Each one is a few lines, and none needs anything from Omarchy that it does not have.
+On [Omarchy](https://omarchy.org), Chasen fits in three places: the menu of apps, the top bar, and the colors of your theme. Each one is one command.
 
 ## In the menu of apps
 
@@ -12,9 +12,15 @@ Chasen is now in the app launcher (`Super + Space`). It opens the screen of your
 
 ## In the top bar
 
-The bar shows a dot and the number of alerts of all your servers, and nothing when there are none. The tooltip lists them, server by server. A click opens the screen.
+The plugin [omarchy-chasen](https://github.com/karloscodes/omarchy-chasen) puts a server icon in the bar of Omarchy. It is dim when all is well, normal when a server has a warning, and in the urgent color when something is wrong. Its tooltip lists the alerts of all your servers, and a click opens the screen.
 
-Add the module to `~/.config/waybar/config.jsonc`. Put `"custom/chasen"` in `modules-right`, then add this next to the other modules:
+```bash
+omarchy plugin add https://github.com/karloscodes/omarchy-chasen.git --enable
+```
+
+It runs `chasen alerts --waybar` once a minute. That asks every server that you are logged in to: a moment of SSH, and nothing runs on the server between two asks. [The reference](reference.md#alerts) lists the alerts. To remove it: `omarchy plugin remove karloscodes.chasen`.
+
+**With an Omarchy that has Waybar** (before its own shell), add a module instead. Put `"custom/chasen"` in `modules-right` of `~/.config/waybar/config.jsonc`, add this next to the other modules, and run `omarchy-restart-waybar`:
 
 ```jsonc
 "custom/chasen": {
@@ -24,18 +30,6 @@ Add the module to `~/.config/waybar/config.jsonc`. Put `"custom/chasen"` in `mod
   "on-click": "omarchy-launch-tui chasen"
 }
 ```
-
-Give it a color in `~/.config/waybar/style.css`:
-
-```css
-#custom-chasen { margin: 0 7.5px; }
-#custom-chasen.warning { color: #e0af68; }
-#custom-chasen.error { color: #f7768e; }
-```
-
-Then run `omarchy-restart-waybar`.
-
-`chasen alerts --waybar` asks every server that you are logged in to, once a minute. Each server answers from its own files: it costs a moment of SSH, and nothing runs on the server between two asks. [The reference](reference.md#alerts) lists the alerts.
 
 ## In the colors of your theme
 
