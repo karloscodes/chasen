@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS apps (
 	health_path    TEXT NOT NULL,
 	health_timeout INTEGER NOT NULL,
 	volumes        TEXT NOT NULL,
-	env            TEXT NOT NULL
+	env            TEXT NOT NULL,
+	memory         TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS replica_state (
 	db           TEXT PRIMARY KEY,
@@ -75,11 +76,31 @@ func openServerDB() (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+	// A database from a version before the memory setting gets its column.
+	if err := addColumn(db, "apps", "memory", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		db.Close()
+		return nil, err
+	}
 	if err := importApps(db); err != nil {
 		db.Close()
 		return nil, err
 	}
 	return db, nil
+}
+
+// addColumn adds a column that a newer version needs to the table of an
+// older version. Two processes can try at the same moment: the second one
+// finds the column there.
+func addColumn(db *sql.DB, table, column, kind string) error {
+	var found int
+	if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?", table, column).Scan(&found); err != nil || found > 0 {
+		return err
+	}
+	_, err := db.Exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + kind)
+	if err != nil && strings.Contains(err.Error(), "duplicate column") {
+		return nil
+	}
+	return err
 }
 
 // The feed keeps this many entries, and this much output of each one.

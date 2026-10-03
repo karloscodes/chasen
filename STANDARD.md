@@ -133,6 +133,7 @@ A secret is a variable whose value must not be in git or in the image.
 - Chasen reads the values on your computer at each deploy and sends them with it. A missing secret stops the deploy before it changes anything.
 - On the server, the values are in a file that only root can read, and they reach the container as environment variables. Whoever is root on the server can read them.
 - To rotate a secret, change it (`chasen secrets edit`) and run `chasen restart`. No build.
+- **Rails.** The key of the Rails credentials travels like a secret, with no setup: `RAILS_MASTER_KEY` gets the content of `config/credentials/production.key` when it exists, else of `config/master.key`. Git ignores both files, so in CI add `RAILS_MASTER_KEY` with `chasen secrets edit`. A value in the secrets wins over the file.
 
 Secrets travel with the deploy on purpose. Nothing that matters lives only on the server, so a server that is gone costs you a new server and a `chasen deploy`, not a hunt for lost keys. The secret key of the app follows the same rule: an app with a secrets file gets its `SECRET_KEY_BASE` in that file at the first deploy (see "Environment").
 
@@ -150,12 +151,12 @@ Secrets travel with the deploy on purpose. Nothing that matters lives only on th
 ## Limits an app must fit
 
 - One container for each app. No second process type (a worker) yet.
-- 512 MB of memory. The engine sets it, and it has no override yet.
+- 512 MB of memory by default. `memory: 1g` in `chasen.yml` gives an app more. One server runs several apps, so a limit keeps one app from taking the memory of the others.
 - No Postgres, MySQL, or Redis from Chasen. The app can use a service that runs elsewhere.
 
 ## Enforcement
 
-- **Before anything is sent: the review.** `chasen deploy` reads `chasen.yml` and the image it built. What cannot work is an error, and the deploy stops. What often fails is a warning, with the line to add to the `Dockerfile`. See [the review before a deploy](docs/deploy.md#the-review-before-a-deploy).
+- **Before anything is sent: the review.** `chasen deploy` reads `chasen.yml` and the image it built. What cannot work is an error, and the deploy stops. What often fails is a warning, with the fix. See [the review before a deploy](docs/deploy.md#the-review-before-a-deploy).
 - **At deploy.** The image must be in the registry, the container must start, and the health path must answer in time. Otherwise the deploy fails and the old version keeps the traffic.
 - **Before deploy: `chasen check`.** It pulls the image of the commit and starts it with no traffic and an empty storage. It reports each rule: the port answers, the health path returns `200` without a redirect, the storage is writable by the user of the image, no database file is outside the storage, a restart leaves the app healthy, and the app stops on `SIGTERM`. It changes nothing that is live.
 

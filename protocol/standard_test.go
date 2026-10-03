@@ -33,3 +33,18 @@ func TestSettingsCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestMemory(t *testing.T) {
+	for memory, valid := range map[string]bool{
+		"512m": true, "64m": true, "1g": true, "16g": true,
+		"32m": false, "1.5g": false, "512": false, "512M": false, "0g": false, "1t": false,
+	} {
+		t.Run(memory, func(t *testing.T) {
+			err := Settings{Memory: memory}.Check()
+
+			if valid && err != nil || !valid && (err == nil || !strings.Contains(err.Error(), "invalid memory")) {
+				t.Errorf("Check() with memory %q = %v, want valid %v", memory, err, valid)
+			}
+		})
+	}
+}

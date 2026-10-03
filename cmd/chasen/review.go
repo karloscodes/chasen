@@ -38,7 +38,6 @@ const (
 	docsAppFile    = "deploy/#chasenyml"
 	docsImage      = "deploy/#the-image"
 	docsDockerfile = "standard/#the-dockerfile-is-the-contract"
-	docsStorage    = "standard/#2-storage"
 	docsEnv        = "standard/#4-environment"
 	docsSecrets    = "standard/#5-secrets"
 )
@@ -68,7 +67,7 @@ func reviewAppFile(app appFile, dockerfile bool, tag string) []finding {
 	for _, name := range app.Secrets {
 		env[name] = ""
 	}
-	settings := protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes}
+	settings := protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes, Memory: app.Memory}
 	for _, err := range unjoin(settings.Check()) {
 		f := finding{true, "chasen.yml: " + err.Error(), "", docsAppFile}
 		if strings.HasPrefix(err.Error(), "chasen sets ") {
@@ -114,10 +113,9 @@ func reviewAppFile(app appFile, dockerfile bool, tag string) []finding {
 // imageFacts is what an image says about itself: the part of
 // `docker image inspect` that the standard reads.
 type imageFacts struct {
-	Ports      []int    // the TCP ports of EXPOSE, sorted
-	Volumes    []string // the paths of VOLUME, sorted
-	Command    bool     // the image has a CMD or an ENTRYPOINT
-	WorkingDir string
+	Ports   []int    // the TCP ports of EXPOSE, sorted
+	Volumes []string // the paths of VOLUME, sorted
+	Command bool     // the image has a CMD or an ENTRYPOINT
 }
 
 // inspectImage reads the facts of an image that this Docker has.
@@ -131,12 +129,11 @@ func inspectImage(image string) (imageFacts, error) {
 		Volumes      map[string]struct{}
 		Cmd          []string
 		Entrypoint   []string
-		WorkingDir   string
 	}
 	if err := json.Unmarshal(out, &config); err != nil {
 		return imageFacts{}, fmt.Errorf("cannot read the image %s: %w", image, err)
 	}
-	facts := imageFacts{Volumes: slices.Sorted(maps.Keys(config.Volumes)), Command: len(config.Cmd)+len(config.Entrypoint) > 0, WorkingDir: config.WorkingDir}
+	facts := imageFacts{Volumes: slices.Sorted(maps.Keys(config.Volumes)), Command: len(config.Cmd)+len(config.Entrypoint) > 0}
 	for key := range config.ExposedPorts {
 		number, proto, _ := strings.Cut(key, "/")
 		if n, err := strconv.Atoi(number); err == nil && (proto == "tcp" || proto == "") {
@@ -148,8 +145,9 @@ func inspectImage(image string) (imageFacts, error) {
 }
 
 // reviewImage reviews the image that the build made, against what the server
-// does with it. deployed says that the server runs the app already.
-func reviewImage(app appFile, image imageFacts, deployed bool) []finding {
+// does with it. An image that says nothing about its port or its storage gets
+// no word: the defaults apply, and a deploy that fails says what the app did.
+func reviewImage(app appFile, image imageFacts) []finding {
 	var found []finding
 	settings := protocol.Settings{Port: app.Port, Volumes: app.Volumes}
 	if _, err := protocol.ShapeOf(settings, image.Ports, image.Volumes); err != nil {
@@ -158,24 +156,7 @@ func reviewImage(app appFile, image imageFacts, deployed bool) []finding {
 	if !image.Command {
 		found = append(found, finding{true, "the image has no command to start the app", `Add the command to the end of the Dockerfile: CMD ["/app/server"].`, docsDockerfile})
 	}
-	if app.Port == 0 && len(image.Ports) == 0 {
-		found = append(found, finding{false, "the Dockerfile has no EXPOSE, and chasen.yml has no port",
-			fmt.Sprintf("Chasen sends the traffic to port %d and sets PORT=%d. An app that listens on another port never gets healthy, and the deploy fails. Say the port of the app in the Dockerfile: EXPOSE 3000.", protocol.DefaultPort, protocol.DefaultPort), docsDockerfile})
-	}
-	// Only at the first deploy: an app with no data, like a website, is right
-	// without a VOLUME, and a warning at every deploy teaches people not to
-	// read warnings. A Rails image keeps its files in /rails/storage, which
-	// is the default.
-	if !deployed && needsStorageAdvice(app, image) {
-		found = append(found, finding{false, "the Dockerfile has no VOLUME, and chasen.yml has no volumes",
-			fmt.Sprintf("Chasen keeps %s across deploys, and backs up the SQLite databases in it. A file that the app writes anywhere else is gone at the next deploy. Say where the app keeps its data in the Dockerfile: VOLUME /app/storage.", protocol.DefaultVolumes[0]), docsStorage})
-	}
 	return found
-}
-
-// needsStorageAdvice reports an image that does not say where its data is.
-func needsStorageAdvice(app appFile, image imageFacts) bool {
-	return len(app.Volumes) == 0 && len(image.Volumes) == 0 && image.WorkingDir != "/rails"
 }
 
 // printReview prints the findings, the errors first. With an error, it

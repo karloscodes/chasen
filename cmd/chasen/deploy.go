@@ -81,8 +81,35 @@ func appSettings(app appFile) (protocol.Settings, error) {
 	for _, name := range app.Secrets {
 		env[name] = secrets[name]
 	}
-	return protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes,
+	if err := railsMasterKey(env); err != nil {
+		return protocol.Settings{}, err
+	}
+	return protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes, Memory: app.Memory,
 		NoBackup: app.Backup != nil && !*app.Backup}, nil
+}
+
+// railsMasterKey gives a Rails app the key of its credentials. The key on
+// this computer travels like a secret, so the app needs no setup for it: the
+// key of the production credentials when the app has them, else
+// config/master.key. A key in the secrets or in env: wins. With credentials
+// and no key, the app fails at start, so the review warns.
+func railsMasterKey(env map[string]string) error {
+	if _, ok := env["RAILS_MASTER_KEY"]; ok {
+		return nil
+	}
+	for _, path := range []string{"config/credentials/production.key", "config/master.key"} {
+		if key, err := os.ReadFile(path); err == nil && len(bytes.TrimSpace(key)) > 0 {
+			env["RAILS_MASTER_KEY"] = string(bytes.TrimSpace(key))
+			return nil
+		}
+	}
+	for _, path := range []string{"config/credentials/production.yml.enc", "config/credentials.yml.enc"} {
+		if _, err := os.Stat(path); err == nil {
+			return printReview(os.Stderr, []finding{{false, "the app has Rails credentials (" + path + ") and no RAILS_MASTER_KEY",
+				"Rails cannot read them without the key, and an app that needs them fails at start. Run chasen secrets edit and add RAILS_MASTER_KEY=<the key of config/master.key>.", docsSecrets}})
+		}
+	}
+	return nil
 }
 
 // commitHash matches the full hash of a git commit.
@@ -135,7 +162,7 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 	}
 
 	settings.Image = app.Image + ":" + tag
-	registry, err := registryLogin(app)
+	registry, from, err := registryLogin(app)
 	if err != nil {
 		return err
 	}
@@ -149,13 +176,10 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 		if err != nil {
 			return err
 		}
-		// The advice about the storage is for the first deploy. Ask the server
-		// only when the image needs that advice.
-		deployed := needsStorageAdvice(app, facts) && isDeployed(creds, app.Name)
-		if err := printReview(os.Stderr, reviewImage(app, facts, deployed)); err != nil {
+		if err := printReview(os.Stderr, reviewImage(app, facts)); err != nil {
 			return err
 		}
-		if err := pushImage(settings.Image, registry); err != nil {
+		if err := pushImage(settings.Image, registry, from); err != nil {
 			return err
 		}
 	}
@@ -203,6 +227,13 @@ func buildImage(image, version string) error {
 		return errNoDocker
 	}
 	build := []string{"build", "--build-arg", "APP_VERSION=" + version, "-t", image}
+	// GitHub links the package of an image to the repository that the label
+	// names, so the package and the repository share their access.
+	if origin, err := exec.Command("git", "remote", "get-url", "origin").Output(); err == nil {
+		if m := githubOrigin.FindStringSubmatch(strings.TrimSpace(string(origin))); m != nil {
+			build = append(build, "--label", "org.opencontainers.image.source=https://github.com/"+m[1]+"/"+m[2])
+		}
+	}
 	// The image must run on the server. Most servers are amd64, and a Mac is not.
 	if os.Getenv("DOCKER_DEFAULT_PLATFORM") == "" {
 		build = append(build, "--platform", "linux/amd64")
@@ -226,8 +257,8 @@ func buildImage(image, version string) error {
 }
 
 // pushImage pushes the image to the registry. The login stays in a directory
-// that is gone after the push.
-func pushImage(image string, registry *protocol.Registry) error {
+// that is gone after the push. from says where the login came from.
+func pushImage(image string, registry *protocol.Registry, from string) error {
 	config, err := os.MkdirTemp("", "chasen-registry-")
 	if err != nil {
 		return err
@@ -253,9 +284,13 @@ func pushImage(image string, registry *protocol.Registry) error {
 		push = append(with, push...)
 	}
 	fmt.Println("Pushing", image)
+	var said strings.Builder
 	pushing := exec.Command("docker", push...)
-	pushing.Stderr = os.Stderr
+	pushing.Stderr = io.MultiWriter(os.Stderr, &said)
 	if err := pushing.Run(); err != nil {
+		if refused := strings.ToLower(said.String()); registry != nil && (strings.Contains(refused, "denied") || strings.Contains(refused, "unauthorized")) {
+			return fmt.Errorf("the registry refused the push of %s, with the login of %s (%s). The login needs the right to write packages. For ghcr.io: gh auth refresh -s write:packages, or docker login ghcr.io with a classic token that has write:packages", image, registry.Username, from)
+		}
 		return fmt.Errorf("docker push failed: %w", err)
 	}
 	return nil

@@ -5,7 +5,17 @@ cd myapp
 chasen deploy
 ```
 
-The deploy pulls the image, makes a backup, starts the new container, and moves the traffic when `/up` answers. If the new version does not become healthy in time, the old version keeps the traffic.
+The deploy pulls the image, makes a backup, starts the new container, and moves the traffic when `/up` answers. If the new version does not become healthy in time, the old version keeps the traffic, and the deploy says why from what the new container left:
+
+```
+The new version did not answer 200 on /up at port 8080 within 30 seconds. The old version keeps the traffic.
+It listens on port 3000, not on 8080. Add EXPOSE 3000 to the Dockerfile, or port: 3000 to chasen.yml.
+
+Its last lines:
+  Listening on http://0.0.0.0:3000
+```
+
+It names the port the app listens on, an exit code, or a container that ran out of memory, and shows the last 40 lines of its output.
 
 A deploy runs to its end on the server, also when your connection drops.
 
@@ -122,18 +132,17 @@ Each finding says what is wrong, what to write, and which page explains it.
 |---|---|
 | An unknown key in `chasen.yml` | error |
 | An app name that is not lowercase letters, digits, and hyphens | error |
-| A port, a health path, a health timeout, or a volume that is not valid | error |
+| A port, a health path, a health timeout, a volume, or a memory value that is not valid | error |
 | `env:` or `secrets:` has a name that Chasen sets itself (`PORT`, `BASE_URL`, and the others of [the standard](../STANDARD.md#4-environment)). `SECRET_KEY_BASE` in `secrets:` is right: then the key is yours | error |
 | `registry.password` holds a token, not the name of a secret | error |
 | The image declares several ports, none is 80, and `chasen.yml` has no `port:` | error |
 | The image has no command (`CMD` or `ENTRYPOINT`) | error |
-| The `Dockerfile` has no `EXPOSE`, and `chasen.yml` has no `port:` | warning |
-| The `Dockerfile` has no `VOLUME`, and `chasen.yml` has no `volumes:` | warning, at the first deploy of the app |
+| A Rails app has credentials and no `RAILS_MASTER_KEY`: no key file on this computer, and none in the secrets | warning |
 | A value in `env:` has the name of a secret (`…_TOKEN`, `…_PASSWORD`) | warning |
 | A name is in `env:` and in `secrets:` | warning |
 | `image:` has a tag and the directory has a `Dockerfile`: nothing is built | warning |
 
-A `Dockerfile` that gets no finding says three things:
+A `Dockerfile` can say three things. Only the command is required: without `EXPOSE`, the traffic goes to port 8080 and the app gets `PORT=8080`, and without `VOLUME`, the storage is `/storage`. When the app does something else, the failed deploy says so, with the line to add.
 
 ```dockerfile
 EXPOSE 3000              # the port of the app. Chasen also gives it as $PORT
@@ -157,6 +166,7 @@ port: 3000
 health: /_health
 health_timeout: 90
 volumes: [/app/storage]
+memory: 1g              # the most memory the app may use. The default is 512m
 
 # For an app whose data needs no backup, like a demo that makes its data again at each start.
 backup: false

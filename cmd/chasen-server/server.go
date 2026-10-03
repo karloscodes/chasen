@@ -745,6 +745,7 @@ func serverDeploy(name, version string) error {
 		HealthTimeout: sh.HealthTimeout,
 		Volumes:       sh.Volumes,
 		Env:           appEnv(settings, domains, version, privateKey, sh),
+		Memory:        settings.Memory,
 	}
 	fmt.Printf("Starting %s %s\n", name, version)
 	if err := apply(name, app); err != nil {
@@ -799,7 +800,7 @@ func serverRestart(name string) error {
 			return err
 		}
 		version := app.Image[strings.LastIndex(app.Image, ":")+1:]
-		app.Port, app.HealthPath, app.HealthTimeout, app.Volumes = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes
+		app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes, settings.Memory
 		app.Env = appEnv(settings, strings.Split(app.Domain, ","), version, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
 	}
 	fmt.Println("Restarting", name)
@@ -823,9 +824,44 @@ func apply(name string, app matcha.AppConfig) error {
 		} else {
 			forgetApp(name)
 		}
+		var failed *matcha.UnhealthyError
+		if errors.As(err, &failed) {
+			return errors.New(unhealthyReport(app, failed))
+		}
 		return fmt.Errorf("%w\nThe app must listen on port %d and answer 200 on %s", err, app.Port, app.HealthPath)
 	}
 	return nil
+}
+
+// unhealthyReport says why a new version did not get the traffic, from what
+// its container left before the engine removed it: how it ended, the ports it
+// listened on, and its last lines.
+func unhealthyReport(app matcha.AppConfig, failed *matcha.UnhealthyError) string {
+	var report strings.Builder
+	timeout := cmp.Or(app.HealthTimeout, protocol.DefaultHealthTimeout)
+	fmt.Fprintf(&report, "The new version did not answer 200 on %s at port %d within %d seconds. The old version keeps the traffic.\n", app.HealthPath, app.Port, timeout)
+	others := slices.DeleteFunc(slices.Clone(failed.Listening), func(port int) bool { return port == app.Port })
+	switch {
+	case failed.OOMKilled:
+		fmt.Fprintf(&report, "Docker stopped it: it used more than its memory, %s. Give it more in chasen.yml, for example: memory: 1g\n", cmp.Or(app.Memory, protocol.DefaultMemory))
+	case failed.Status != "running" || failed.Restarts > 0:
+		fmt.Fprintf(&report, "It stopped with exit code %d", failed.ExitCode)
+		if failed.Restarts > 0 {
+			fmt.Fprintf(&report, ", %d times", failed.Restarts+1)
+		}
+		report.WriteString(". Its last lines say why.\n")
+	case len(others) > 0 && !slices.Contains(failed.Listening, app.Port):
+		fmt.Fprintf(&report, "It listens on port %d, not on %d. Add EXPOSE %d to the Dockerfile, or port: %d to chasen.yml.\n", others[0], app.Port, others[0], others[0])
+	case slices.Contains(failed.Listening, app.Port):
+		fmt.Fprintf(&report, "It listens on port %d, and %s does not answer 200. %s must answer with no login, no redirect to https, and any Host.\n", app.Port, app.HealthPath, app.HealthPath)
+	}
+	if failed.Logs != "" {
+		report.WriteString("\nIts last lines:\n")
+		for _, line := range strings.Split(failed.Logs, "\n") {
+			report.WriteString("  " + line + "\n")
+		}
+	}
+	return strings.TrimRight(report.String(), "\n")
 }
 
 // prepareData makes the data of an app ready for a new container: the volume

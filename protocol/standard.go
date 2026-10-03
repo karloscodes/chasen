@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -23,6 +24,23 @@ const (
 	DefaultHealth        = "/up"
 	DefaultHealthTimeout = 30
 )
+
+// DefaultMemory is the most memory an app may use when chasen.yml does not
+// say. One server runs several apps, so one app must not take all of it.
+const DefaultMemory = "512m"
+
+var memoryRe = regexp.MustCompile(`^([1-9][0-9]{0,5})([mg])$`)
+
+// ValidMemory reports a memory limit in the form of Docker: 512m, 2g. Less
+// than 64 MB runs no real app.
+func ValidMemory(memory string) bool {
+	m := memoryRe.FindStringSubmatch(memory)
+	if m == nil {
+		return false
+	}
+	n, _ := strconv.Atoi(m[1])
+	return m[2] == "g" || n >= 64
+}
 
 // DefaultVolumes is the default storage. Rails keeps its files in
 // /rails/storage, so the same directory is at both paths.
@@ -144,6 +162,9 @@ func (s Settings) Check() error {
 	}
 	if err := CheckVolumes(s.Volumes); err != nil {
 		problems = append(problems, err)
+	}
+	if s.Memory != "" && !ValidMemory(s.Memory) {
+		problems = append(problems, fmt.Errorf("invalid memory %q: use megabytes or gigabytes, like 512m or 2g, and 64m or more", s.Memory))
 	}
 	return errors.Join(problems...)
 }

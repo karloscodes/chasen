@@ -318,7 +318,7 @@ func TestEndToEnd(t *testing.T) {
 		// The change is in the working directory only: a restart needs no commit.
 		// The secret key of the app comes as a secret too: then it is the owner's key, not one the server made.
 		const key = "0123456789abcdef0123456789abcdef-kept-by-the-owner"
-		os.WriteFile(filepath.Join(app, "chasen.yml"), []byte(yml+"port: 9000\nenv:\n  GREETING: adios\nsecrets: [TOKEN, SECRET_KEY_BASE]\nsecrets_command: printf 'TOKEN=rotated\\nSECRET_KEY_BASE="+key+"\\n'\n"), 0644)
+		os.WriteFile(filepath.Join(app, "chasen.yml"), []byte(yml+"port: 9000\nmemory: 300m\nenv:\n  GREETING: adios\nsecrets: [TOKEN, SECRET_KEY_BASE]\nsecrets_command: printf 'TOKEN=rotated\\nSECRET_KEY_BASE="+key+"\\n'\n"), 0644)
 
 		out := must(app, bin, "restart")
 
@@ -329,6 +329,9 @@ func TestEndToEnd(t *testing.T) {
 		values, _ := docker("exec", greeting, "sh", "-c", "echo $GREETING $TOKEN $PORT")
 		if values != "adios rotated 9000" {
 			t.Errorf("env in the container = %q, want the new greeting, the rotated secret, and the port of chasen.yml", values)
+		}
+		if memory, _ := docker("inspect", "-f", "{{.HostConfig.Memory}}", greeting); memory != "314572800" {
+			t.Errorf("the memory of the container = %q bytes, want the 300m of chasen.yml", memory)
 		}
 		if keys, _ := docker("exec", greeting, "sh", "-c", "echo $SECRET_KEY_BASE $PRIVATE_KEY"); keys != key+" "+key {
 			t.Errorf("the secret key in the container = %q, want the key that the deploy brought, under both names", keys)
@@ -521,10 +524,13 @@ func TestEndToEnd(t *testing.T) {
 	t.Run("a deploy that does not get healthy keeps the previous version live", func(t *testing.T) {
 		commit("app.py", "raise SystemExit('broken')\n")
 
-		_, err := run(app, bin, "deploy")
+		out, err := run(app, bin, "deploy")
 
 		if err == nil {
 			t.Error("the deploy of a broken app reported success")
+		}
+		if !strings.Contains(out, "It stopped with exit code 1") || !strings.Contains(out, "  broken") {
+			t.Errorf("deploy = %q, want how the app ended and its last lines", out)
 		}
 		if got := get("shop.localhost"); !strings.HasPrefix(got, "hits=5 ") {
 			t.Errorf("GET after the failed deploy = %q, want hits=5 from the previous version", got)
@@ -537,6 +543,16 @@ func TestEndToEnd(t *testing.T) {
 		}
 		if out := must(app, bin, "domains", "add", "blog.localhost"); !strings.Contains(out, "Added") {
 			t.Errorf("domains add after the failed deploy = %q, want it to redeploy the good version", out)
+		}
+
+		// An app that listens on its own port, and not on the one of the standard.
+		good, _ := os.ReadFile("example/app.py")
+		commit("app.py", strings.Replace(string(good), `int(os.environ["PORT"])`, "9000", 1))
+
+		out, err = run(app, bin, "deploy")
+
+		if err == nil || !strings.Contains(out, "It listens on port 9000, not on 8080. Add EXPOSE 9000") {
+			t.Errorf("deploy of an app on port 9000 = %q, %v, want the port it listens on", out, err)
 		}
 	})
 

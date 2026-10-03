@@ -28,36 +28,37 @@ func originImage(origin string) string {
 }
 
 // registryLogin returns the login of the registry of the app, or nil for an
-// image that needs none. The first one that exists wins:
+// image that needs none, and where the login came from, in the words of a
+// message. The first one that exists wins:
 //
 //  1. `registry:` in chasen.yml.
 //  2. For ghcr.io: GHCR_TOKEN or GITHUB_TOKEN. This is the way of CI.
 //  3. The login of Docker for this registry (`docker login`).
 //  4. For ghcr.io: the login of the gh CLI.
-func registryLogin(app appFile) (*protocol.Registry, error) {
+func registryLogin(app appFile) (*protocol.Registry, string, error) {
 	if app.Registry.Password != "" {
 		secrets, err := secretValues(app, []string{app.Registry.Password})
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
-		return &protocol.Registry{Username: app.Registry.Username, Password: secrets[app.Registry.Password]}, nil
+		return &protocol.Registry{Username: app.Registry.Username, Password: secrets[app.Registry.Password]}, "registry: in chasen.yml", nil
 	}
 	owner, github := strings.CutPrefix(app.Image, "ghcr.io/")
 	owner, _, _ = strings.Cut(owner, "/")
 	owner = cmp.Or(app.Registry.Username, owner)
 	if token := cmp.Or(os.Getenv("GHCR_TOKEN"), os.Getenv("GITHUB_TOKEN")); github && token != "" {
-		return &protocol.Registry{Username: owner, Password: token}, nil
+		return &protocol.Registry{Username: owner, Password: token}, "GHCR_TOKEN or GITHUB_TOKEN", nil
 	}
 	if login := dockerLogin(protocol.RegistryHost(app.Image)); login != nil {
-		return login, nil
+		return login, "docker login", nil
 	}
 	if !github {
-		return nil, nil
+		return nil, "", nil
 	}
 	if out, _ := exec.Command("gh", "auth", "token").Output(); len(bytes.TrimSpace(out)) > 0 {
-		return &protocol.Registry{Username: owner, Password: string(bytes.TrimSpace(out))}, nil
+		return &protocol.Registry{Username: owner, Password: string(bytes.TrimSpace(out))}, "the gh CLI", nil
 	}
-	return nil, errors.New(`no login for ghcr.io. Do one of these:
+	return nil, "", errors.New(`no login for ghcr.io. Do one of these:
   docker login ghcr.io      with your GitHub name and a token that has the write:packages scope
   gh auth login -s write:packages
   set GHCR_TOKEN            in CI: the token of the job`)

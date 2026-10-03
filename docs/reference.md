@@ -188,7 +188,7 @@ The server has no config file: the database is all of it. An older version kept 
 - The log of each container is capped at 3 files of 10 MB. `chasen logs` shows the newest lines; ship the logs elsewhere (the LogNorth addon) to keep more.
 - One owner for each server. Every login to a server can deploy every app on that server.
 - An app stays on its server. No command moves it to another one.
-- One container for each app. 512 MB of memory for each container (a matcha default).
+- One container for each app. Each container gets 512 MB of memory unless `memory:` in `chasen.yml` says more.
 - SQLite only. Files in the storage that are not SQLite databases persist, but they have no backup.
 - A server never builds an image. `chasen deploy` builds it where it runs: your computer, or CI.
 - No rollback command. Deploy the previous commit again: `chasen deploy --tag <commit>`.

@@ -72,6 +72,9 @@ type Settings struct {
 	Health        string            `json:"health,omitempty"`
 	HealthTimeout int               `json:"health_timeout,omitempty"`
 	Volumes       []string          `json:"volumes,omitempty"`
+	// Memory is the most memory the app may use: "512m", "1g". Empty is
+	// DefaultMemory.
+	Memory string `json:"memory,omitempty"`
 }
 
 // Registry is the login of an image registry, like ghcr.io or Docker Hub.

@@ -45,6 +45,7 @@ type appFile struct {
 	Backup *bool `yaml:"backup"`
 
 	Port          int      `yaml:"port"`
+	Memory        string   `yaml:"memory"`
 	Health        string   `yaml:"health"`
 	HealthTimeout int      `yaml:"health_timeout"`
 	Volumes       []string `yaml:"volumes"`

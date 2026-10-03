@@ -178,7 +178,7 @@ func TestRegistryLogin(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "")
 
 	t.Run("an image on ghcr.io uses the login of docker", func(t *testing.T) {
-		login, err := registryLogin(appFile{Image: "ghcr.io/you/shop:abc"})
+		login, _, err := registryLogin(appFile{Image: "ghcr.io/you/shop:abc"})
 
 		if err != nil || login == nil || login.Username != "you" || login.Password != "from-docker" {
 			t.Errorf("registryLogin = %+v, %v, want the login of docker", login, err)
@@ -188,7 +188,7 @@ func TestRegistryLogin(t *testing.T) {
 	t.Run("in CI, the token of the job wins", func(t *testing.T) {
 		t.Setenv("GHCR_TOKEN", "from-ci")
 
-		login, err := registryLogin(appFile{Image: "ghcr.io/you/shop:abc"})
+		login, _, err := registryLogin(appFile{Image: "ghcr.io/you/shop:abc"})
 
 		if err != nil || login == nil || login.Username != "you" || login.Password != "from-ci" {
 			t.Errorf("registryLogin = %+v, %v, want the token of the job", login, err)
@@ -200,7 +200,7 @@ func TestRegistryLogin(t *testing.T) {
 		app := appFile{Image: "ghcr.io/you/shop:abc"}
 		app.Registry.Username, app.Registry.Password = "bot", "HUB_TOKEN"
 
-		login, err := registryLogin(app)
+		login, _, err := registryLogin(app)
 
 		if err != nil || login == nil || login.Username != "bot" || login.Password != "from-yml" {
 			t.Errorf("registryLogin = %+v, %v, want the login of chasen.yml", login, err)
@@ -208,7 +208,7 @@ func TestRegistryLogin(t *testing.T) {
 	})
 
 	t.Run("a registry with no login anywhere gets none", func(t *testing.T) {
-		login, err := registryLogin(appFile{Image: "registry.example.com/you/shop:abc"})
+		login, _, err := registryLogin(appFile{Image: "registry.example.com/you/shop:abc"})
 
 		if err != nil || login != nil {
 			t.Errorf("registryLogin = %+v, %v, want no login and no error", login, err)
