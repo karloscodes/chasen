@@ -186,4 +186,39 @@ To turn the nightly update off, run `chasen-server settings auto_update off`. `c
 
 **The CLI tells you, and you update it.** Once a day `chasen` looks for a newer release. When there is one, it says so in one line after your command. Then run `chasen update`: it downloads the release, checks its checksum, and replaces itself. It does not change by itself, because it also runs in CI, where a program that changes between two commands is a surprise. In CI it does not look at all.
 
-**The operating system is yours.** Chasen does not update it, and does not reboot it. `chasen alerts` tells you when the server does not install its security updates, and when an update waits for a reboot.
+**The operating system is yours.** Chasen does not update it and does not reboot it: it sets nothing there. We recommend that you turn on automatic security updates yourself, and let the server reboot at night when an update needs it. On Ubuntu:
+
+```bash
+apt-get install -y unattended-upgrades
+cat > /etc/apt/apt.conf.d/52auto-reboot <<'CONF'
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+CONF
+```
+
+A reboot is safe: Docker starts at boot, and the proxy, the API, and your apps start again by themselves. It costs about one minute of downtime.
+
+**You can turn the automatic reboot off.** Do this when one minute of downtime at night is not acceptable, and you want to choose the moment yourself:
+
+```bash
+echo 'Unattended-Upgrade::Automatic-Reboot "false";' > /etc/apt/apt.conf.d/52auto-reboot
+```
+
+Ubuntu still installs each security update. A new kernel then waits on the disk: the server runs the old kernel, with its known holes, until you reboot. So check and reboot yourself:
+
+```bash
+cat /var/run/reboot-required   # the file exists when a reboot is waiting
+reboot
+```
+
+To move the reboot to another hour, keep `"true"` and change `Automatic-Reboot-Time`.
+
+**The server knows its quiet hour.** The proxy logs each request, so the server can count them. This command prints the hour of the day with the fewest requests to your apps in the last week, in the time zone of the server:
+
+```bash
+chasen-server quiet-hour   # 03:00
+```
+
+Put that hour in `Automatic-Reboot-Time`. The command needs one full day of log before it answers.
+
+`chasen alerts` tells you when the server does not install its security updates, and when an update waits for a reboot for more than a day.

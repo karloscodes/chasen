@@ -294,7 +294,7 @@ func updateAlerts() []alert {
 		return nil
 	}
 	return []alert{{"updates", false, "the server does not install its security updates by itself",
-		"Install them with apt-get upgrade, or let Ubuntu do it each day: apt-get install -y unattended-upgrades."}}
+		"We recommend that you let Ubuntu install them each day: apt-get install -y unattended-upgrades. The docs show how: https://chasenhq.com/docs/#updates"}}
 }
 
 // rebootAlerts reports an update that waits for a reboot for more than a day:
@@ -309,7 +309,7 @@ func rebootAlerts(now time.Time) []alert {
 		what += ", for " + strings.Join(slices.Compact(slices.Sorted(slices.Values(strings.Fields(string(pkgs))))), ", ")
 	}
 	return []alert{{"reboot", false, what,
-		"Run reboot on the server when it suits you: your apps start again by themselves, after about one minute."}}
+		"Run reboot on the server when it suits you: your apps start again by themselves, after about one minute. The docs show how to let Ubuntu reboot at night: https://chasenhq.com/docs/#updates"}}
 }
 
 // selfUpdateAlerts reports a server that does not update chasen-server.
