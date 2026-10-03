@@ -303,7 +303,7 @@ func updateAlerts() []alert {
 		return nil
 	}
 	return []alert{{"updates", false, "the server does not install its security updates by itself",
-		"apt-get install -y unattended-upgrades && dpkg-reconfigure -f noninteractive unattended-upgrades. The docs show how to let it reboot at night: https://chasenhq.com/docs/getting-started/#updates"}}
+		"apt-get install -y unattended-upgrades && dpkg-reconfigure -f noninteractive unattended-upgrades. The docs show how to let it reboot at night: https://chasenhq.com/docs/#updates"}}
 }
 
 // rebootAlerts reports an update that waits for a reboot for more than a day:
@@ -318,7 +318,7 @@ func rebootAlerts(now time.Time) []alert {
 		what += ", for " + strings.Join(slices.Compact(slices.Sorted(slices.Values(strings.Fields(string(pkgs))))), ", ")
 	}
 	return []alert{{"reboot", false, what,
-		"Run reboot on the server: about one minute of downtime. The docs show how to let it reboot at night: https://chasenhq.com/docs/getting-started/#updates"}}
+		"Run reboot on the server: about one minute of downtime. The docs show how to let it reboot at night: https://chasenhq.com/docs/#updates"}}
 }
 
 // selfUpdateAlerts reports a server that does not update chasen-server.
