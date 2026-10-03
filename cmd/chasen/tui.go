@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -144,9 +145,12 @@ type tui struct {
 	logsFollow    bool
 	overlay       *overlay
 	prompt        *prompt
-	hit           hits              // where the last drawing put the things that a click can choose
-	filter        string            // what / narrows the rows or the logs of the tab to
-	watching      map[string]string // the id of the history entry that runs now, by app
+	hit           hits                 // where the last drawing put the things that a click can choose
+	filter        string               // what / narrows the rows or the logs of the tab to
+	watching      map[string]string    // the id of the history entry that runs now, by app
+	finished      map[string]string    // the id of an entry that ended, until its history says how
+	changes       map[string][2]string // from the overview: the id and the action that run now, by app
+	noOverview    bool                 // the server is older than the overview command: read the histories
 	openURL       func(page string) error
 	message       string // one line of news, until the next key
 	update        string // a newer release of chasen, or ""
@@ -171,6 +175,11 @@ type (
 	appsEvent struct {
 		output string
 		err    error
+	}
+	overviewEvent struct {
+		server string
+		output string
+		failed bool
 	}
 	statsEvent struct {
 		output string
@@ -214,7 +223,7 @@ func newTUI(run runner, server, cwdApp string) *tui {
 	return &tui{
 		run: run, server: server, cwdApp: cwdApp,
 		width: 80, height: 24,
-		panes: map[string]*pane{}, logsFollow: true, watching: map[string]string{}, openURL: openURL,
+		panes: map[string]*pane{}, logsFollow: true, watching: map[string]string{}, finished: map[string]string{}, openURL: openURL,
 		events: make(chan any, 256), now: time.Now,
 	}
 }
@@ -381,8 +390,14 @@ func (t *tui) filtered(lines []string) []string {
 }
 
 // running returns the history entry of an app that runs now: its id and its
-// action. A deploy from another terminal, or from CI, shows up here.
+// action. A deploy from another terminal, or from CI, shows up here. The
+// overview says it for all apps in one call; a server from before it says it
+// in the history of each app.
 func (t *tui) running(app string) (id, action string) {
+	if t.changes != nil {
+		now := t.changes[app]
+		return now[0], now[1]
+	}
 	lines := t.pane(app, tabHistory).lines
 	for _, line := range lines[min(1, len(lines)):] {
 		if parts := columns.Split(strings.TrimSpace(line), 4); len(parts) == 4 && parts[3] == "running" {
@@ -401,15 +416,42 @@ func commandLine(args ...string) string {
 	return "chasen -a " + args[1] + " " + args[0] + strings.TrimRight(" "+strings.Join(args[2:], " "), " ")
 }
 
+// loadApps asks for all that the screen shows of the server: the apps with
+// their domains, what poll asks, and the alerts and the tree. These change
+// slowly: the screen asks for them once a minute.
 func (t *tui) loadApps() {
+	t.listApps()
+	if !t.noOverview {
+		t.askOverview()
+	}
+	t.loadStats()
+	t.loadAlerts()
+	t.loadTree()
+}
+
+func (t *tui) listApps() {
 	run := t.run
 	go func() {
 		var out strings.Builder
 		_, err := run(context.Background(), &out, "list")
 		t.events <- appsEvent{out.String(), err}
 	}()
-	t.loadAlerts()
-	t.loadTree()
+}
+
+// poll asks the current server what runs on its apps, and how busy it is:
+// two calls, however many apps it has. A server from before the overview
+// has the list of apps in place of it.
+func (t *tui) poll() {
+	if t.noOverview {
+		t.listApps()
+	} else {
+		t.askOverview()
+	}
+	t.loadStats()
+}
+
+func (t *tui) loadStats() {
+	run := t.run
 	if t.noStats {
 		return
 	}
@@ -457,6 +499,7 @@ func (t *tui) switchServer(name, app string) {
 	t.stopLogs()
 	t.run, t.server = run, name
 	t.panes, t.stats, t.noStats = map[string]*pane{}, nil, false
+	t.changes, t.noOverview, t.watching, t.finished = nil, false, map[string]string{}, map[string]string{}
 	t.alerts, t.alertsChecked, t.noAlerts = nil, "", false
 	t.apps, t.appsLoaded, t.listed, t.selected = t.tree[name], len(t.tree[name]) > 0, false, 0
 	t.cursor, t.scroll, t.filter, t.want = 0, 0, "", app
@@ -494,6 +537,31 @@ func (t *tui) crossServer(by int) bool {
 		return true
 	}
 	return false
+}
+
+// sameApps reports whether the overview and the list have the same apps.
+func sameApps(overview []appView, list []appRow) bool {
+	var a, b []string
+	for _, app := range overview {
+		a = append(a, app.App)
+	}
+	for _, app := range list {
+		b = append(b, app.Name)
+	}
+	slices.Sort(a)
+	slices.Sort(b)
+	return slices.Equal(a, b)
+}
+
+// askOverview asks the server for the state of all its apps and what runs on
+// them, in one call.
+func (t *tui) askOverview() {
+	run, server := t.run, t.server
+	go func() {
+		var out strings.Builder
+		code, err := run(context.Background(), &out, "overview", "--json")
+		t.events <- overviewEvent{server, out.String(), err != nil || code != 0}
+	}()
 }
 
 // alertsTitle is the title of the overlay of the alerts.
@@ -689,25 +757,46 @@ func (t *tui) watch(app string) {
 	if before == "" || before == id {
 		return
 	}
-	for _, line := range t.pane(app, tabHistory).lines {
-		if parts := columns.Split(strings.TrimSpace(line), 4); len(parts) == 4 && parts[0] == before {
-			t.message = app + ": " + parts[2] + " " + parts[3]
-		}
-	}
+	// The history says how it ended.
+	t.finished[app] = before
+	t.load(app, tabHistory)
 	delete(t.panes, paneKey(app, paneRunning))
 	t.load(app, tabOverview)
 	t.loadApps()
+}
+
+// tellFinished says how the entry that ended went, when the history of its
+// app has it.
+func (t *tui) tellFinished(app string) {
+	id := t.finished[app]
+	if id == "" {
+		return
+	}
+	for _, line := range t.pane(app, tabHistory).lines {
+		if parts := columns.Split(strings.TrimSpace(line), 4); len(parts) == 4 && parts[0] == id && parts[3] != "running" {
+			t.message = app + ": " + parts[2] + " " + parts[3]
+			delete(t.finished, app)
+		}
+	}
 }
 
 // follow asks again for what runs: the history of each app with a running
 // entry, the output of the one of the chosen app, and the entry that an
 // overlay shows.
 func (t *tui) follow() {
+	asked := false
 	for app, id := range t.watching {
 		if id == "" {
 			continue
 		}
-		t.load(app, tabHistory)
+		// One overview tells when any of them ends. A server from before it
+		// tells in the history of each app.
+		if t.noOverview {
+			t.load(app, tabHistory)
+		} else if !asked {
+			t.askOverview()
+			asked = true
+		}
 		if app == t.app() {
 			run := t.run
 			go func() {
@@ -744,18 +833,22 @@ func (t *tui) handle(event any) bool {
 		t.width, t.height = e.width, e.height
 	case tickEvent:
 		t.frame++
-		// Every few seconds, ask again for what the screen shows, and for the
-		// history of each app: a deploy from somewhere else starts there.
-		if t.frame%40 == 0 && t.overlay == nil && t.prompt == nil {
-			t.loadApps()
-			t.load(t.app(), t.tab)
-			for _, app := range t.apps[:min(len(t.apps), 12)] {
-				t.load(app.Name, tabHistory)
+		// Every 10 seconds, ask again for what the screen shows, and for
+		// what runs: a deploy from somewhere else shows up in the overview. A
+		// server from before it shows it in the history of each app. Every
+		// minute, ask for what changes slowly too.
+		if t.frame%80 == 0 && t.overlay == nil && t.prompt == nil {
+			if t.frame%480 == 0 {
+				t.loadApps()
+			} else {
+				t.poll()
 			}
-		}
-		// Every minute, ask for the alerts of the server.
-		if t.frame%480 == 0 {
-			t.loadAlerts()
+			t.load(t.app(), t.tab)
+			if t.noOverview {
+				for _, app := range t.apps[:min(len(t.apps), 12)] {
+					t.load(app.Name, tabHistory)
+				}
+			}
 		}
 		// Every second, follow what runs now.
 		if t.frame%8 == 0 {
@@ -799,6 +892,45 @@ func (t *tui) handle(event any) bool {
 			}
 			t.tree[e.server] = parseApps(e.output)
 		}
+	case overviewEvent:
+		if e.server != t.server {
+			break
+		}
+		// A server from before the overview command, or the cloud, answers with an error.
+		var apps []appView
+		if e.failed || json.Unmarshal([]byte(strings.TrimSpace(e.output)), &apps) != nil {
+			t.noOverview, t.changes = true, nil
+			break
+		}
+		changes := map[string][2]string{}
+		for _, a := range apps {
+			if a.Running != "" {
+				changes[a.App] = [2]string{fmt.Sprint(a.ID), a.Running}
+			}
+			// The overview of v0.8.6 and v0.8.7 has no id: read the histories.
+			if a.Running != "" && a.ID == 0 {
+				changes = nil
+				break
+			}
+		}
+		if changes == nil {
+			t.noOverview, t.changes = true, nil
+			break
+		}
+		t.changes = changes
+		// An app that is new, or gone: ask for the list with its domains now.
+		if !sameApps(apps, t.apps) {
+			t.listApps()
+		}
+		for _, a := range apps {
+			t.watch(a.App)
+		}
+		// An entry that ended before the overview: none of its app runs now.
+		for app := range t.watching {
+			if !slices.ContainsFunc(apps, func(a appView) bool { return a.App == app }) {
+				t.watch(app)
+			}
+		}
 	case alertsEvent:
 		// A server from before the alerts command, or the cloud, answers with an error.
 		t.noAlerts = e.failed
@@ -825,6 +957,7 @@ func (t *tui) handle(event any) bool {
 		t.cursor = max(0, min(t.cursor, len(t.rows())-1))
 		if e.tab == tabHistory && e.err == nil {
 			t.watch(e.app)
+			t.tellFinished(e.app)
 		}
 	case logEvent:
 		if e.app == t.logsFor {

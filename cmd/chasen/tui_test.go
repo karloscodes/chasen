@@ -679,8 +679,8 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		}()
 		time.Sleep(150 * time.Millisecond)
 
-		// The slow look, every five seconds, finds it. Then the screen follows it.
-		sc.ticks(40)
+		// The slow look, every 10 seconds, finds it. Then the screen follows it.
+		sc.ticks(80)
 		sc.ticks(8)
 		sc.shows("Running now: deploy abc1234", "Pulling ghcr.io/you/shop:abc1234")
 		if !strings.Contains(sc.text(), "▸ "+spinner[sc.tui.frame%len(spinner)]+" shop") {

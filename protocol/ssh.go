@@ -45,7 +45,9 @@ func SSHCommand(address, command string) (*exec.Cmd, error) {
 	if strings.Contains(command, "'") {
 		return nil, fmt.Errorf("the command %q has a quote", command)
 	}
-	args := []string{"-T"}
+	// A connection can stay open for minutes between two requests: ssh
+	// ends it when the server stops answering, so the next request dials again.
+	args := []string{"-T", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3"}
 	if port := server.Port(); port != "" {
 		args = append(args, "-p", port)
 	}

@@ -12,13 +12,13 @@ Chasen is now in the app launcher (`Super + Space`). It opens the screen of your
 
 ## In the top bar
 
-The plugin [omarchy-chasen](https://github.com/karloscodes/omarchy-chasen) puts a server icon in the bar of Omarchy. It is dim when all is well, normal when a server has a warning, and in the urgent color when something is wrong. Its tooltip lists the alerts of all your servers, and a click opens the screen.
+The plugin [omarchy-chasen](https://github.com/karloscodes/omarchy-chasen) puts a server icon in the bar of Omarchy. It turns while a deploy runs, on any of your servers. It is dim when all is well, normal when a server has a warning, and in the urgent color when an app is down or a server has an error. A click opens the tree: each server with its alerts and its apps. Enter opens the screen.
 
 ```bash
 omarchy plugin add https://github.com/karloscodes/omarchy-chasen.git --enable
 ```
 
-It runs `chasen alerts --waybar` once a minute. That asks every server that you are logged in to: a moment of SSH, and nothing runs on the server between two asks. [The reference](reference.md#alerts) lists the alerts. To remove it: `omarchy plugin remove karloscodes.chasen`.
+It runs one `chasen overview --watch` for as long as the bar runs. That keeps one connection open to each server that you are logged in to, so it logs in once, not at each ask. It asks once a minute, and every 5 seconds while a deploy runs. Each ask is one `docker ps` and one read of the database on the server. [The reference](reference.md#alerts) lists the alerts. To remove it: `omarchy plugin remove karloscodes.chasen`.
 
 **With an Omarchy that has Waybar** (before its own shell), add a module instead. Put `"custom/chasen"` in `modules-right` of `~/.config/waybar/config.jsonc`, add this next to the other modules, and run `omarchy-restart-waybar`:
 

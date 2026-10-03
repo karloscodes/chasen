@@ -35,7 +35,7 @@
 | `chasen remove` | Stop the app. Keeps the data and the backups |
 | `chasen list` | List all apps on the server |
 | `chasen load` | Show how busy the server is: the load, the memory in use, and the disk of the apps |
-| `chasen overview` | Each app of the server: its state, its version, and the change that runs now. `--json`: every server that you are logged in to, with its apps and alerts, for a desktop |
+| `chasen overview` | Each app of the server: its state, its version, and the change that runs now. `--json`: every server that you are logged in to, with its apps and alerts, for a desktop. `--watch`: the same JSON again, one line once a minute and every 5 seconds while a deploy runs, on connections that stay open |
 | `chasen alerts` | Show what is wrong with the server, or puts it at risk. See "Alerts" below. `--waybar`: the alerts of every server, for [the top bar of Omarchy](omarchy.md) |
 | `chasen bucket` | Show where the backups of the server go. With `--endpoint`, `--name`, and `--access-key-id`: send them to an S3 bucket too |
 
@@ -128,7 +128,7 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 | `?` | Show the keys |
 | `q` | Close |
 
-**A deploy shows up while it runs.** Start `chasen deploy` in another terminal, or let CI do it. Within five seconds the app gets a spinner in the list, and its overview shows "Running now" with the output as it comes. Enter on the entry in the history follows it to its end.
+**A deploy shows up while it runs.** Start `chasen deploy` in another terminal, or let CI do it. Within 10 seconds the app gets a spinner in the list, and its overview shows "Running now" with the output as it comes. Enter on the entry in the history follows it to its end.
 
 **The screen shows its commands.** Each tab has the line of the CLI that prints it, like `chasen -a shop backups`, and each action shows the line that does the same. So the screen also teaches the CLI.
 

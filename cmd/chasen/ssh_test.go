@@ -74,8 +74,8 @@ func TestServerThroughSSH(t *testing.T) {
 			t.Fatalf("list = %q (%v), want the apps of the server", out.String(), err)
 		}
 		host := strings.TrimPrefix(strings.TrimSuffix(creds.URL, ":2222"), "ssh://")
-		if ran, _ := os.ReadFile(calls); !strings.HasPrefix(string(ran), "-T -p 2222 "+host+" ") || !strings.Contains(string(ran), "chasen-server connect") {
-			t.Errorf("ssh ran with %q, want the port, the user, the host, and the connect command", ran)
+		if ran, _ := os.ReadFile(calls); !strings.HasPrefix(string(ran), "-T -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -p 2222 "+host+" ") || !strings.Contains(string(ran), "chasen-server connect") {
+			t.Errorf("ssh ran with %q, want the keepalive, the port, the user, the host, and the connect command", ran)
 		}
 	})
 
