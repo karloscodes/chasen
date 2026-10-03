@@ -317,6 +317,10 @@ func TestEndToEnd(t *testing.T) {
 		if out := must(app, bin, "backups"); !strings.Contains(out, "Z  server") {
 			t.Errorf("backups = %q, want one backup on the server", out)
 		}
+		// The old version got SIGTERM, and had the time to stop by itself.
+		if out := must(app, bin, "run", "sh", "-c", `cat "$(dirname "$DATABASE_PATH")/stops.log"`); !strings.Contains(out, "stopped ") {
+			t.Errorf("stops.log = %q, want a line from the version before: a deploy stops it with SIGTERM", out)
+		}
 		env, _ := docker("exec", "example", "sh", "-c", "echo $TOKEN")
 		if next, _ := docker("exec", "example-next", "sh", "-c", "echo $TOKEN"); env != "s3cret" && next != "s3cret" {
 			t.Errorf("TOKEN in the container = %q / %q, want s3cret", env, next)

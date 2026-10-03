@@ -8,7 +8,15 @@ import sqlite3
 import sys
 
 # Rule 10: stop on SIGTERM. Python as the first process ignores it otherwise.
-signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+# A deploy stops the old version this way: a worker in the app finishes its
+# job here. This one writes down that it stopped, next to its database.
+def stop(*_):
+    with open(os.path.join(os.path.dirname(os.environ["DATABASE_PATH"]), "stops.log"), "a") as log:
+        log.write(f"stopped {os.environ['APP_VERSION']}\n")
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, stop)
 
 db = sqlite3.connect(os.environ["DATABASE_PATH"])
 db.execute("PRAGMA journal_mode=WAL")
