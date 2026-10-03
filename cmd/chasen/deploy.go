@@ -184,7 +184,14 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 			return err
 		}
 	}
-	return remote(creds, settings.Body(nil), os.Stdout, command, app.Name, version)
+	var printed strings.Builder
+	if err := remote(creds, settings.Body(nil), io.MultiWriter(os.Stdout, &printed), command, app.Name, version); err != nil {
+		return err
+	}
+	if command == "deploy" {
+		checkAddresses(os.Stdout, appURLs(printed.String()))
+	}
+	return nil
 }
 
 // isDeployed reports that the server runs the app. A server that does not
@@ -214,8 +221,12 @@ func deployWebsite(creds credentials, app appFile, settings protocol.Settings, c
 	if err := archive.Start(); err != nil {
 		return err
 	}
-	if err := remote(creds, settings.Body(files), os.Stdout, command, app.Name, commit[:7]); err != nil {
+	var printed strings.Builder
+	if err := remote(creds, settings.Body(files), io.MultiWriter(os.Stdout, &printed), command, app.Name, commit[:7]); err != nil {
 		return err
+	}
+	if command == "deploy" {
+		checkAddresses(os.Stdout, appURLs(printed.String()))
 	}
 	return archive.Wait()
 }

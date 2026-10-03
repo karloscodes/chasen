@@ -222,7 +222,14 @@ func runCommand(creds credentials, args []string) error {
 	if err != nil {
 		return err
 	}
-	return remote(creds, nil, os.Stdout, append([]string{args[0], app.Name}, args[1:]...)...)
+	if err := remote(creds, nil, os.Stdout, append([]string{args[0], app.Name}, args[1:]...)...); err != nil {
+		return err
+	}
+	// A new domain: say whether it reaches the app yet.
+	if len(args) == 3 && args[0] == "domains" && args[1] == "add" {
+		checkAddresses(os.Stdout, appURLs("  https://"+strings.ToLower(args[2])+"\n"))
+	}
+	return nil
 }
 
 func loadAppFile() (appFile, error) {
