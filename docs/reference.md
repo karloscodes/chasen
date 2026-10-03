@@ -19,7 +19,7 @@
 | `chasen rollback` | Start the version before the current one again, in seconds: the server keeps its image. The data stays as it is: `chasen restore` brings back a backup. A second rollback goes forward again |
 | `chasen secrets edit` | Change the secrets of the app in your editor. They stay in the repository, encrypted |
 | `chasen secrets` | List the names of the secrets. `chasen secrets show` prints the values too |
-| `chasen status` | Show the version, the state, the URLs, the last backup, and the replica |
+| `chasen status` | Show the version, the state, the URLs, the last backup, the replica, and the disk: the data, the backups on the server, and the image that runs |
 | `chasen logs` | Follow the app logs. `chasen logs jobs` follows the jobs container |
 | `chasen enable <addon> [domain]` | Run fusionaly, formlander, or lognorth from its image |
 | `chasen -a <app> <command>` | Run a command for an addon, or for an app of another directory |
@@ -28,7 +28,7 @@
 | `chasen history [id]` | Show the deploys and changes of the app, or the output of one |
 | `chasen domains [add\|rm <domain>]` | List or change the domains |
 | `chasen backup` | Make a snapshot now |
-| `chasen backups` | List the backups |
+| `chasen backups` | List the backups, where each one is, and its size on the server |
 | `chasen verify` | Prove that the copies restore: the live replica and the newest snapshot are restored next to the real databases, checked, and removed |
 | `chasen download [backup]` | Save the databases of a backup in the current directory, as a `tar.gz` file. The default is the newest backup |
 | `chasen restore [backup\|live]` | Restore a backup |

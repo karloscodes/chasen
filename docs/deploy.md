@@ -106,14 +106,14 @@ Run `chasen enable <addon>` again to update it to the newest image. An addon has
 
 ```bash
 chasen history
-# ID  WHEN (UTC)           ACTION                      RESULT
-# 5   2026-10-01 12:03:21  deploy 6cff7df              failed
-# 4   2026-10-01 12:03:02  restore                     succeeded
-# 3   2026-10-01 12:02:44  domains add shop.com        succeeded
+# ID  WHEN (UTC)           ACTION                RESULT     TOOK
+# 5   2026-10-01 12:03:21  deploy 6cff7df        failed     34s
+# 4   2026-10-01 12:03:02  restore               succeeded  6s
+# 3   2026-10-01 12:02:44  domains add shop.com  succeeded  3s
 chasen history 5      # the full output of that deploy
 ```
 
-The server records each deploy, restore, domain change, and removal, with its output.
+The server records each deploy, restore, domain change, and removal, with when it started, how long it took, and its output.
 
 ## Roll back
 

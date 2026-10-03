@@ -31,6 +31,25 @@ const stampLayout = "20060102T150405Z"
 
 func backupsDir(name string) string { return appDir(name) + "/backups" }
 
+// dirSize adds up the sizes of the files under dir, but not under the
+// directories that skip names.
+func dirSize(dir string, skip func(name string) bool) int64 {
+	var total int64
+	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && path != dir && skip != nil && skip(d.Name()) {
+			return filepath.SkipDir
+		}
+		if info, err := d.Info(); err == nil && info.Mode().IsRegular() {
+			total += info.Size()
+		}
+		return nil
+	})
+	return total
+}
+
 // localBackups returns the stamps of the complete backups, newest first.
 func localBackups(name string) []string {
 	entries, _ := os.ReadDir(backupsDir(name))
@@ -467,7 +486,12 @@ func serverBackups(name string) error {
 		if _, ok := offsite[stamp]; ok {
 			where = append(where, "offsite")
 		}
-		fmt.Printf("%s  %s\n", stamp, strings.Join(where, " + "))
+		// The size is last, so a client that knows two columns still reads them.
+		size := ""
+		if slices.Contains(local, stamp) {
+			size = "  " + megabytes(dirSize(backupsDir(name)+"/"+stamp, nil))
+		}
+		fmt.Printf("%s  %-16s%s\n", stamp, strings.Join(where, " + "), size)
 	}
 	if len(all) == 0 {
 		fmt.Println("No backups.")

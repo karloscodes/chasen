@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 )
 
 // The database of the server. It holds all the state of the server: its
@@ -168,20 +169,39 @@ func serverHistory(name string, args []string) error {
 		return nil
 	}
 
-	rows, err := db.Query("SELECT id, started_at, action, status FROM activity WHERE app = ? ORDER BY id DESC LIMIT 20", name)
+	rows, err := db.Query("SELECT id, started_at, coalesce(finished_at, ''), action, status FROM activity WHERE app = ? ORDER BY id DESC LIMIT 20", name)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+	// TOOK is last, so a client that knows four columns still reads them.
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tWHEN (UTC)\tACTION\tRESULT")
+	fmt.Fprintln(w, "ID\tWHEN (UTC)\tACTION\tRESULT\tTOOK")
 	for rows.Next() {
 		var id int64
-		var when, action, status string
-		if err := rows.Scan(&id, &when, &action, &status); err != nil {
+		var when, finished, action, status string
+		if err := rows.Scan(&id, &when, &finished, &action, &status); err != nil {
 			return err
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", id, when, action, status)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", id, when, action, status, took(when, finished))
 	}
 	return w.Flush()
+}
+
+// took says how long an entry of the history ran: "42s", "3m 12s", "1h 5m".
+// An entry that runs has no end yet.
+func took(started, finished string) string {
+	from, err1 := time.Parse(time.DateTime, started)
+	to, err2 := time.Parse(time.DateTime, finished)
+	if err1 != nil || err2 != nil {
+		return ""
+	}
+	switch d := to.Sub(from); {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
+	default:
+		return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+	}
 }

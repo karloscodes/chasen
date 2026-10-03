@@ -1285,6 +1285,14 @@ func serverStatus(name string) error {
 	fmt.Printf("App:      %s\n", name)
 	fmt.Printf("Version:  %s\n", version)
 	fmt.Printf("State:    %s\n", state)
+	// The data, the backups on this server, and the image that runs. Versions
+	// share the layers of their images, so the sizes of images do not add up.
+	data := dirSize(appDir(name), func(dir string) bool {
+		return dir == "backups" || strings.HasPrefix(dir, "pre-restore-") || strings.HasSuffix(dir, "-litestream")
+	})
+	var image struct{ Size int64 }
+	dockerAPI("GET", "/images/"+app.Image+"/json", nil, &image)
+	fmt.Printf("Disk:     data %s · backups %s in %d · image %s\n", megabytes(data), megabytes(dirSize(backupsDir(name), nil)), len(localBackups(name)), megabytes(image.Size))
 	if settings, _ := loadSettings(name); settings.Jobs != "" {
 		jobs := all.of(jobsName(name)).Status
 		fmt.Printf("Jobs:     %s (%s)\n", cmp.Or(jobs, "not running"), settings.Jobs)

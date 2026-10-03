@@ -335,6 +335,7 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 			backup, replica = a.backups[0], "live"
 		}
 		fmt.Fprintf(out, "Backup:   %s\nReplica:  %s\n", backup, replica)
+		fmt.Fprintf(out, "Disk:     data 1.2 MB · backups %d KB in %d · image 87.4 MB\n", 140*len(a.backups), len(a.backups))
 	case "history":
 		defer s.mu.Unlock()
 		if len(args) == 2 {
@@ -347,10 +348,18 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 			return fail("no entry %s for %s", args[1], name)
 		}
 		w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "ID\tWHEN (UTC)\tACTION\tRESULT")
+		fmt.Fprintln(w, "ID\tWHEN (UTC)\tACTION\tRESULT\tTOOK")
 		for i := len(a.history) - 1; i >= 0; i-- {
 			e := a.history[i]
-			fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", i+1, e.at.UTC().Format("2006-01-02 15:04:05"), e.action, e.result)
+			// Made-up times: a deploy takes a while, the rest a moment.
+			took := "2s"
+			switch {
+			case e.result == "running":
+				took = ""
+			case strings.HasPrefix(e.action, "deploy"):
+				took = "38s"
+			}
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, e.at.UTC().Format("2006-01-02 15:04:05"), e.action, e.result, took)
 		}
 		w.Flush()
 	case "verify":
@@ -371,7 +380,7 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 			return 0
 		}
 		for _, stamp := range a.backups {
-			fmt.Fprintf(out, "%s  server + offsite\n", stamp)
+			fmt.Fprintf(out, "%s  server + offsite  140 KB\n", stamp)
 		}
 		fmt.Fprintln(out, "live              offsite, continuous")
 	case "domains":

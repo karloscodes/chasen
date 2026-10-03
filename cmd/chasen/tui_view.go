@@ -628,6 +628,7 @@ func (t *tui) overviewLines(app string, status []string, width int) []string {
 		}
 		field("Replica", replica)
 	}
+	field("Disk", statusValues(status, "Disk")...)
 
 	if id, action := t.running(app); id != "" {
 		lines = append(lines, "", spread(width, []cell{{spinner[t.frame%len(spinner)] + " ", colorAccent}, {"Running now: ", colorAccent}, {action, colorBold}}, []cell{{"2, then enter, follows it ", colorDim}}))
@@ -649,13 +650,18 @@ func (t *tui) overviewLines(app string, status []string, width int) []string {
 
 // actionWidth is the room for the action of a history row: what the id, the
 // time, and the result leave.
-func actionWidth(width int) int { return max(12, min(30, width-5-28-12)) }
+func actionWidth(width int) int { return max(12, min(30, width-5-28-13-7)) }
 
-// historyCells draws one row of `chasen history`: ID, WHEN, ACTION, RESULT.
+// historyCells draws one row of `chasen history`: ID, WHEN, ACTION, RESULT,
+// and TOOK from a server that says it.
 func (t *tui) historyCells(row string, width int) []cell {
-	parts := columns.Split(strings.TrimSpace(row), 4)
+	parts := columns.Split(strings.TrimSpace(row), 5)
 	if len(parts) < 4 {
 		return []cell{{row, ""}}
+	}
+	took := ""
+	if len(parts) == 5 {
+		took = parts[4]
 	}
 	result := cell{"✓ " + parts[3], colorAccent}
 	switch parts[3] {
@@ -668,20 +674,25 @@ func (t *tui) historyCells(row string, width int) []cell {
 	if at, err := time.Parse("2006-01-02 15:04:05", when); err == nil {
 		when = at.Format("Jan 2 15:04") + " · " + ago(t.now(), at)
 	}
-	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, 28), colorDim}, {fit(clip(parts[2], actionWidth(width)-1), actionWidth(width)), ""}, result}
+	result.text = fit(result.text, 13)
+	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, 28), colorDim}, {fit(clip(parts[2], actionWidth(width)-1), actionWidth(width)), ""}, result, {took, colorDim}}
 }
 
-// backupCells draws one row of `chasen backups`: the name of the backup, and
-// where it is.
+// backupCells draws one row of `chasen backups`: the name of the backup,
+// where it is, and its size from a server that says it.
 func (t *tui) backupCells(row string) []cell {
-	parts := columns.Split(strings.TrimSpace(row), 2)
+	parts := columns.Split(strings.TrimSpace(row), 3)
 	if len(parts) < 2 {
 		return []cell{{row, ""}}
 	}
 	if parts[0] == "live" {
 		return []cell{{fit("live replica", 34), colorAccent}, {parts[1], colorDim}}
 	}
-	return []cell{{fit(t.stampText(parts[0]), 34), ""}, {parts[1], colorDim}}
+	size := ""
+	if len(parts) == 3 {
+		size = parts[2]
+	}
+	return []cell{{fit(t.stampText(parts[0]), 34), ""}, {fit(parts[1], 18), colorDim}, {size, colorDim}}
 }
 
 // rowLines draws rows that the cursor can choose. The first line of the
@@ -689,7 +700,7 @@ func (t *tui) backupCells(row string) []cell {
 func (t *tui) rowLines(width, height int, cells func(row string) []cell) []string {
 	var lines []string
 	if t.tab == tabHistory {
-		lines = append(lines, spread(width, []cell{{fit("ID", 5) + fit("WHEN (UTC)", 28) + fit("ACTION", actionWidth(width)) + "RESULT", colorDim}}, nil))
+		lines = append(lines, spread(width, []cell{{fit("ID", 5) + fit("WHEN (UTC)", 28) + fit("ACTION", actionWidth(width)) + fit("RESULT", 13) + "TOOK", colorDim}}, nil))
 		height--
 	}
 	rows := t.rows()
