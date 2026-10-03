@@ -272,14 +272,15 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 			Version string `json:"version"`
 			Running string `json:"running,omitempty"`
 			Since   string `json:"since,omitempty"`
+			ID      int    `json:"id,omitempty"`
 		}
 		s.mu.Lock()
 		var rows []row
 		for _, a := range s.apps {
 			r := row{App: a.name, State: a.state, Up: strings.HasPrefix(a.state, "Up"), Version: a.version}
-			for _, e := range a.history {
+			for i, e := range a.history {
 				if e.result == "running" {
-					r.Running, r.Since = e.action, e.at.UTC().Format(time.RFC3339)
+					r.Running, r.Since, r.ID = e.action, e.at.UTC().Format(time.RFC3339), i+1
 				}
 			}
 			rows = append(rows, r)

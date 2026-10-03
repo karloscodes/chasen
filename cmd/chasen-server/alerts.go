@@ -120,23 +120,14 @@ func appAlerts() []alert {
 	if err != nil || len(apps) == 0 {
 		return nil
 	}
-	out, err := docker("ps", "-a", "--format", "{{.Names}} {{.State}}")
+	all, err := containers()
 	if err != nil {
-		return []alert{{"docker", true, "Docker does not answer: " + lastLine(out), "Check it on the server: systemctl status docker"}}
-	}
-	state := map[string]string{}
-	for _, line := range strings.Split(out, "\n") {
-		if name, s, ok := strings.Cut(line, " "); ok {
-			state[name] = s
-		}
+		return []alert{{"docker", true, "Docker does not answer: " + err.Error(), "Check it on the server: systemctl status docker"}}
 	}
 	var found []alert
 	for _, name := range slices.Sorted(maps.Keys(apps)) {
 		// During a deploy an app has two containers: one that runs is enough.
-		now := cmp.Or(state[name], state[name+"-next"])
-		if state[name] == "running" || state[name+"-next"] == "running" {
-			now = "running"
-		}
+		now := cmp.Or(all.of(name).State, all[name+"-next"].State)
 		switch now {
 		case "running":
 		case "restarting":

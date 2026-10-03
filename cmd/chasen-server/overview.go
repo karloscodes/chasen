@@ -24,6 +24,7 @@ type overviewApp struct {
 	Version string `json:"version"`
 	Running string `json:"running,omitempty"` // the change that runs now: "deploy 3f9a2c1"
 	Since   string `json:"since,omitempty"`   // when that change started, in RFC 3339
+	ID      int64  `json:"id,omitempty"`      // its id in the history, to follow its output
 }
 
 // serverOverview prints the overview as a table, or as JSON with --json.
@@ -52,47 +53,77 @@ func overview() ([]overviewApp, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The containers: an app has two during a deploy, and the one that runs counts.
-	containers := map[string][2]string{} // name: status, state
-	if out, err := docker("ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.State}}"); err == nil {
-		for _, line := range strings.Split(out, "\n") {
-			if f := strings.SplitN(line, "\t", 3); len(f) == 3 {
-				containers[f[0]] = [2]string{f[1], f[2]}
-			}
-		}
+	all, _ := containers()
+	type change struct {
+		id              int64
+		action, started string
 	}
-	running := map[string][2]string{} // app: action, started
+	running := map[string]change{}
 	if db, err := openServerDB(); err == nil {
 		defer db.Close()
-		if rows, err := db.Query("SELECT app, action, started_at FROM activity WHERE status = 'running' ORDER BY id"); err == nil {
+		if rows, err := db.Query("SELECT id, app, action, started_at FROM activity WHERE status = 'running' ORDER BY id"); err == nil {
 			defer rows.Close()
 			for rows.Next() {
-				var app, action, started string
-				if rows.Scan(&app, &action, &started) == nil {
-					if at, err := time.Parse("2006-01-02 15:04:05", started); err == nil {
-						started = at.UTC().Format(time.RFC3339)
+				var c change
+				var app string
+				if rows.Scan(&c.id, &app, &c.action, &c.started) == nil {
+					if at, err := time.Parse("2006-01-02 15:04:05", c.started); err == nil {
+						c.started = at.UTC().Format(time.RFC3339)
 					}
-					running[app] = [2]string{action, started}
+					running[app] = c
 				}
 			}
 		}
 	}
 	var rows []overviewApp
 	for _, name := range matcha.ListAppsSorted(apps) {
-		c := containers[name]
-		if next := containers[name+"-next"]; next[1] == "running" && c[1] != "running" {
-			c = next
-		}
+		c := all.of(name)
 		_, version, _ := strings.Cut(apps[name].Image, ":")
-		r := overviewApp{App: name, State: c[0], Version: version, Up: c[1] == "running" && !strings.Contains(c[0], "unhealthy")}
+		r := overviewApp{App: name, State: c.Status, Version: version, Up: c.State == "running" && !strings.Contains(c.Status, "unhealthy")}
 		if r.State == "" {
 			r.State = "no container"
 		}
 		if now, ok := running[name]; ok {
-			r.Running, r.Since = now[0], now[1]
+			r.Running, r.Since, r.ID = now.action, now.started, now.id
 		}
 		rows = append(rows, r)
 	}
 	slices.SortFunc(rows, func(a, b overviewApp) int { return strings.Compare(a.App, b.App) })
 	return rows, nil
+}
+
+// container is what Docker says of one container: "Up 3 hours (healthy)",
+// and "running".
+type container struct{ Status, State string }
+
+type containerList map[string]container
+
+// containers asks the socket of Docker for every container, by name: one
+// request, with no docker command to start. The screen and the bar ask every
+// few seconds.
+func containers() (containerList, error) {
+	var list []struct {
+		Names         []string
+		Status, State string
+	}
+	if err := dockerAPI("GET", "/containers/json?all=1", nil, &list); err != nil {
+		return nil, err
+	}
+	all := containerList{}
+	for _, c := range list {
+		for _, name := range c.Names {
+			all[strings.TrimPrefix(name, "/")] = container{c.Status, c.State}
+		}
+	}
+	return all, nil
+}
+
+// of returns the container of an app. During a deploy an app has two, and
+// the one that runs counts.
+func (all containerList) of(app string) container {
+	c := all[app]
+	if next := all[app+"-next"]; next.State == "running" && c.State != "running" {
+		c = next
+	}
+	return c
 }

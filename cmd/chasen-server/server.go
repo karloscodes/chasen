@@ -1238,7 +1238,8 @@ func serverStatus(name string) error {
 	if err != nil {
 		return err
 	}
-	state, _ := docker("ps", "--filter", "name=^"+name+"(-next)?$", "--format", "{{.Status}}")
+	all, _ := containers()
+	state := all.of(name).Status
 	if state == "" {
 		state = "not running"
 	}
