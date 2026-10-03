@@ -13,7 +13,9 @@
 # (bin/dev deploy) goes through the real CLI to the mock server.
 # To see a deploy fail, add this to tmp/dev/shop/chasen.yml:  env: {FAIL: "1"}
 #
-# The log of the mock server is tmp/dev/mock.log.
+# There are two mock servers, on the port and the port after it, so the
+# screen shows its tree of servers. chasen uses logins of its own, in
+# tmp/dev/home: your real logins stay out. The logs are tmp/dev/mock-<port>.log.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -31,20 +33,31 @@ if [ ! -d "$dir/shop/.git" ]; then
 fi
 
 # A mock server that runs already keeps its state: start one yourself in
-# another pane (tmp/dev/mock) to keep what your commands changed.
-if ! curl -fs "http://127.0.0.1:$port/up" > /dev/null 2>&1; then
-  "$dir/mock" "127.0.0.1:$port" > "$dir/mock.log" 2>&1 &
-  mock=$!
-  trap 'kill $mock 2>/dev/null || true' EXIT INT TERM HUP PIPE
-  for _ in $(seq 50); do
-    curl -fs "http://127.0.0.1:$port/up" > /dev/null 2>&1 && break
-    sleep 0.1
-  done
-fi
-if ! curl -fs "http://127.0.0.1:$port/up" > /dev/null 2>&1; then
-  echo "The mock server did not start. Is the port $port in use? See $dir/mock.log" >&2
-  exit 1
-fi
+# another pane (tmp/dev/mock 127.0.0.1:4777) to keep what your commands changed.
+pids=()
+trap 'kill ${pids[@]+"${pids[@]}"} 2>/dev/null || true' EXIT INT TERM HUP PIPE
+for p in "$port" "$((port + 1))"; do
+  if ! curl -fs "http://127.0.0.1:$p/up" > /dev/null 2>&1; then
+    "$dir/mock" "127.0.0.1:$p" > "$dir/mock-$p.log" 2>&1 &
+    pids+=($!)
+    for _ in $(seq 50); do
+      curl -fs "http://127.0.0.1:$p/up" > /dev/null 2>&1 && break
+      sleep 0.1
+    done
+  fi
+  if ! curl -fs "http://127.0.0.1:$p/up" > /dev/null 2>&1; then
+    echo "The mock server did not start. Is the port $p in use? See $dir/mock-$p.log" >&2
+    exit 1
+  fi
+done
+
+home="$dir/home"
+config="$home/.config/chasen"
+[ "$(uname)" = Darwin ] && config="$home/Library/Application Support/chasen"
+mkdir -p "$config"
+cat > "$config/credentials.json" <<JSON
+{"current": "http://127.0.0.1:$port", "logins": {"http://127.0.0.1:$port": "dev", "http://127.0.0.1:$((port + 1))": "dev"}}
+JSON
 
 cd "$dir/shop"
-CHASEN_URL="http://127.0.0.1:$port" CHASEN_TOKEN=dev CHASEN_NO_UPDATE_CHECK=1 "$dir/chasen" "$@"
+HOME="$home" XDG_CONFIG_HOME="$home/.config" CHASEN_NO_UPDATE_CHECK=1 "$dir/chasen" "$@"
