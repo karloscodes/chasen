@@ -172,6 +172,11 @@ func frameHTML(view, theme string) string {
 		}
 		for _, r := range s {
 			switch {
+			case r >= 0x2500 && r <= 0x259f && (bold || under):
+				// A line or a block in bold has another width, or gaps: keep it plain, in one cell.
+				out.WriteString(`<span class="g" style="font-weight:400;text-decoration:none">` + string(r) + `</span>`)
+			case r == ' ' && under:
+				out.WriteString(`<span style="text-decoration:none"> </span>`)
 			case r < 0x80, r >= 0x2500 && r <= 0x259f:
 				out.WriteString(html.EscapeString(string(r)))
 			default:
