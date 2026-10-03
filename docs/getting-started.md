@@ -170,7 +170,7 @@ If the firewall of the server lets in only the addresses of Cloudflare, every na
 
 ## Updates
 
-**The server updates itself.** Each night, at a random minute between 03:00 and 05:00, a timer runs `chasen-server update`:
+**Chasen updates itself on your server.** Each night, at a random minute between 03:00 and 05:00, a timer runs `chasen-server update`. It updates Chasen only, not the operating system:
 
 - It compares the checksum of the newest release with the binary that runs. When they are the same, nothing happens.
 - It keeps the old binary as `chasen-server.previous`, installs the new one, and starts the API again. Your apps do not restart.
