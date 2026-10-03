@@ -415,6 +415,26 @@ func TestScreen(t *testing.T) {
 		sc.shows("▸ ● lognorth")
 	})
 
+	t.Run(": shows the commands it runs, and narrows them as the user types", func(t *testing.T) {
+		sc := openScreen(t, newTestServer(t), "shop")
+
+		sc.press(":")
+
+		sc.shows("commands for shop", "restore live", "Restore the newest state from the live replica", "domains add <domain>")
+		sc.press("r", "e")
+		sc.shows("restart", "restore [backup]")
+		_, help, _ := strings.Cut(sc.text(), "commands for shop")
+		if strings.Contains(help, "   status ") || strings.Contains(help, "   backups ") {
+			t.Errorf("the help shows commands that do not start with re:\n%s", help)
+		}
+		sc.press("x")
+		sc.shows("chasen has no command rex")
+		sc.press("esc")
+		if strings.Contains(sc.text(), "commands for shop") {
+			t.Error("the help stays after esc")
+		}
+	})
+
 	t.Run(": runs a command of the CLI for the chosen app, and asks first when it changes something", func(t *testing.T) {
 		s := newTestServer(t)
 		sc := openScreen(t, s, "shop")

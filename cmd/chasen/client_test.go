@@ -86,6 +86,39 @@ func TestServers(t *testing.T) {
 			t.Errorf("after use, loadCredentials = %+v, %v, want server two", creds, err)
 		}
 	})
+
+	t.Run("use takes the number of chasen servers, or a part of the address", func(t *testing.T) {
+		for said, want := range map[string]string{"1": "https://api.one.example.com", "two": "https://api.two.example.com"} {
+			var out strings.Builder
+
+			err := chooseServer([]string{said}, strings.NewReader(""), &out)
+
+			if creds, _ := loadCredentials(""); err != nil || creds.URL != want {
+				t.Errorf("use %s = %v, now %s, want %s", said, err, creds.URL, want)
+			}
+		}
+	})
+
+	t.Run("use with nothing shows the list and asks", func(t *testing.T) {
+		var out strings.Builder
+
+		err := chooseServer(nil, strings.NewReader("2\n"), &out)
+
+		if !strings.Contains(out.String(), "  2  https://api.two.example.com") || !strings.Contains(out.String(), "Use which server?") {
+			t.Errorf("use showed:\n%s", out.String())
+		}
+		if creds, _ := loadCredentials(""); err != nil || creds.URL != "https://api.two.example.com" {
+			t.Errorf("use 2 = %v, now %s", err, creds.URL)
+		}
+	})
+
+	t.Run("a part that two addresses have asks for more", func(t *testing.T) {
+		err := chooseServer([]string{"example"}, strings.NewReader(""), io.Discard)
+
+		if err == nil || !strings.Contains(err.Error(), "matches https://api.one.example.com and https://api.two.example.com") {
+			t.Errorf("use example = %v, want both matches named", err)
+		}
+	})
 }
 
 func TestChoosePlacement(t *testing.T) {

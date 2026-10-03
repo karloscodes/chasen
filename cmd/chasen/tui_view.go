@@ -1,7 +1,10 @@
 package main
 
 import (
+	"slices"
+
 	"fmt"
+	"github.com/karloscodes/chasen/protocol"
 	"math"
 	"os"
 	"regexp"
@@ -120,7 +123,13 @@ func (t *tui) view() string {
 	} else {
 		rule := paint(strings.Repeat("─", width), colorDim)
 		lines = append(lines, t.firstLine(width), rule)
-		lines = append(lines, t.body(width, height-4)...)
+		body := t.body(width, height-4)
+		// The : line shows the commands it can run, over the bottom of the body.
+		if p := t.prompt; p != nil && p.label == ":" {
+			help := t.commandHelp(width, p.value, len(body))
+			copy(body[len(body)-len(help):], help)
+		}
+		lines = append(lines, body...)
 		lines = append(lines, rule, t.lastLine(width))
 	}
 
@@ -134,6 +143,64 @@ func (t *tui) view() string {
 	}
 	screen.WriteString("\x1b[J")
 	return screen.String()
+}
+
+// commandHelp is one command that the : line runs: how the usage of the CLI
+// writes it, and what it does.
+type commandHelp struct{ name, usage, what string }
+
+// screenCommands are the commands that the : line runs, in the words of the
+// usage of the CLI, so one text describes them. A deploy and a check need
+// the directory of the app, so they are not here.
+var screenCommands = func() []commandHelp {
+	var list []commandHelp
+	for _, line := range strings.Split(usage, "\n") {
+		if !strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "   ") {
+			continue // a heading, or the second line of a description
+		}
+		form, what, ok := strings.Cut(strings.TrimSpace(line), "  ")
+		name, _, _ := strings.Cut(form, " ")
+		if !ok || !slices.Contains(protocol.Commands, name) || name == "deploy" || name == "check" {
+			continue
+		}
+		list = append(list, commandHelp{name, form, strings.TrimSpace(what)})
+	}
+	return list
+}()
+
+// commandHelp draws the commands that start with what the user typed, at most
+// room lines: a title, then one command on each line.
+func (t *tui) commandHelp(width int, typed string, room int) []string {
+	word := ""
+	if words := strings.Fields(typed); len(words) > 0 {
+		word = words[0]
+	}
+	var found []commandHelp
+	for _, c := range screenCommands {
+		if strings.HasPrefix(c.name, word) && (!strings.Contains(typed, " ") || c.name == word) {
+			found = append(found, c)
+		}
+	}
+	about := "for " + t.app() + ". enter runs it, and a command that changes something asks first. esc closes"
+	if t.app() == "" {
+		about = "enter runs it. esc closes"
+	}
+	lines := []string{spread(width, []cell{{" commands ", colorAccent}, {about, colorDim}}, nil)}
+	if len(found) == 0 {
+		lines = append(lines, spread(width, []cell{{"   chasen has no command " + word, colorBad}}, nil))
+	}
+	column := 0
+	for _, c := range found {
+		column = max(column, utf8.RuneCountInString(c.usage))
+	}
+	for _, c := range found {
+		if len(lines) == room-1 {
+			lines = append(lines, spread(width, []cell{{fmt.Sprintf("   and %d more: type more of the name", len(found)-(room-2)), colorDim}}, nil))
+			break
+		}
+		lines = append(lines, spread(width, []cell{{"   " + fit(c.usage, column) + "  ", colorAccent}, {clip(c.what, max(0, width-column-6)), ""}}, nil))
+	}
+	return lines[:min(len(lines), room)]
 }
 
 func (t *tui) firstLine(width int) string {

@@ -9,7 +9,7 @@
 | `chasen add server <user>@<host>` | Log in to your own server through SSH, with no deploy |
 | `chasen add server <domain>` | Use your own server through its address on the web (`https://api.<domain>`), with a login in the browser |
 | `chasen servers` | List the servers you are logged in to. The star marks the current one |
-| `chasen use <server>` | Make another server the current one: a name from the list, or `cloud` |
+| `chasen use [server]` | Make another server the current one: its number in `chasen servers`, a part of its address, or `cloud`. With nothing, it shows the list and asks |
 | `chasen logout` | Forget the login, here and on the server |
 | `chasen update` | Install the newest release of the CLI, after a check of its checksum. `chasen` tells you when there is one |
 | `chasen report` | Something is wrong with Chasen? Open a new issue on GitHub, with your version and your system filled in. It sends nothing by itself |
@@ -139,9 +139,12 @@ You can be logged in to several servers and to the cloud at the same time.
 ```bash
 chasen add server root@203.0.113.5   # through SSH
 chasen add server example.org        # through its address on the web
-chasen servers                       # the star marks where commands go
-chasen use root@203.0.113.5          # change it
+chasen servers                       # numbered. The star marks where commands go
+chasen use 2                         # change it: the number, or a part of the address
+chasen use                           # or choose from the list
 ```
+
+In the screen (`chasen` with no command), `s` switches to another server.
 
 An app can name its server in `chasen.yml`, so `chasen deploy` always goes to the right one:
 

@@ -22,8 +22,10 @@ const usage = `Usage: chasen <command>
   add server <user>@<host>   Log in to your own server through SSH, with no deploy
   add server <domain>    Use your own server through its address on the web, with a browser
   login                  Log in to the Chasen cloud instead
-  servers                List the servers you are logged in to. The star marks the current one
-  use <server>           Make another server the current one: a name from the list
+  servers                List the servers you are logged in to, with a number. The star marks
+                         the current one
+  use [server]           Make another server the current one: its number in the list, or a part
+                         of its address. With nothing, it shows the list and asks
   logout                 Forget the login, here and on the server
   report                 Something is wrong with Chasen? Open an issue, with your version filled in
   update                 Install the newest chasen. chasen tells you when there is one

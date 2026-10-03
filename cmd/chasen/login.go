@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"cmp"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,33 +135,83 @@ func listServers() error {
 	if len(saved.Tokens) == 0 {
 		return errors.New("not logged in. " + howToLogin)
 	}
-	addresses := slices.Sorted(maps.Keys(saved.Tokens))
-	for _, address := range addresses {
+	printServers(os.Stdout, saved)
+	return nil
+}
+
+// printServers prints the logins with a number: `chasen use 2` takes one.
+// The star marks the current one.
+func printServers(w io.Writer, saved logins) {
+	for i, address := range slices.Sorted(maps.Keys(saved.Tokens)) {
 		mark := " "
 		if address == saved.Current {
 			mark = "*"
 		}
-		fmt.Println(mark, address)
+		fmt.Fprintf(w, "%s %d  %s\n", mark, i+1, address)
 	}
-	return nil
 }
 
-// useServer makes another saved login the current one.
-func useServer(args []string) error {
-	if len(args) != 1 {
-		return errors.New("usage: chasen use <server>. chasen servers lists them")
-	}
+// useServer makes another saved login the current one. The server is its
+// number in chasen servers, its address, or a part of the address that
+// only one login has. With nothing, it shows the list and asks.
+func useServer(args []string) error { return chooseServer(args, os.Stdin, os.Stdout) }
+
+func chooseServer(args []string, in io.Reader, out io.Writer) error {
 	saved := loadLogins()
-	address := apiAddress(args[0])
-	if _, ok := saved.Tokens[address]; !ok {
-		return fmt.Errorf("you are not logged in to %s. Run: chasen servers", address)
+	if len(saved.Tokens) == 0 {
+		return errors.New("not logged in. " + howToLogin)
+	}
+	var said string
+	switch len(args) {
+	case 0:
+		printServers(out, saved)
+		fmt.Fprint(out, "Use which server? ")
+		line, _ := bufio.NewReader(in).ReadString('\n')
+		if said = strings.TrimSpace(line); said == "" {
+			return errors.New("usage: chasen use <server>: a number of the list, or a part of the address")
+		}
+	case 1:
+		said = args[0]
+	default:
+		return errors.New("usage: chasen use <server>: a number of chasen servers, or a part of the address")
+	}
+	address, err := findServer(saved, said)
+	if err != nil {
+		return err
 	}
 	saved.Current = address
 	if err := saved.save(); err != nil {
 		return err
 	}
-	fmt.Println("Commands now go to", address)
+	fmt.Fprintln(out, "Commands now go to", address)
 	return nil
+}
+
+// findServer returns the login that a person means.
+func findServer(saved logins, said string) (string, error) {
+	addresses := slices.Sorted(maps.Keys(saved.Tokens))
+	if n, err := strconv.Atoi(said); err == nil {
+		if n < 1 || n > len(addresses) {
+			return "", fmt.Errorf("there is no server %d: chasen servers lists %d", n, len(addresses))
+		}
+		return addresses[n-1], nil
+	}
+	if address := apiAddress(said); slices.Contains(addresses, address) {
+		return address, nil
+	}
+	var found []string
+	for _, address := range addresses {
+		if strings.Contains(address, said) {
+			found = append(found, address)
+		}
+	}
+	switch len(found) {
+	case 1:
+		return found[0], nil
+	case 0:
+		return "", fmt.Errorf("you are not logged in to %s. Run: chasen servers", said)
+	}
+	return "", fmt.Errorf("%s matches %s. Say more of the address, or its number in chasen servers", said, strings.Join(found, " and "))
 }
 
 // cloudURL is the Chasen cloud that `chasen login` uses. CHASEN_CLOUD sets
