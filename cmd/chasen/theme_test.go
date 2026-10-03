@@ -28,6 +28,7 @@ func TestScreenColors(t *testing.T) {
 
 	t.Run("on Omarchy, take the accent, the dim text, and the red of its theme", func(t *testing.T) {
 		computer(t, tokyoNight)
+		themeChoice = "omarchy"
 
 		followTheme()
 
@@ -38,6 +39,7 @@ func TestScreenColors(t *testing.T) {
 
 	t.Run("follow the theme when Omarchy switches it", func(t *testing.T) {
 		path := computer(t, tokyoNight)
+		themeChoice = "omarchy"
 		followTheme()
 
 		os.WriteFile(path, []byte("accent = \"#205EA6\"\n"), 0644)
@@ -48,8 +50,8 @@ func TestScreenColors(t *testing.T) {
 		}
 	})
 
-	t.Run("keep the Chasen colors with no Omarchy theme", func(t *testing.T) {
-		computer(t, "")
+	t.Run("the Chasen colors are the default, also on Omarchy", func(t *testing.T) {
+		computer(t, tokyoNight)
 
 		followTheme()
 
@@ -61,14 +63,14 @@ func TestScreenColors(t *testing.T) {
 	t.Run("t goes through the themes and remembers the choice", func(t *testing.T) {
 		computer(t, tokyoNight)
 
-		first, second, third := nextTheme(), nextTheme(), nextTheme()
+		first, second, third, fourth := nextTheme(), nextTheme(), nextTheme(), nextTheme()
 
-		if first != "chasen" || second != "terminal" || third != "omarchy" {
-			t.Errorf("t gave %s, %s, %s, want chasen, terminal, omarchy", first, second, third)
+		if first != "monochrome" || second != "omarchy" || third != "terminal" || fourth != "chasen" {
+			t.Errorf("t gave %s, %s, %s, %s, want monochrome, omarchy, terminal, chasen", first, second, third, fourth)
 		}
 		nextTheme()
-		if loadThemeChoice() != "chasen" || colorAccent != chasenColors[0] {
-			t.Errorf("the saved choice = %q, accent %q, want chasen", loadThemeChoice(), colorAccent)
+		if loadThemeChoice() != "monochrome" || colorAccent != "1" || colorDim != "2" {
+			t.Errorf("the saved choice = %q, accent %q, want monochrome: bold and dim", loadThemeChoice(), colorAccent)
 		}
 	})
 

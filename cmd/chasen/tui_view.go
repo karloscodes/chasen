@@ -214,9 +214,7 @@ func (t *tui) firstLine(width int) string {
 	}
 	left := []cell{{" chasen", colorAccent + ";" + colorBold}, {"  " + t.server, ""}}
 	// The way to the other servers sits next to the name of this one.
-	if len(t.servers) > 1 {
-		left = append(left, cell{"  s", colorAccent}, cell{" switch", colorDim})
-	}
+	left = append(left, cell{"  s", colorAccent}, cell{" servers", colorDim})
 	// In the corner: how busy the server is, then the count of the apps. A
 	// narrow window drops the notice of a new release first, then the numbers.
 	right := []cell{{count, colorDim}}
@@ -309,15 +307,13 @@ func (t *tui) keys() [][2]string {
 	case len(t.apps) == 0:
 		return [][2]string{{"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
 	case !t.inPane:
-		keys := [][2]string{{"↑↓", "app"}, {"→", "its " + tabNames[t.tab]}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {":", "command"}}
-		// With more than one login, the way to the other servers is in view.
-		if len(t.servers) > 1 {
-			keys = append(keys, [2]string{"s", "servers"})
-		}
+		// The line drops the keys at its end when the window is narrow: the
+		// ones that are hard to guess come first.
+		keys := [][2]string{{"↑↓", "app"}, {":", "command"}, {"s", "servers"}, {"t", "theme"}}
 		if len(t.alerts) > 0 {
 			keys = append(keys, [2]string{"!", "alerts"})
 		}
-		return append(keys, [2]string{"t", "theme"}, [2]string{"?", "keys"}, [2]string{"q", "close"})
+		return append(keys, [2]string{"r", "restart"}, [2]string{"b", "backup"}, [2]string{"o", "open"}, [2]string{"→", "its " + tabNames[t.tab]}, [2]string{"?", "keys"}, [2]string{"q", "close"})
 	}
 	switch t.tab {
 	case tabHistory:

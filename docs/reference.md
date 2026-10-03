@@ -139,11 +139,12 @@ A restart, a restore, and the removal of a domain ask first. Each action is a co
 
 **The colors follow your theme.** `t` goes to the next theme, and the screen remembers it:
 
-- `omarchy`: on [Omarchy](https://omarchy.org), the accent and the red of the current theme. The screen changes with it when you switch themes. This is the default when you have Omarchy.
-- `chasen`: the amber of Chasen. The default everywhere else.
+- `chasen`: the amber of Chasen. The default.
+- `monochrome`: no color, only bold and dim.
+- `omarchy`: on [Omarchy](https://omarchy.org), the accent and the red of the current theme. The screen changes with it when you switch themes.
 - `terminal`: the 16 colors of your terminal, so any terminal theme applies.
 
-`CHASEN_THEME=terminal` (or `chasen`, `omarchy`) wins over the choice. The screen has no color when `NO_COLOR` is set.
+`CHASEN_THEME=monochrome` (or `chasen`, `omarchy`, `terminal`) wins over the choice. The screen has no color when `NO_COLOR` is set.
 
 ## Alerts
 

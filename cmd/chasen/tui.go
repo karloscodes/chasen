@@ -1064,7 +1064,7 @@ func openURL(page string) error {
 
 func (t *tui) chooseServer() {
 	if len(t.servers) < 2 || t.change == nil {
-		t.message = "You are logged in to one server. Add another with: chasen add server <domain>"
+		t.message = "You are logged in to one server. Add another with: chasen add server <user>@<host>"
 		return
 	}
 	o := &overlay{title: "servers", choices: t.servers}
@@ -1175,8 +1175,8 @@ The screen
   g    load everything again
   !    the alerts of the server: what is wrong, and what puts it at risk.
        They refresh every minute
-  t    the next theme: Omarchy, when you have it, the amber of Chasen, or the
-       colors of your terminal. The screen remembers it
+  t    the next theme: the amber of Chasen, monochrome, Omarchy when you
+       have it, or the colors of your terminal. The screen remembers it
   s    go to another server
   q    close
 

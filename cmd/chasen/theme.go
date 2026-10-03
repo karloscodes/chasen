@@ -12,14 +12,14 @@ import (
 
 // The themes of the screen:
 //
+//   - chasen: the amber of the Chasen mark. The default.
+//   - monochrome: no color, only bold and dim.
 //   - omarchy: the colors of the current Omarchy theme. Omarchy keeps them in
 //     one file, and the screen follows it when the theme changes.
-//   - chasen: the amber of the Chasen mark.
 //   - terminal: the 16 colors of the terminal, so any terminal theme applies.
 //
 // t in the screen goes to the next one and remembers it. CHASEN_THEME wins
-// over the choice. Without either, it is omarchy when the computer has it,
-// and chasen otherwise.
+// over the choice.
 
 // The colors of the chasen theme, as the terminal can show them.
 var chasenColors = [3]string{colorAccent, colorDim, colorBad}
@@ -37,9 +37,9 @@ func loadThemeChoice() string {
 // themes are the themes this computer can show, in the order of t.
 func themes() []string {
 	if omarchyColorsFile() != "" {
-		return []string{"omarchy", "chasen", "terminal"}
+		return []string{"chasen", "monochrome", "omarchy", "terminal"}
 	}
-	return []string{"chasen", "terminal"}
+	return []string{"chasen", "monochrome", "terminal"}
 }
 
 // currentTheme is the theme that the screen shows now.
@@ -95,6 +95,9 @@ func followTheme() {
 		themeRead = ""
 	case "chasen":
 		colorAccent, colorDim, colorBad = chasenColors[0], chasenColors[1], chasenColors[2]
+		themeRead = ""
+	case "monochrome":
+		colorAccent, colorDim, colorBad = "1", "2", "1;4" // bold, dim, and bold underlined
 		themeRead = ""
 	case "omarchy":
 		data, err := os.ReadFile(omarchyColorsFile())
