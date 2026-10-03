@@ -125,7 +125,7 @@ chasen rollback
 # Rolled back shop to 3f9a2c1. The data is as it was: chasen restore brings back a backup.
 ```
 
-It takes seconds: the server keeps the image of the version before, so nothing is built or pulled. Run it again to go forward to the newer version.
+It takes seconds: the server keeps the images of the last 5 versions, like Kamal, so nothing is built or pulled. Run it again to go forward to the newer version.
 
 **The data stays as it is.** When the bad version changed the database, bring back the backup that Chasen made just before its deploy:
 

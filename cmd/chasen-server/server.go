@@ -832,22 +832,32 @@ func serverDeploy(name, version string) error {
 		return err
 	}
 
-	// Keep the image of this version and of the one before it, by name.
-	// The order of Docker's list says nothing: it is the age of the image, and
-	// two versions can be the same image.
-	if tags, err := docker("images", imageRepo(name), "--format", "{{.Repository}}:{{.Tag}}"); err == nil {
-		for _, tag := range strings.Fields(tags) {
-			if tag != image && tag != old.Image {
-				docker("rmi", tag)
-			}
-		}
-	}
+	pruneImages(name, image, old.Image)
 
 	fmt.Printf("\nDeployed %s %s\n", name, version)
 	for _, d := range domains {
 		fmt.Println("  " + link(d))
 	}
 	return nil
+}
+
+// keptImages is how many images of an app the server keeps, like Kamal:
+// the way back of chasen rollback, with no pull.
+const keptImages = 5
+
+// pruneImages removes the images of an app but the newest ones, and never the
+// image of this version or of the one before it. Docker lists the newest
+// first.
+func pruneImages(name string, keep ...string) {
+	tags, err := docker("images", imageRepo(name), "--format", "{{.Repository}}:{{.Tag}}")
+	if err != nil {
+		return
+	}
+	for i, tag := range strings.Fields(tags) {
+		if i >= keptImages && !slices.Contains(keep, tag) {
+			docker("rmi", tag)
+		}
+	}
 }
 
 // serverRestart starts the app again from the image it has, with the
@@ -904,7 +914,7 @@ func serverRollback(name string) error {
 		return fmt.Errorf("%s runs an image that Chasen did not build. Deploy the version you want: chasen deploy --tag <version>", name)
 	}
 	current := app.Image[strings.LastIndex(app.Image, ":")+1:]
-	// Docker lists the newest first, and a deploy keeps two versions.
+	// Docker lists the newest first, and the server keeps the newest five.
 	tags, _ := docker("images", imageRepo(name), "--format", "{{.Tag}}")
 	previous := ""
 	for _, tag := range strings.Fields(tags) {
