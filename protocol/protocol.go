@@ -80,6 +80,10 @@ type Settings struct {
 	// Cron is the commands that the server runs in the container on a
 	// schedule: `cron:` in chasen.yml.
 	Cron []CronJob `json:"cron,omitempty"`
+	// Jobs is the command of the jobs container: `jobs:` in chasen.yml, like
+	// bin/jobs. The container runs the image of the app, with its env and its
+	// volumes, and deploys with the web container as one unit.
+	Jobs string `json:"jobs,omitempty"`
 }
 
 // Registry is the login of an image registry, like ghcr.io or Docker Hub.

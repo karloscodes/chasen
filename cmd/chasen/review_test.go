@@ -229,7 +229,7 @@ func TestAppFileWithAnUnknownKey(t *testing.T) {
 	_, err := loadAppFile()
 
 	want := "chasen.yml: line 2: unknown key `prot`\n" +
-		"  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes, memory, backup, cron.\n" +
+		"  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes, memory, backup, cron, jobs.\n" +
 		"  https://chasenhq.com/docs/deploy/#chasenyml"
 	if err == nil || err.Error() != want {
 		t.Errorf("got:\n%v\nwant:\n%s", err, want)

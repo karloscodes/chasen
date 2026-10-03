@@ -417,6 +417,47 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("a jobs container deploys with the web container as one unit", func(t *testing.T) {
+		jobs := "jobs: sh -c 'while true; do date > \"$(dirname \"$DATABASE_PATH\")/jobs.beat\"; sleep 1; done'\n"
+		os.WriteFile(filepath.Join(app, "chasen.yml"), []byte(yml+"env:\n  GREETING: with-jobs\n"+jobs), 0644)
+		defer func() {
+			must(app, "git", "checkout", "-q", "chasen.yml")
+			must(app, bin, "restart")
+			if out, _ := docker("ps", "-q", "--filter", "name=^example_jobs"); out != "" {
+				t.Errorf("a restart with no jobs left the jobs container running")
+			}
+		}()
+
+		out := must(app, bin, "restart")
+
+		if !strings.Contains(out, "Starting the jobs of example") {
+			t.Errorf("restart = %q, want the jobs container to start", out)
+		}
+		if status := must(app, bin, "status"); !strings.Contains(status, "Jobs:     Up") {
+			t.Errorf("status = %q, want the jobs container up", status)
+		}
+		// The jobs container has the env and the storage of the app.
+		if beat := must(app, bin, "run", "sh", "-c", `cat "$(dirname "$DATABASE_PATH")/jobs.beat"`); strings.TrimSpace(beat) == "" {
+			t.Error("the jobs container wrote nothing to the storage of the app")
+		}
+		before, _ := docker("ps", "-q", "--filter", "name=^example_jobs")
+
+		// A jobs command that stops: the new version does not stay, web or jobs.
+		os.WriteFile(filepath.Join(app, "chasen.yml"), []byte(yml+"env:\n  GREETING: broken\njobs: sh -c 'echo broken-jobs; exit 3'\n"), 0644)
+		out, err := run(app, bin, "restart")
+
+		if err == nil || !strings.Contains(out, "broken-jobs") || !strings.Contains(out, "The version before runs again") {
+			t.Errorf("restart with jobs that stop = %q, %v, want a failure with their output, and the version before", out, err)
+		}
+		// No GET here: the app counts each request, and the tests after this one count them.
+		if got := must(app, bin, "run", "sh", "-c", "echo $GREETING"); strings.TrimSpace(got) != "with-jobs" {
+			t.Errorf("GREETING in the web container = %q, want the version before: the web goes back with its jobs", got)
+		}
+		if after, _ := docker("ps", "-q", "--filter", "name=^example_jobs"); after != before || after == "" {
+			t.Errorf("the jobs container = %q, want the one from before, %q, still running", after, before)
+		}
+	})
+
 	t.Run("run runs a command in the container of the app, and gives its exit code back", func(t *testing.T) {
 		if out := must(app, bin, "run", "sh", "-c", `echo in-the-container && test -f "$DATABASE_PATH" && echo has-the-database`); !strings.Contains(out, "in-the-container") || !strings.Contains(out, "has-the-database") {
 			t.Errorf("run = %q, want the output of the command, with the env and the storage of the app", out)
@@ -584,6 +625,39 @@ func TestEndToEnd(t *testing.T) {
 		}
 		if got := get("direct.localhost"); !strings.HasPrefix(got, "hits=1 ") {
 			t.Errorf("GET direct.localhost = %q, want the app", got)
+		}
+
+		// Six older images of the app, each its own, as six deploys leave them.
+		// The next deploy keeps the newest five, here and in the registry.
+		first := "127.0.0.1:5555/direct:" + strings.TrimSpace(must(direct, "git", "rev-parse", "HEAD"))
+		for i := range 6 {
+			older := fmt.Sprintf("127.0.0.1:5555/direct:older%d", i)
+			build := exec.Command("docker", "build", "-q", "-t", older, "-")
+			build.Stdin = strings.NewReader(fmt.Sprintf("FROM %s\nLABEL older=%d\n", first, i))
+			if out, err := build.CombinedOutput(); err != nil {
+				t.Fatalf("docker build: %s", out)
+			}
+			must(".", "docker", "push", "-q", older)
+		}
+		t.Cleanup(func() {
+			if out, _ := docker("images", "-q", "127.0.0.1:5555/direct"); out != "" {
+				docker(append([]string{"rmi", "-f"}, strings.Fields(out)...)...)
+			}
+		})
+		appPy, _ := os.ReadFile(filepath.Join(direct, "app.py"))
+		os.WriteFile(filepath.Join(direct, "app.py"), append(appPy, []byte("# a change\n")...), 0644)
+		must(direct, "git", "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-qam", "change")
+		newest := strings.TrimSpace(must(direct, "git", "rev-parse", "HEAD"))
+		must(direct, bin, "deploy")
+
+		local, _ := docker("images", "-q", "127.0.0.1:5555/direct")
+		listed := must(".", "curl", "-s", "http://127.0.0.1:5555/v2/direct/tags/list")
+		if n := len(strings.Fields(local)); n != 5 {
+			t.Errorf("the Docker of this computer keeps %d images of the app, want 5", n)
+		}
+		_, tags, _ := strings.Cut(listed, `"tags":`)
+		if n := strings.Count(tags, ",") + 1; n != 5 || !strings.Contains(tags, newest) {
+			t.Errorf("the registry of this computer lists %s, want 5 tags, with the one of this deploy", listed)
 		}
 		must(direct, bin, "remove")
 		// The tests after this one use the address on the web again, and they count the logins.

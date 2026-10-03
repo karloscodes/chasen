@@ -137,6 +137,10 @@ func appAlerts() []alert {
 			found = append(found, alert{"app", true, fmt.Sprintf("%s is down: its container is %s", name, cmp.Or(now, "gone")),
 				fmt.Sprintf("chasen -a %s logs shows why, and chasen -a %s restart starts it again.", name, name)})
 		}
+		if settings, _ := loadSettings(name); settings.Jobs != "" && all.of(jobsName(name)).State != "running" {
+			found = append(found, alert{"app", true, name + " has no jobs container that runs: its jobs wait",
+				fmt.Sprintf("chasen -a %s restart starts it again.", name)})
+		}
 	}
 	return found
 }

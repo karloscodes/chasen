@@ -67,7 +67,7 @@ func reviewAppFile(app appFile, dockerfile bool, tag string) []finding {
 	for _, name := range app.Secrets {
 		env[name] = ""
 	}
-	settings := protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes, Memory: app.Memory, Cron: app.Cron}
+	settings := protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes, Memory: app.Memory, Cron: app.Cron, Jobs: app.Jobs}
 	for _, err := range unjoin(settings.Check()) {
 		f := finding{true, "chasen.yml: " + err.Error(), "", docsAppFile}
 		if strings.HasPrefix(err.Error(), "chasen sets ") {

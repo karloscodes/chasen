@@ -148,7 +148,7 @@ Secrets travel with the deploy on purpose. Nothing that matters lives only on th
 
 ## Limits an app must fit
 
-- One container for each app. No second process type (a worker): background jobs run in the process of the app, with their queue in its database in the storage, and a job must be safe to run twice. Cron jobs (`cron:` in `chasen.yml`) run in its container.
+- One web container for each app, and one jobs container when `jobs:` in `chasen.yml` names its command. The queue of the jobs is in a database of the app, in the storage, and a job must be safe to run twice. Cron jobs (`cron:` in `chasen.yml`) run in the web container.
 - 512 MB of memory by default. `memory: 1g` in `chasen.yml` gives an app more. One server runs several apps, so a limit keeps one app from taking the memory of the others.
 - No Postgres, MySQL, or Redis from Chasen. The app can use a service that runs elsewhere.
 

@@ -150,6 +150,16 @@ func runServer(args []string) error {
 		if _, err := loadApp(name); err != nil {
 			return err
 		}
+		// chasen logs jobs: the jobs container.
+		if len(args) == 1 && args[0] == "jobs" {
+			jobs := runningJobs(name)
+			if jobs == "" {
+				return fmt.Errorf("%s has no jobs container that runs. It is `jobs:` in chasen.yml", name)
+			}
+			cmd := exec.Command("docker", "logs", "-f", "--tail", "100", jobs)
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stdout
+			return cmd.Run()
+		}
 		return engine(name).Logs()
 	case "backup":
 		cfg, err := loadServerConfig()
@@ -949,8 +959,9 @@ func serverRollback(name string) error {
 	return nil
 }
 
-// apply saves the app and deploys it. When the deploy fails, the previous
-// container keeps the traffic and apply puts the previous record back.
+// apply saves the app and deploys it, with its jobs container: one unit (see
+// jobs.go). When the deploy fails, the previous version keeps the traffic and
+// its jobs, and apply puts the previous record back.
 func apply(name string, app matcha.AppConfig) error {
 	old, oldErr := loadApp(name)
 	if err := saveApp(name, app); err != nil {
@@ -967,6 +978,22 @@ func apply(name string, app matcha.AppConfig) error {
 			return errors.New(unhealthyReport(app, failed))
 		}
 		return fmt.Errorf("%w\nThe app must listen on port %d and answer 200 on %s", err, app.Port, app.HealthPath)
+	}
+	settings, _ := loadSettings(name)
+	if err := swapJobs(name, settings.Jobs); err != nil {
+		// The web and the jobs are one unit: the web goes back too.
+		m := engine(name)
+		if oldErr != nil {
+			m.RemoveFromProxy()
+			m.StopApp()
+			forgetApp(name)
+			return fmt.Errorf("%w\nNothing of %s runs: this was its first deploy", err, name)
+		}
+		saveApp(name, old)
+		if back := m.DeployApp(old); back != nil {
+			return fmt.Errorf("%w\nThe version before did not start again either: %v", err, back)
+		}
+		return fmt.Errorf("%w\nThe version before runs again, with its jobs", err)
 	}
 	return nil
 }
@@ -1258,6 +1285,10 @@ func serverStatus(name string) error {
 	fmt.Printf("App:      %s\n", name)
 	fmt.Printf("Version:  %s\n", version)
 	fmt.Printf("State:    %s\n", state)
+	if settings, _ := loadSettings(name); settings.Jobs != "" {
+		jobs := all.of(jobsName(name)).Status
+		fmt.Printf("Jobs:     %s (%s)\n", cmp.Or(jobs, "not running"), settings.Jobs)
+	}
 	for _, d := range strings.Split(app.Domain, ",") {
 		fmt.Printf("URL:      %s\n", link(d))
 	}
@@ -1303,6 +1334,9 @@ func serverRemove(name string) error {
 		fmt.Printf("Warning: %v\n", err)
 	}
 	m.StopApp()
+	if jobs := runningJobs(name); jobs != "" {
+		stopContainer(jobs)
+	}
 	if err := forgetApp(name); err != nil {
 		return err
 	}

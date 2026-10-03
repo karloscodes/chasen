@@ -20,7 +20,7 @@
 | `chasen secrets edit` | Change the secrets of the app in your editor. They stay in the repository, encrypted |
 | `chasen secrets` | List the names of the secrets. `chasen secrets show` prints the values too |
 | `chasen status` | Show the version, the state, the URLs, the last backup, and the replica |
-| `chasen logs` | Follow the app logs |
+| `chasen logs` | Follow the app logs. `chasen logs jobs` follows the jobs container |
 | `chasen enable <addon> [domain]` | Run fusionaly, formlander, or lognorth from its image |
 | `chasen -a <app> <command>` | Run a command for an addon, or for an app of another directory |
 | `chasen run <command>` | Run one command in the container of the app, with its env and its storage: `chasen run bin/rails db:migrate`. The output comes back as it is written, and the exit code is the one of the command. The history keeps it. See "Run a command in the app" below |

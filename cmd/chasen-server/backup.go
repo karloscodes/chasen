@@ -516,10 +516,19 @@ func serverRestore(name, source string) error {
 	if err := pauseReplica(); err != nil {
 		return err
 	}
+	// The jobs write to the databases too: they stop first, and start again after.
+	if jobs := runningJobs(name); jobs != "" {
+		stopContainer(jobs)
+	}
 	m.StopApp()
 	aside, swapErr := swap(name, staged)
 	if err := m.DeployApp(app); err != nil {
 		return fmt.Errorf("the app did not start after the restore: %w", err)
+	}
+	if settings, _ := loadSettings(name); settings.Jobs != "" {
+		if err := swapJobs(name, settings.Jobs); err != nil {
+			return fmt.Errorf("the jobs did not start after the restore: %w", err)
+		}
 	}
 	if swapErr != nil {
 		return swapErr

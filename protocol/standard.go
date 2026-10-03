@@ -167,6 +167,11 @@ func (s Settings) Check() error {
 		problems = append(problems, fmt.Errorf("invalid memory %q: use megabytes or gigabytes, like 512m or 2g, and 64m or more", s.Memory))
 	}
 	problems = append(problems, checkCron(s.Cron)...)
+	if s.Jobs != "" {
+		if _, err := CommandWords(s.Jobs); err != nil {
+			problems = append(problems, fmt.Errorf("jobs: %w", err))
+		}
+	}
 	return errors.Join(problems...)
 }
 

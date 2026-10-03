@@ -163,7 +163,7 @@ If the firewall of the server lets in only the addresses of Cloudflare, every na
 
 ## Limits to know
 
-- One container for each app, with 512 MB of memory unless `memory:` in `chasen.yml` says more. No worker process: [background jobs](deploy.md#background-jobs) run in the process of the app, and [cron jobs](deploy.md#cron-jobs) in its container.
+- One container for each app, with 512 MB of memory unless `memory:` in `chasen.yml` says more. One more container for its [background jobs](deploy.md#background-jobs), when `jobs:` names its command. [Cron jobs](deploy.md#cron-jobs) run in the web container.
 - SQLite only. Uploaded files persist across deploys, but they have no backup yet.
 - The build is for the CPU of the server, `amd64` or `arm64`. When your computer has another one, the build runs under emulation and takes longer.
 - `setup` does not harden the server. `chasen alerts` reports what is missing, with the fix: SSH with keys only, a firewall, and security updates.

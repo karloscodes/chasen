@@ -47,6 +47,9 @@ type appFile struct {
 	// Cron is the commands that the server runs in the container on a
 	// schedule, in UTC.
 	Cron []protocol.CronJob `yaml:"cron"`
+	// Jobs is the command of a second container for the jobs of the app,
+	// like the job role of Kamal: bin/jobs.
+	Jobs string `yaml:"jobs"`
 
 	Port          int      `yaml:"port"`
 	Memory        string   `yaml:"memory"`
@@ -306,7 +309,7 @@ var unknownKey = regexp.MustCompile(`line (\d+): field (\S+) not found in type \
 func appFileError(err error) error {
 	message := unknownKey.ReplaceAllString(err.Error(), "line $1: unknown key `$2`")
 	message = strings.TrimPrefix(strings.ReplaceAll(message, "yaml: unmarshal errors:\n  ", ""), "yaml: ")
-	return fmt.Errorf("chasen.yml: %s\n  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes, memory, backup, cron.\n  %s%s", message, docsURL, docsAppFile)
+	return fmt.Errorf("chasen.yml: %s\n  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes, memory, backup, cron, jobs.\n  %s%s", message, docsURL, docsAppFile)
 }
 
 // bucket shows where the backups of the server go, or sets the bucket: the
