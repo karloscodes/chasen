@@ -387,6 +387,32 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("a cron job of chasen.yml runs in the container on its schedule, and the history keeps the run", func(t *testing.T) {
+		os.WriteFile(filepath.Join(app, "chasen.yml"), []byte(yml+"cron:\n  - schedule: \"* * * * *\"\n    run: sh -c 'echo cron-ran in $DATABASE_PATH'\n"), 0644)
+		must(app, bin, "restart")
+		defer func() {
+			must(app, "git", "checkout", "-q", "chasen.yml")
+			must(app, bin, "restart")
+		}()
+
+		// The API looks at the start of each minute.
+		var entry string
+		for deadline := time.Now().Add(75 * time.Second); entry == "" && time.Now().Before(deadline); time.Sleep(3 * time.Second) {
+			for _, line := range strings.Split(must(app, bin, "history"), "\n") {
+				if strings.Contains(line, "cron sh -c") && strings.Contains(line, "succeeded") {
+					entry = strings.Fields(line)[0]
+				}
+			}
+		}
+
+		if entry == "" {
+			t.Fatalf("no cron run in the history after 75 seconds: %q", must(app, bin, "history"))
+		}
+		if out := must(app, bin, "history", entry); !strings.Contains(out, "cron-ran in /storage/") {
+			t.Errorf("the output of the cron run = %q, want the echo, with the env of the app", out)
+		}
+	})
+
 	t.Run("run runs a command in the container of the app, and gives its exit code back", func(t *testing.T) {
 		if out := must(app, bin, "run", "sh", "-c", `echo in-the-container && test -f "$DATABASE_PATH" && echo has-the-database`); !strings.Contains(out, "in-the-container") || !strings.Contains(out, "has-the-database") {
 			t.Errorf("run = %q, want the output of the command, with the env and the storage of the app", out)

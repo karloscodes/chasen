@@ -166,6 +166,7 @@ func (s Settings) Check() error {
 	if s.Memory != "" && !ValidMemory(s.Memory) {
 		problems = append(problems, fmt.Errorf("invalid memory %q: use megabytes or gigabytes, like 512m or 2g, and 64m or more", s.Memory))
 	}
+	problems = append(problems, checkCron(s.Cron)...)
 	return errors.Join(problems...)
 }
 

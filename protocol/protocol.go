@@ -77,6 +77,9 @@ type Settings struct {
 	// Memory is the most memory the app may use: "512m", "1g". Empty is
 	// DefaultMemory.
 	Memory string `json:"memory,omitempty"`
+	// Cron is the commands that the server runs in the container on a
+	// schedule: `cron:` in chasen.yml.
+	Cron []CronJob `json:"cron,omitempty"`
 }
 
 // Registry is the login of an image registry, like ghcr.io or Docker Hub.

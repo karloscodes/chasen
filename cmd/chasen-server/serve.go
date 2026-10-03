@@ -66,6 +66,7 @@ func serverServe() error {
 			time.Sleep(5 * time.Second)
 		}
 	}()
+	go cronLoop(self)
 	go func() {
 		// At the start of each hour, by the clock. A tick from the start of
 		// the API moved with each restart: updates less than an hour apart
