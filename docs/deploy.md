@@ -147,9 +147,9 @@ When CI pushes your images to a registry, deploy the image that is there, with n
 
 Chasen has no job system of its own, and your app needs no code for Chasen. Keep the queue that your framework has, and follow three rules:
 
-1. **The queue is in the database of the app, in the storage.** Solid Queue for Rails 8, River or goqite for Go, or a `jobs` table and a loop. So Chasen backs up the queue with the data, and a restore brings back both from the same second: no job points to a row that is gone.
+1. **The queue is in a database of the app, in the storage.** Solid Queue for Rails 8, River or goqite for Go, or a `jobs` table and a loop. Rails 8 keeps the queue in a file of its own, `storage/production_queue.sqlite3`: that is fine, because Chasen backs up every SQLite file in the storage, with its live replica. A restore brings back the data and the queue from the same backup, so no job points to a row that is gone.
 2. **The worker runs in the process of the app.** For Rails 8, set `SOLID_QUEUE_IN_PUMA=true`. In Go, start a goroutine. One container, one memory limit, and `chasen logs` shows the requests and the jobs together.
-3. **A job can run twice.** A deploy sends `SIGTERM`, and Docker stops the old container 10 seconds later. A job that it cuts off goes back to the queue and runs again. During a deploy, the old and the new container also run together for a few seconds, and both take jobs from the queue: a real queue locks each job in the database, and a plain timer can run twice.
+3. **A job can run twice.** A deploy, a restart, a rollback, and a restore send `SIGTERM` to the old container, and Docker kills it 10 seconds later. Stop taking new jobs on `SIGTERM`, and finish the one that runs if it takes less than that. A job that it cuts off goes back to the queue and runs again. During a deploy, the old and the new container also run together for a few seconds, and both take jobs from the queue: a real queue locks each job in the database, and a plain timer can run twice.
 
 | You need | Use |
 |---|---|
