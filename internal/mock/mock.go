@@ -264,8 +264,8 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 			0.2+beat, 0.4+beat/2, 0.5, 2.1+beat, int((2.1+beat)*100/7.6))
 		return 0
 	case "alerts":
-		// One error and one warning, so the screen has its alerts to show.
-		fmt.Fprint(out, "ERROR    blog is down: its container is exited\n         chasen -a blog logs shows why, and chasen -a blog restart starts it again.\nWARNING  SSH accepts passwords: a bot can guess one\n         Log in with a key, then add PasswordAuthentication no to /etc/ssh/sshd_config and run: systemctl reload ssh\n\n1 error, 1 warning. Checked at 14:00 UTC.\n")
+		// Two warnings, so the screen has its alerts to show.
+		fmt.Fprint(out, "WARNING  SSH accepts passwords: a bot can guess one\n         Log in with a key, then add PasswordAuthentication no to /etc/ssh/sshd_config and run: systemctl reload ssh\nWARNING  a reboot waits since 2 days: the server runs an old kernel, for linux-image-6.8.0-45-generic\n         Run reboot on the server: about one minute of downtime.\n\n2 warnings. Checked at 10:19 UTC.\n")
 		return 0
 	case "logout":
 		return 0
