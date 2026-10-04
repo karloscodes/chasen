@@ -458,6 +458,48 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("the secrets of chasen.secrets.enc reach the app with the key of CI, and with no key nothing changes", func(t *testing.T) {
+		// A person makes the file with chasen secrets edit. The editor here
+		// copies the secrets in.
+		typed := filepath.Join(t.TempDir(), "secrets.env")
+		os.WriteFile(typed, []byte("FROM_THE_FILE=sealed-value\nGREETING=\"from the file\"\n"), 0600)
+		t.Setenv("EDITOR", "cp "+typed)
+		t.Setenv("CHASEN_KEY", "")
+		must(app, bin, "secrets", "edit")
+		t.Cleanup(func() {
+			for _, name := range []string{"chasen.key", "chasen.secrets.enc", ".gitignore"} {
+				os.Remove(filepath.Join(app, name))
+			}
+			run(app, "git", "checkout", "-q", "--", ".")
+			os.Unsetenv("CHASEN_KEY")
+			must(app, bin, "restart")
+		})
+		if sealed, _ := os.ReadFile(filepath.Join(app, "chasen.secrets.enc")); strings.Contains(string(sealed), "sealed-value") {
+			t.Fatal("chasen.secrets.enc has the value as plain text")
+		}
+		// In CI the key is CHASEN_KEY, and there is no key file.
+		key, _ := os.ReadFile(filepath.Join(app, "chasen.key"))
+		os.Remove(filepath.Join(app, "chasen.key"))
+		t.Setenv("CHASEN_KEY", strings.TrimSpace(string(key)))
+
+		must(app, bin, "restart")
+
+		if got := strings.TrimSpace(must(app, bin, "run", "sh", "-c", "echo $FROM_THE_FILE / $GREETING")); got != "sealed-value / from the file" {
+			t.Errorf("the secrets in the container = %q, want the values of chasen.secrets.enc", got)
+		}
+
+		// No key: the restart stops before it changes anything.
+		t.Setenv("CHASEN_KEY", "")
+		out, err := run(app, bin, "restart")
+
+		if err == nil || !strings.Contains(out, "its key is not") || strings.Contains(out, "Restarting") {
+			t.Errorf("restart with no key = %q, %v, want a stop that names the key, before the restart", out, err)
+		}
+		if got := strings.TrimSpace(must(app, bin, "run", "sh", "-c", "echo $FROM_THE_FILE")); got != "sealed-value" {
+			t.Errorf("the secret after a restart with no key = %q, want the value from before", got)
+		}
+	})
+
 	t.Run("run runs a command in the container of the app, and gives its exit code back", func(t *testing.T) {
 		if out := must(app, bin, "run", "sh", "-c", `echo in-the-container && test -f "$DATABASE_PATH" && echo has-the-database`); !strings.Contains(out, "in-the-container") || !strings.Contains(out, "has-the-database") {
 			t.Errorf("run = %q, want the output of the command, with the env and the storage of the app", out)
