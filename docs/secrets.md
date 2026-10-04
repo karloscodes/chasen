@@ -24,7 +24,9 @@ The first `chasen secrets edit` makes the key and prints it:
 
 Save the key in a password manager. If you lose it, nobody can read the secrets. On another computer, put the key back in `chasen.key`. In CI, give it as `CHASEN_KEY`.
 
-One key at the top of a repository opens the secrets of every app in it: Chasen looks for `chasen.key` in the directory of the app, then in each directory above it.
+One key at the top of a repository opens the secrets of every app in it. Chasen takes `CHASEN_KEY` from the environment first. Without it, Chasen looks for `chasen.key` in the directory of the app, then in each directory above it.
+
+A value with spaces goes in double quotes: `GREETING="hello there"`. A value of more than one line goes on one line, with `\n` for each line break: `CERT="first line\nsecond line"`.
 
 ```bash
 chasen secrets         # the names
@@ -51,7 +53,13 @@ secrets_command: op inject -i .env.tpl
 | fnox | `fnox export` |
 | sops | `sops -d secrets.enc.env` |
 
-Chasen takes each name from the output of the command, then from the environment, then from `chasen.secrets.enc`. So a value in the environment wins over the file: CI can replace one secret without the key. A missing secret stops the deploy before it changes anything.
+Chasen takes each name of `secrets:` from the output of the command, then from the environment, then from `chasen.secrets.enc`. So for a name in `secrets:`, a value in the environment wins over the file: CI can replace that one secret. CI still needs `CHASEN_KEY` when the repository has `chasen.secrets.enc`, because Chasen opens the whole file at each deploy. A missing secret stops the deploy before it changes anything.
+
+## Rails credentials
+
+A Rails app needs no setup for its credentials. At each deploy, Chasen reads the key of the credentials on this computer, `config/credentials/production.key` or `config/master.key`, and sends it as the secret `RAILS_MASTER_KEY`. Git ignores both files, so the key travels like every other secret, and it is never in the repository.
+
+In CI the key file is not there. Add `RAILS_MASTER_KEY` to `chasen.secrets.enc` once, with `chasen secrets edit`, and CI sends it from there. When neither has it, the review of the deploy warns you before the app fails at start.
 
 ## Change a secret, or remove one
 
