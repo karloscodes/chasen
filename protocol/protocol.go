@@ -84,6 +84,11 @@ type Settings struct {
 	// bin/jobs. The container runs the image of the app, with its env and its
 	// volumes, and deploys with the web container as one unit.
 	Jobs string `json:"jobs,omitempty"`
+
+	// KeepSettings deploys the image and keeps the other settings that the
+	// app has: `chasen deploy <image>`, which runs again to update an app.
+	// Image, Registry, and Domain come from the deploy.
+	KeepSettings bool `json:"keep_settings,omitempty"`
 }
 
 // Registry is the login of an image registry, like ghcr.io or Docker Hub.

@@ -773,6 +773,15 @@ func serverDeploy(name, version string) error {
 	if err != nil {
 		return err
 	}
+	// An image alone changes the image: the port, the env, and the rest stay.
+	if settings.KeepSettings {
+		saved, err := loadSettings(name)
+		if err != nil {
+			return err
+		}
+		saved.Image, saved.Registry, saved.Domain = settings.Image, settings.Registry, settings.Domain
+		settings = saved
+	}
 	if err := saveSettings(name, settings); err != nil {
 		return err
 	}

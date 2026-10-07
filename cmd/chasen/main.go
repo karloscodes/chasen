@@ -78,6 +78,12 @@ Run these in the directory of your app:
                          Send the backups to an S3 bucket too, and start the live replica.
                          It asks for the secret access key
 
+Apps that others release run from their image, in any directory:
+  deploy <image> [<user>@<host>] --domain <domain>
+                         Deploy the newest image, like ghcr.io/basecamp/once-campfire. Nothing of
+                         the directory counts. The app is named after the image, or -a <app>.
+                         Run it again to update: the settings of the app stay. --tag for a version
+
 Addons run from a ready image, with the same backups:
   enable <addon> [domain]   Run fusionaly, formlander, or lognorth. Run it again to update
   -a <app> <command>        Run a command for an addon, or for an app of another directory

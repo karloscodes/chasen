@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"runtime"
 	"slices"
@@ -143,13 +145,8 @@ func headCommit() (string, error) {
 // same is true for a directory with no Dockerfile: its image is the newest
 // one in the registry.
 func deployImage(creds credentials, app appFile, settings protocol.Settings, command string) error {
-	tag := tagFlag
-	if at := strings.LastIndexAny(app.Image, ":@"); at > strings.LastIndex(app.Image, "/") {
-		if tag == "" {
-			tag = app.Image[at+1:]
-		}
-		app.Image = app.Image[:at]
-	}
+	image, tag := splitImage(app.Image)
+	app.Image, tag = image, cmp.Or(tagFlag, tag)
 	build := tag == ""
 	if _, err := os.Stat("Dockerfile"); build && err != nil {
 		// Nothing to build here: the image comes from the release of another
@@ -171,7 +168,8 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 
 	settings.Image = app.Image + ":" + tag
 	registry, from, err := registryLogin(app)
-	if err != nil {
+	// An image that is not built here can be public: the server pulls it with no login.
+	if err != nil && build {
 		return err
 	}
 	settings.Registry = registry
@@ -225,6 +223,37 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 		}
 	}
 	return nil
+}
+
+// splitImage returns the image without its tag or digest, and the tag or
+// digest: ghcr.io/you/app:2.1 is ghcr.io/you/app and 2.1.
+func splitImage(ref string) (image, tag string) {
+	if at := strings.LastIndexAny(ref, ":@"); at > strings.LastIndex(ref, "/") {
+		return ref[:at], ref[at+1:]
+	}
+	return ref, ""
+}
+
+// deployRelease deploys an image that another repository releases, with the
+// line of its README: chasen deploy ghcr.io/basecamp/once-campfire --domain
+// chat.example.com. Nothing of this directory counts: no chasen.yml, no
+// Dockerfile, no secrets. The app is named after the image, or -a. The same
+// line again updates the app to the newest image and keeps its settings.
+func deployRelease(creds credentials, ref string) error {
+	image, tag := splitImage(ref)
+	app := appFile{Name: appFlag, Image: image + ":" + cmp.Or(tagFlag, tag, "latest")}
+	if app.Name == "" {
+		app.Name = strings.NewReplacer("_", "-", ".", "-").Replace(strings.ToLower(path.Base(image)))
+	}
+	if err := printReview(os.Stderr, reviewAppFile(app, false, "")); err != nil {
+		return err
+	}
+	creds, err := placed(creds, app.Name)
+	if err != nil {
+		return err
+	}
+	settings := protocol.Settings{Env: map[string]string{}, Domain: domainFlag, KeepSettings: true}
+	return deployImage(creds, app, settings, "deploy")
 }
 
 // isDeployed reports that the server runs the app. A server that does not

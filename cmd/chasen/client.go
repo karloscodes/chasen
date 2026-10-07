@@ -169,14 +169,29 @@ options:
 	// `chasen deploy root@203.0.113.5` names the server of the deploy. The
 	// first time, that is all it takes: the server gets Chasen, this computer
 	// gets its login, and the app goes live.
+	// `chasen deploy ghcr.io/you/app` deploys that image, with nothing of this
+	// directory. Both words can come together, in any order.
 	login := func() (credentials, error) { return loadCredentials(app.Server) }
 	if args[0] == "deploy" && len(args) > 1 {
-		if len(args) > 2 {
-			return errors.New("usage: chasen deploy [<user>@<host>] [--domain <domain>] [--tag <tag>]")
+		var server, image string
+		for _, arg := range args[1:] {
+			switch {
+			case isImageRef(arg) && image == "":
+				image = arg
+			case !isImageRef(arg) && server == "":
+				server = arg
+			default:
+				return errors.New("usage: chasen deploy [<image>] [<user>@<host>] [--domain <domain>] [--tag <tag>]")
+			}
 		}
-		server := args[1]
 		args = args[:1]
-		login = func() (credentials, error) { return serverLogin(server) }
+		if image != "" {
+			args = append(args, image)
+			app.Server = "" // the server of chasen.yml is for the app of this directory
+		}
+		if server != "" {
+			login = func() (credentials, error) { return serverLogin(server) }
+		}
 	}
 	creds, err := login()
 	if err != nil {
@@ -205,6 +220,9 @@ func runCommand(creds credentials, args []string) error {
 	case "bucket":
 		return bucket(creds, args[1:])
 	case "deploy", "check":
+		if len(args) == 2 && cmd == "deploy" {
+			return deployRelease(creds, args[1])
+		}
 		app, err := loadAppFile()
 		if err != nil {
 			return err
@@ -275,6 +293,14 @@ func runCommand(creds credentials, args []string) error {
 		checkAddresses(os.Stdout, appURLs("  https://"+strings.ToLower(args[2])+"\n"))
 	}
 	return nil
+}
+
+// isImageRef reports a word after deploy that names an image, not a server:
+// it has a slash, like ghcr.io/you/app or you/app. A server is root@host,
+// a domain, cloud, or an address with :// in it.
+func isImageRef(word string) bool {
+	slash := strings.Index(word, "/")
+	return slash > 0 && !strings.Contains(word, "://") && !strings.Contains(word[:slash], "@")
 }
 
 func loadAppFile() (appFile, error) {

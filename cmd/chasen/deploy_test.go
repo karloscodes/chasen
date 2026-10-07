@@ -1,10 +1,101 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/karloscodes/chasen/internal/mock"
+	"github.com/karloscodes/chasen/protocol"
 )
+
+// sentDeploy is what a server gets for a deploy: the app, the version, and
+// the settings.
+type sentDeploy struct {
+	args     []string
+	settings protocol.Settings
+}
+
+func TestDeployAnImage(t *testing.T) {
+	// A mock server that keeps the deploy it gets, in an app directory with
+	// settings and a Dockerfile that the deploy of an image must not use.
+	deployTo := func(t *testing.T, args ...string) sentDeploy {
+		server := mock.New(time.Now())
+		server.Wait = func(context.Context, time.Duration) bool { return true }
+		var sent sentDeploy
+		api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v1/deploy" {
+				body, _ := io.ReadAll(r.Body)
+				line, _ := bufio.NewReader(bytes.NewReader(body)).ReadBytes('\n')
+				sent.args = r.URL.Query()["arg"]
+				json.Unmarshal(line, &sent.settings)
+				r.Body = io.NopCloser(bytes.NewReader(body))
+			}
+			server.ServeHTTP(w, r)
+		}))
+		t.Cleanup(api.Close)
+		t.Chdir(t.TempDir())
+		os.WriteFile("chasen.yml", []byte("name: shop\nenv:\n  FOO: bar\n"), 0644)
+		os.WriteFile("Dockerfile", []byte("FROM scratch\n"), 0644)
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("CHASEN_URL", api.URL)
+		t.Setenv("CHASEN_TOKEN", server.Token)
+		t.Setenv("GHCR_TOKEN", "test")
+		t.Cleanup(func() { appFlag, tagFlag, domainFlag = "", "", "" })
+
+		if err := runClient(args); err != nil {
+			t.Fatal(err)
+		}
+		return sent
+	}
+
+	t.Run("deploys the newest image, named after it, with nothing of the directory", func(t *testing.T) {
+		sent := deployTo(t, "deploy", "ghcr.io/basecamp/once-campfire", "--domain", "chat.example.com")
+
+		if strings.Join(sent.args, " ") != "once-campfire latest" {
+			t.Errorf("args = %v, want once-campfire latest", sent.args)
+		}
+		s := sent.settings
+		if s.Image != "ghcr.io/basecamp/once-campfire:latest" || s.Domain != "chat.example.com" || !s.KeepSettings || len(s.Env) != 0 {
+			t.Errorf("settings = %+v, want the image, the domain, keep_settings, and no env", s)
+		}
+	})
+
+	t.Run("takes the tag of the image and the name of -a", func(t *testing.T) {
+		sent := deployTo(t, "deploy", "basecamp/once-campfire:1.2", "-a", "campfire")
+
+		if strings.Join(sent.args, " ") != "campfire 1.2" || sent.settings.Image != "basecamp/once-campfire:1.2" {
+			t.Errorf("args = %v, image = %s, want campfire 1.2", sent.args, sent.settings.Image)
+		}
+	})
+}
+
+func TestIsImageRef(t *testing.T) {
+	for word, want := range map[string]bool{
+		"ghcr.io/basecamp/once-campfire": true,
+		"basecamp/once-campfire:1.2":     true,
+		"ghcr.io/you/app@sha256:abc":     true,
+		"root@203.0.113.5":               false,
+		"ubuntu@matcha-prod":             false,
+		"example.com":                    false,
+		"cloud":                          false,
+		"ssh://root@203.0.113.5":         false,
+		"https://api.example.com":        false,
+	} {
+		if got := isImageRef(word); got != want {
+			t.Errorf("isImageRef(%q) = %v, want %v", word, got, want)
+		}
+	}
+}
 
 func TestRailsMasterKey(t *testing.T) {
 	rails := func(t *testing.T, files map[string]string) {

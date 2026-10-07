@@ -743,6 +743,27 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("an image alone deploys from any directory, and keeps the settings of the app", func(t *testing.T) {
+		// The login that docker login saved for the registry, as on the computer of a person.
+		config := t.TempDir()
+		login := exec.Command("docker", "--config", config, "login", "-u", "chasen", "--password-stdin", registry)
+		login.Stdin = strings.NewReader("chasen-e2e")
+		if out, err := login.CombinedOutput(); err != nil {
+			t.Fatalf("docker login: %s", out)
+		}
+		t.Setenv("DOCKER_CONFIG", config)
+		_, greeting, _ := strings.Cut(get("example.localhost"), "greeting=")
+
+		out := must(t.TempDir(), bin, "deploy", registry+"/example")
+
+		if strings.Contains(out, "Building") || !strings.Contains(out, "Deployed example") {
+			t.Errorf("deploy = %q, want the image of the registry deployed as example, with no build", out)
+		}
+		if _, now, _ := strings.Cut(get("example.localhost"), "greeting="); greeting == "" || now != greeting {
+			t.Errorf("greeting after the deploy of the image = %q, want %q: the env of the app stays", now, greeting)
+		}
+	})
+
 	t.Run("a deploy that does not get healthy keeps the previous version live", func(t *testing.T) {
 		commit("app.py", "raise SystemExit('broken')\n")
 

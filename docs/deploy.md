@@ -62,7 +62,20 @@ registry:                 # the login of the registry, when docker login is not 
 
 ## An image that another repository releases
 
-Some apps are not yours to build: a product that ships as an image, like an analytics tool or a form backend. You only run it. Keep a folder for it with a `chasen.yml` that names the image, and no `Dockerfile`:
+Some apps are not yours to build: a product that ships as an image, like a chat app, an analytics tool, or a form backend. You only run it. When the image follows [the standard](../STANDARD.md), one line deploys it, from any directory:
+
+```bash
+chasen deploy ghcr.io/basecamp/once-campfire --domain chat.example.com
+chasen deploy ghcr.io/basecamp/once-campfire root@203.0.113.5 --domain chat.example.com   # to that server
+```
+
+- **Nothing of the directory counts:** no `chasen.yml`, no `Dockerfile`, no secrets. Nothing is built.
+- **The app is named after the image:** `once-campfire`. `-a campfire` gives it another name. Use the name for the other commands: `chasen -a once-campfire status`.
+- **The server pulls `latest`, or the tag in the image:** `ghcr.io/basecamp/once-campfire:1.2`. `--tag` does the same.
+- **Run the same line again to update** to the newest image. The app keeps its domains and its settings. A public image needs no login. For a private one, run `docker login` first.
+- **Apps made for [ONCE](https://github.com/basecamp/once) follow the same rules:** port 80, `/up`, and the data in `/storage`. They get `SECRET_KEY_BASE` and `BASE_URL` too. Chasen does not make the `VAPID_*` keys of ONCE yet: an app that needs them for push notifications gets them as secrets, in a folder like the one below.
+
+An image that needs settings (another health path, env, a volume) gets a folder with a `chasen.yml` that names the image, and no `Dockerfile`:
 
 ```yaml
 # analytics/chasen.yml
