@@ -200,12 +200,19 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 	// The server pulls an image of this computer through a port of its own
 	// loopback, which leads back here for as long as the deploy runs.
 	if local {
+		// By digest, not by tag: the registry of this computer has no login,
+		// so another local user could put another image under the tag before
+		// the server pulls it. The digest names the image that was reviewed.
+		digest, err := imageDigest(app.Image, tag)
+		if err != nil {
+			return err
+		}
 		port, closeTunnel, err := registryTunnel(creds.URL)
 		if err != nil {
 			return err
 		}
 		defer closeTunnel()
-		settings.Image = fmt.Sprintf("127.0.0.1:%d/%s:%s", port, app.Image[len(localRegistry)+1:], tag)
+		settings.Image = fmt.Sprintf("127.0.0.1:%d/%s@%s", port, app.Image[len(localRegistry)+1:], digest)
 	}
 	var printed strings.Builder
 	if err := remote(creds, settings.Body(nil), io.MultiWriter(os.Stdout, &printed), command, app.Name, version); err != nil {

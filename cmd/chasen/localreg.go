@@ -88,7 +88,8 @@ func registryTunnel(address string) (int, func(), error) {
 			args = append(args, "-p", p)
 		}
 		// The command runs once the port is open: its first line says so.
-		ssh := exec.Command("ssh", append(args, target, "sh -c 'echo open; exec cat'")...)
+		// "--": the target can never read as an option of ssh.
+		ssh := exec.Command("ssh", append(args, "--", target, "sh -c 'echo open; exec cat'")...)
 		input, _ := ssh.StdinPipe()
 		output, _ := ssh.StdoutPipe()
 		var said bytes.Buffer
@@ -209,6 +210,24 @@ func registryDigest(name, tag string) (string, error) {
 	digest := resp.Header.Get("Docker-Content-Digest")
 	if resp.StatusCode != http.StatusOK || digest == "" {
 		return "", fmt.Errorf("%s:%s: %s", name, tag, resp.Status)
+	}
+	return digest, nil
+}
+
+// imageDigest returns the digest of an image of the local registry: the one
+// that Docker recorded when this computer pushed it. An image that this
+// computer no longer has (a --tag of an old version) takes the digest that
+// the registry gives now.
+func imageDigest(repo, tag string) (string, error) {
+	out, _ := exec.Command("docker", "image", "inspect", "-f", "{{range .RepoDigests}}{{println .}}{{end}}", repo+":"+tag).Output()
+	for _, line := range strings.Fields(string(out)) {
+		if digest, ok := strings.CutPrefix(line, repo+"@"); ok {
+			return digest, nil
+		}
+	}
+	digest, err := registryDigest(strings.TrimPrefix(repo, localRegistry+"/"), tag)
+	if err != nil {
+		return "", fmt.Errorf("the registry of this computer has no image %s:%s. Deploy with no --tag to build it", repo, tag)
 	}
 	return digest, nil
 }
