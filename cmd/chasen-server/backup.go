@@ -85,15 +85,28 @@ func findDatabases(dir string, open map[string]os.FileInfo) ([]string, error) {
 			return nil
 		}
 		rel, _ := filepath.Rel(dir, path)
-		if info, err := d.Info(); err == nil && os.SameFile(open[path], info) {
+		// The app can turn a part of the path into a link at any moment: the
+		// walk saw a file, and the open must find the same file there.
+		if !linkFree(dir, path) {
+			return nil
+		}
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			return nil
+		}
+		if os.SameFile(open[path], info) {
 			dbs = append(dbs, rel)
 			return nil
 		}
-		f, err := os.Open(path)
+		// No link at the end, and no wait on a pipe that the app put there.
+		f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 		if err != nil {
-			return err
+			return nil
 		}
 		defer f.Close()
+		if opened, err := f.Stat(); err != nil || !os.SameFile(opened, info) {
+			return nil
+		}
 		header := make([]byte, 16)
 		if _, err := io.ReadFull(f, header); err == nil && string(header) == "SQLite format 3\x00" {
 			dbs = append(dbs, rel)
@@ -234,8 +247,17 @@ func backupApp(name string, cfg serverConfig) (string, error) {
 	tmp := dir + ".tmp"
 	defer os.RemoveAll(tmp)
 	for _, db := range dbs {
-		if err := snapshot(filepath.Join(appDir(name), db), filepath.Join(tmp, db+".gz")); err != nil {
+		path := filepath.Join(appDir(name), db)
+		// The copy must be of the file of the app, and stay so while it runs.
+		before, err := os.Lstat(path)
+		if err != nil || !linkFree(appDir(name), path) {
+			return "", fmt.Errorf("%s changed while it was backed up: it is not a file of %s now", db, name)
+		}
+		if err := snapshot(path, filepath.Join(tmp, db+".gz")); err != nil {
 			return "", err
+		}
+		if after, err := os.Lstat(path); err != nil || !os.SameFile(before, after) || !linkFree(appDir(name), path) {
+			return "", fmt.Errorf("%s changed while it was backed up: the backup of %s is not kept", db, name)
 		}
 	}
 	if err := os.Rename(tmp, dir); err != nil {
@@ -626,6 +648,9 @@ func stageBackup(name, stamp string) (staged map[string]string, err error) {
 	}()
 	for _, file := range files {
 		db := filepath.Join(appDir(name), strings.TrimSuffix(file, ".gz"))
+		if !parentLinkFree(appDir(name), db) {
+			return nil, fmt.Errorf("%s is not inside the storage of %s", filepath.Dir(db), name)
+		}
 		if err := os.MkdirAll(filepath.Dir(db), 0755); err != nil {
 			return nil, err
 		}
@@ -637,6 +662,9 @@ func stageBackup(name, stamp string) (staged map[string]string, err error) {
 		}
 		if err := checkIntegrity(staged[db]); err != nil {
 			return nil, err
+		}
+		if isServerDatabase(staged[db]) {
+			return nil, fmt.Errorf("the backup %s of %s holds the database of the server, not one of the app: it is not restored", stamp, name)
 		}
 	}
 	return staged, nil

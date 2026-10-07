@@ -144,7 +144,8 @@ func serverReplicate() error {
 			}
 			for _, rel := range dbs {
 				path := filepath.Join(appDir(name), rel)
-				if info, err := os.Stat(path); err == nil {
+				// Lstat, and no link in the path: see paths.go.
+				if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() && linkFree(appDir(name), path) {
 					current[path], clients[path] = info, replicaClient(cfg.Backup.S3, name, rel)
 				}
 			}
@@ -152,7 +153,10 @@ func serverReplicate() error {
 
 		// A restore replaces the file of a database. The replica must start again on the new file.
 		for path, info := range registered {
-			if now, ok := current[path]; !ok || !os.SameFile(info, now) {
+			// Litestream opens the file itself, a moment after the check. When
+			// the file it opened is not the one that was checked, it stops.
+			opened := replicas[path].FileInfo()
+			if now, ok := current[path]; !ok || !os.SameFile(info, now) || (opened != nil && !os.SameFile(info, opened)) {
 				if err := store.UnregisterDB(ctx, path); err != nil {
 					slog.Error("cannot stop the replica", "db", path, "error", err)
 				}
@@ -230,6 +234,9 @@ func stageLive(name string, s3 *s3Config) (staged map[string]string, err error) 
 	}()
 	for _, rel := range dbs {
 		db := filepath.Join(appDir(name), rel)
+		if !parentLinkFree(appDir(name), db) {
+			return nil, fmt.Errorf("%s is not inside the storage of %s", filepath.Dir(db), name)
+		}
 		if err := os.MkdirAll(filepath.Dir(db), 0755); err != nil {
 			return nil, err
 		}
@@ -250,6 +257,9 @@ func stageLive(name string, s3 *s3Config) (staged map[string]string, err error) 
 		os.Remove(tmp + "-shm")
 		if err := checkIntegrity(tmp); err != nil {
 			return nil, err
+		}
+		if isServerDatabase(tmp) {
+			return nil, fmt.Errorf("the live replica of %s holds the database of the server, not one of the app: it is not restored", name)
 		}
 	}
 	return staged, nil
