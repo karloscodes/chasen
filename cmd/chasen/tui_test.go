@@ -745,3 +745,50 @@ func TestParseAppsOfTheCloud(t *testing.T) {
 		t.Errorf("parseApps = %+v, want %+v", apps, want)
 	}
 }
+
+func TestServerTextIsCleanedOnTheScreen(t *testing.T) {
+	t.Run("clean removes C1 controls, which some terminals act on like escape codes", func(t *testing.T) {
+		got := clean("a\u009b2J\u009d0;title\u009cb")
+
+		if got != "a2J0;titleb" {
+			t.Errorf("clean = %q, want the text with no C1 controls", got)
+		}
+	})
+
+	t.Run("the error text of a server keeps its lines and loses its escape codes", func(t *testing.T) {
+		got := cleanText("failed\x1b]52;c;aGk=\x07\nsee the logs\x1b[2J")
+
+		if got != "failed\nsee the logs" {
+			t.Errorf("cleanText = %q", got)
+		}
+	})
+
+	t.Run("an error answer of a server reaches the screen without its escape codes", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "broken\x1b]52;c;aGk=\x07\x1b[2J\u009b2J", http.StatusInternalServerError)
+		}))
+		defer server.Close()
+		client := protocol.Client{URL: server.URL, Token: "token"}
+		ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
+			return client.Run(ctx, args[0], args[1:], nil, out)
+		}, "example.com", "shop")
+		sc := &screen{t, ui}
+
+		ui.loadApps()
+		sc.settle()
+
+		view := ui.view()
+		if strings.Contains(view, "\x1b]52") || strings.Contains(view, "\x1b[2J") || strings.Contains(view, "\u009b") {
+			t.Errorf("an escape code of the server reached the terminal:\n%q", view)
+		}
+		sc.shows("broken")
+	})
+
+	t.Run("only a web address opens in the browser", func(t *testing.T) {
+		for _, page := range []string{"file:///etc/passwd", "--help", "javascript:alert(1)"} {
+			if err := openURL(page); err == nil {
+				t.Errorf("openURL(%q) opened it", page)
+			}
+		}
+	})
+}

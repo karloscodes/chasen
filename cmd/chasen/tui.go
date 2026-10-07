@@ -238,7 +238,8 @@ var (
 )
 
 // clean makes one line of server output safe to show: no escape sequences, no
-// control characters, and only the text after the last carriage return.
+// control characters (C0, DEL, and C1, which some terminals also act on), and
+// only the text after the last carriage return.
 func clean(line string) string {
 	line = strings.TrimRight(line, "\r\n")
 	if i := strings.LastIndexByte(line, '\r'); i >= 0 {
@@ -249,12 +250,16 @@ func clean(line string) string {
 		switch {
 		case r == '\t':
 			return ' '
-		case r < 0x20 || r == 0x7f:
+		case r < 0x20 || r == 0x7f, r >= 0x80 && r <= 0x9f:
 			return -1
 		}
 		return r
 	}, line)
 }
+
+// cleanText cleans each line of a text from a server, such as the text of an
+// error, and keeps its line breaks.
+func cleanText(text string) string { return strings.Join(cleanLines(text), "\n") }
 
 func cleanLines(output string) []string {
 	var lines []string
@@ -695,7 +700,7 @@ func (t *tui) followLogs(app string) {
 		_, err := run(ctx, w, "logs", app)
 		w.flush()
 		if err != nil && ctx.Err() == nil {
-			t.events <- logEvent{app, "The logs stopped: " + err.Error()}
+			t.events <- logEvent{app, "The logs stopped: " + cleanText(err.Error())}
 		}
 	}()
 }
@@ -857,7 +862,7 @@ func (t *tui) handle(event any) bool {
 	case appsEvent:
 		t.appsLoaded = true
 		if e.err != nil {
-			t.appsErr = e.err.Error()
+			t.appsErr = cleanText(e.err.Error())
 			if errors.Is(e.err, protocol.ErrUnauthorized) {
 				t.appsErr = "The server does not accept the token. Close this screen (q) and log in again: chasen add server <domain>, or chasen login for the cloud."
 			}
@@ -950,7 +955,7 @@ func (t *tui) handle(event any) bool {
 		p := t.pane(e.app, e.tab)
 		p.loaded, p.err = true, ""
 		if e.err != nil {
-			p.err = e.err.Error()
+			p.err = cleanText(e.err.Error())
 		} else {
 			p.lines = cleanLines(e.output)
 		}
@@ -974,7 +979,7 @@ func (t *tui) handle(event any) bool {
 		e.on.running = false
 		if e.err != nil && !errors.Is(e.err, context.Canceled) {
 			e.on.failed = true
-			e.on.lines = append(e.on.lines, "", "Error: "+e.err.Error())
+			e.on.lines = append(e.on.lines, "", "Error: "+cleanText(e.err.Error()))
 		}
 		t.loadApps()
 		t.panes = map[string]*pane{}
@@ -1321,8 +1326,12 @@ func (t *tui) openInBrowser() {
 	t.message = "Opened " + urls[0]
 }
 
-// openURL opens a page in the browser of the machine.
+// openURL opens a page in the browser of the machine. Only a web address:
+// the address can come from a server, and the opener runs anything else.
 func openURL(page string) error {
+	if !strings.HasPrefix(page, "https://") && !strings.HasPrefix(page, "http://") {
+		return fmt.Errorf("not a web address: %q", page)
+	}
 	opener := "xdg-open"
 	if runtime.GOOS == "darwin" {
 		opener = "open"

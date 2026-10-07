@@ -407,7 +407,7 @@ func deviceLogin(server string) (string, error) {
 	}
 
 	// The page is always on the server the user named, not on an address from the answer.
-	page := server + "/oauth/device?user_code=" + device.UserCode
+	page := server + "/oauth/device?user_code=" + url.QueryEscape(device.UserCode)
 	fmt.Printf("Open this page to log in:\n  %s\nCode: %s\n", page, device.UserCode)
 	for _, opener := range []string{"xdg-open", "open"} {
 		if exec.Command(opener, page).Start() == nil {

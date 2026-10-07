@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"maps"
 	"net/url"
@@ -59,7 +60,7 @@ func waybarAlerts(w io.Writer) error {
 		switch a := answers[i]; {
 		case a.err != nil:
 			warnings++
-			tooltip = append(tooltip, name+": cannot ask it. "+a.err.Error())
+			tooltip = append(tooltip, name+": cannot ask it. "+cleanText(a.err.Error()))
 		case len(a.alerts) == 0:
 			tooltip = append(tooltip, name+": no alerts")
 		default:
@@ -75,7 +76,8 @@ func waybarAlerts(w io.Writer) error {
 			}
 		}
 	}
-	line := waybarLine{Tooltip: strings.Join(tooltip, "\n")}
+	// Waybar reads the tooltip as Pango markup: text from a server is escaped.
+	line := waybarLine{Tooltip: html.EscapeString(strings.Join(tooltip, "\n"))}
 	switch {
 	case errors > 0:
 		line.Text, line.Class = fmt.Sprintf("● %d", errors+warnings), "error"
