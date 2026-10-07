@@ -102,6 +102,7 @@ func startJobs(name, web string, words []string) error {
 			"NetworkMode":   like.HostConfig.NetworkMode,
 			"LogConfig":     like.HostConfig.LogConfig,
 			"RestartPolicy": map[string]string{"Name": "unless-stopped"},
+			"CapDrop":       []string{"NET_RAW"}, // like the web container: no spoofing on the shared network
 		},
 	}
 	if err := dockerAPI("POST", "/containers/create?name="+name, create, nil); err != nil {

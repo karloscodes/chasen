@@ -1096,7 +1096,7 @@ func imageUser(image string) (uid, gid int) {
 	gid, gidErr := strconv.Atoi(gidText)
 	if uidErr != nil || (hasGroup && gidErr != nil) {
 		// The user is a name. Ask the image for the numbers.
-		ids, err := docker("run", "--rm", "--entrypoint", "sh", image, "-c", "id -u; id -g")
+		ids, err := docker("run", "--rm", "--network", "none", "--memory=128m", "--cap-drop", "NET_RAW", "--entrypoint", "sh", image, "-c", "id -u; id -g")
 		fields := strings.Fields(ids)
 		if err != nil || len(fields) != 2 {
 			fmt.Printf("Warning: cannot find the uid of user %q. The app may not have write access to its volumes\n", user)

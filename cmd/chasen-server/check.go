@@ -88,7 +88,7 @@ func serverCheck(name, version string) error {
 	if err != nil {
 		return err
 	}
-	args := []string{"run", "-d", "--name", container, "--network", "matcha-network", "--memory=512m"}
+	args := []string{"run", "-d", "--name", container, "--network", "matcha-network", "--memory=512m", "--cap-drop", "NET_RAW"}
 	for _, v := range sh.Volumes {
 		args = append(args, "-v", filepath.Join(appDir(scratch), path.Base(v))+":"+v)
 	}

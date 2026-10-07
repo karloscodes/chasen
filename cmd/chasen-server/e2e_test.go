@@ -441,6 +441,13 @@ func TestEndToEnd(t *testing.T) {
 			t.Error("the jobs container wrote nothing to the storage of the app")
 		}
 		before, _ := docker("ps", "-q", "--filter", "name=^example_jobs")
+		// Neither container may use raw sockets on the shared network.
+		web, _ := docker("ps", "-q", "--filter", "name=^example(-next)?$")
+		for _, id := range []string{web, before} {
+			if caps, _ := docker("inspect", "-f", "{{.HostConfig.CapDrop}}", id); !strings.Contains(caps, "NET_RAW") {
+				t.Errorf("container %s drops %s, want NET_RAW", id, caps)
+			}
+		}
 
 		// A jobs command that stops: the new version does not stay, web or jobs.
 		os.WriteFile(filepath.Join(app, "chasen.yml"), []byte(yml+"env:\n  GREETING: broken\njobs: sh -c 'echo broken-jobs; exit 3'\n"), 0644)
