@@ -210,6 +210,7 @@ Each finding says what is wrong, what to write, and which page explains it.
 |---|---|
 | An unknown key in `chasen.yml` | error |
 | An app name that is not lowercase letters, digits, and hyphens | error |
+| An app name that the server keeps for itself: `api`, `proxy`, `chasen-server`, a name that ends in `-next`, or one that starts with `chasen-check-` | error |
 | A port, a health path, a health timeout, a volume, or a memory value that is not valid | error |
 | `env:` or `secrets:` has a name that Chasen sets itself (`PORT`, `BASE_URL`, and the others of [the standard](../STANDARD.md#4-environment)). `SECRET_KEY_BASE` in `secrets:` is right: then the key is yours | error |
 | `registry.password` holds a token, not the name of a secret | error |
