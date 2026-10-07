@@ -20,7 +20,7 @@ chasen deploy root@203.0.113.5 --domain myapp.example.com
 An app that someone else made deploys from its image, from any directory. Run the same line again to update it:
 
 ```bash
-chasen deploy ghcr.io/basecamp/once-campfire --domain chat.example.com
+chasen deploy ghcr.io/acme/chat chat.example.com
 ```
 
 No server yet? [Chasen cloud](https://chasenhq.com/cloud/) creates one for you at Hetzner and runs this same software on it.

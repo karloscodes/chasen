@@ -58,38 +58,38 @@ func TestDeployAnImage(t *testing.T) {
 		return sent
 	}
 
-	t.Run("deploys the newest image, named after it, with nothing of the directory", func(t *testing.T) {
-		sent := deployTo(t, "deploy", "ghcr.io/basecamp/once-campfire", "--domain", "chat.example.com")
+	t.Run("deploys the newest image at the domain after it, named after it, with nothing of the directory", func(t *testing.T) {
+		sent := deployTo(t, "deploy", "ghcr.io/acme/chat", "chat.example.com")
 
-		if strings.Join(sent.args, " ") != "once-campfire latest" {
-			t.Errorf("args = %v, want once-campfire latest", sent.args)
+		if strings.Join(sent.args, " ") != "chat latest" {
+			t.Errorf("args = %v, want chat latest", sent.args)
 		}
 		s := sent.settings
-		if s.Image != "ghcr.io/basecamp/once-campfire:latest" || s.Domain != "chat.example.com" || !s.KeepSettings || len(s.Env) != 0 {
+		if s.Image != "ghcr.io/acme/chat:latest" || s.Domain != "chat.example.com" || !s.KeepSettings || len(s.Env) != 0 {
 			t.Errorf("settings = %+v, want the image, the domain, keep_settings, and no env", s)
 		}
 	})
 
 	t.Run("takes the tag of the image and the name of -a", func(t *testing.T) {
-		sent := deployTo(t, "deploy", "basecamp/once-campfire:1.2", "-a", "campfire")
+		sent := deployTo(t, "deploy", "acme/chat:1.2", "-a", "team-chat")
 
-		if strings.Join(sent.args, " ") != "campfire 1.2" || sent.settings.Image != "basecamp/once-campfire:1.2" {
-			t.Errorf("args = %v, image = %s, want campfire 1.2", sent.args, sent.settings.Image)
+		if strings.Join(sent.args, " ") != "team-chat 1.2" || sent.settings.Image != "acme/chat:1.2" {
+			t.Errorf("args = %v, image = %s, want team-chat 1.2", sent.args, sent.settings.Image)
 		}
 	})
 }
 
 func TestIsImageRef(t *testing.T) {
 	for word, want := range map[string]bool{
-		"ghcr.io/basecamp/once-campfire": true,
-		"basecamp/once-campfire:1.2":     true,
-		"ghcr.io/you/app@sha256:abc":     true,
-		"root@203.0.113.5":               false,
-		"ubuntu@matcha-prod":             false,
-		"example.com":                    false,
-		"cloud":                          false,
-		"ssh://root@203.0.113.5":         false,
-		"https://api.example.com":        false,
+		"ghcr.io/acme/chat":          true,
+		"acme/chat:1.2":              true,
+		"ghcr.io/you/app@sha256:abc": true,
+		"root@203.0.113.5":           false,
+		"ubuntu@matcha-prod":         false,
+		"example.com":                false,
+		"cloud":                      false,
+		"ssh://root@203.0.113.5":     false,
+		"https://api.example.com":    false,
 	} {
 		if got := isImageRef(word); got != want {
 			t.Errorf("isImageRef(%q) = %v, want %v", word, got, want)

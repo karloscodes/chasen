@@ -169,25 +169,33 @@ options:
 	// `chasen deploy root@203.0.113.5` names the server of the deploy. The
 	// first time, that is all it takes: the server gets Chasen, this computer
 	// gets its login, and the app goes live.
-	// `chasen deploy ghcr.io/you/app` deploys that image, with nothing of this
-	// directory. Both words can come together, in any order.
+	// `chasen deploy ghcr.io/you/app chat.example.com` deploys that image, with
+	// nothing of this directory, at that domain. With an image, a word with no
+	// @ is the domain of the app, and a word with @ is the server.
 	login := func() (credentials, error) { return loadCredentials(app.Server) }
 	if args[0] == "deploy" && len(args) > 1 {
-		var server, image string
+		var server, image, domain string
+		if i := slices.IndexFunc(args[1:], isImageRef); i >= 0 {
+			image = args[1+i]
+			args = slices.Delete(args, 1+i, 2+i)
+		}
 		for _, arg := range args[1:] {
 			switch {
-			case isImageRef(arg) && image == "":
-				image = arg
-			case !isImageRef(arg) && server == "":
+			case image != "" && domain == "" && !isServer(arg):
+				domain = arg
+			case server == "" && (image == "" || isServer(arg)):
 				server = arg
 			default:
-				return errors.New("usage: chasen deploy [<image>] [<user>@<host>] [--domain <domain>] [--tag <tag>]")
+				return errors.New("usage: chasen deploy [<user>@<host>] [--domain <domain>] [--tag <tag>]\n       chasen deploy <image> [<domain>] [<user>@<host>]")
 			}
 		}
 		args = args[:1]
 		if image != "" {
 			args = append(args, image)
 			app.Server = "" // the server of chasen.yml is for the app of this directory
+		}
+		if domain != "" {
+			domainFlag = strings.ToLower(domain)
 		}
 		if server != "" {
 			login = func() (credentials, error) { return serverLogin(server) }
@@ -301,6 +309,13 @@ func runCommand(creds credentials, args []string) error {
 func isImageRef(word string) bool {
 	slash := strings.Index(word, "/")
 	return slash > 0 && !strings.Contains(word, "://") && !strings.Contains(word[:slash], "@")
+}
+
+// isServer reports a word that names a server: root@203.0.113.5, cloud, or
+// an address with :// in it. A plain domain names a server too, but not
+// after an image: there it is the domain of the app.
+func isServer(word string) bool {
+	return strings.Contains(word, "@") || strings.Contains(word, "://") || word == "cloud"
 }
 
 func loadAppFile() (appFile, error) {

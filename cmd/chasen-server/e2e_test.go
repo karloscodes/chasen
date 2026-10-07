@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -704,9 +705,23 @@ func TestEndToEnd(t *testing.T) {
 		if n := len(strings.Fields(local)); n != 5 {
 			t.Errorf("the Docker of this computer keeps %d images of the app, want 5", n)
 		}
-		_, tags, _ := strings.Cut(listed, `"tags":`)
-		if n := strings.Count(tags, ",") + 1; n != 5 || !strings.Contains(tags, newest) {
-			t.Errorf("the registry of this computer lists %s, want 5 tags, with the one of this deploy", listed)
+		// Count only the tags of this run: the registry of a developer keeps
+		// the tags of runs before, and the cleanup keeps a tag that shares its
+		// image with a kept one.
+		var registryTags struct{ Tags []string }
+		json.Unmarshal([]byte(listed), &registryTags)
+		ours := []string{newest, strings.TrimPrefix(first, "127.0.0.1:5555/direct:")}
+		for i := range 6 {
+			ours = append(ours, fmt.Sprintf("older%d", i))
+		}
+		kept := 0
+		for _, tag := range registryTags.Tags {
+			if slices.Contains(ours, tag) {
+				kept++
+			}
+		}
+		if kept != 5 || !slices.Contains(registryTags.Tags, newest) {
+			t.Errorf("the registry of this computer lists %s, want 5 tags of this run, with the one of this deploy", listed)
 		}
 		must(direct, bin, "remove")
 		// The tests after this one use the address on the web again, and they count the logins.
@@ -752,14 +767,24 @@ func TestEndToEnd(t *testing.T) {
 			t.Fatalf("docker login: %s", out)
 		}
 		t.Setenv("DOCKER_CONFIG", config)
-		_, greeting, _ := strings.Cut(get("example.localhost"), "greeting=")
+		// The env of the container, not a request: the steps after this one count the requests.
+		// A swap names the container example or example-next.
+		envGreeting := func() string {
+			for _, name := range []string{"example", "example-next"} {
+				if value, err := docker("exec", name, "sh", "-c", "echo $GREETING"); err == nil {
+					return value
+				}
+			}
+			return ""
+		}
+		greeting := envGreeting()
 
 		out := must(t.TempDir(), bin, "deploy", registry+"/example")
 
 		if strings.Contains(out, "Building") || !strings.Contains(out, "Deployed example") {
 			t.Errorf("deploy = %q, want the image of the registry deployed as example, with no build", out)
 		}
-		if _, now, _ := strings.Cut(get("example.localhost"), "greeting="); greeting == "" || now != greeting {
+		if now := envGreeting(); greeting == "" || now != greeting {
 			t.Errorf("greeting after the deploy of the image = %q, want %q: the env of the app stays", now, greeting)
 		}
 	})
@@ -772,7 +797,8 @@ func TestEndToEnd(t *testing.T) {
 		if err == nil {
 			t.Error("the deploy of a broken app reported success")
 		}
-		if !strings.Contains(out, "It stopped with exit code 1") || !strings.Contains(out, "  broken") {
+		// Docker can have started it again at that moment: then no exit code, never a wrong one.
+		if !strings.Contains(out, "It stopped") || strings.Contains(out, "exit code 0") || !strings.Contains(out, "  broken") {
 			t.Errorf("deploy = %q, want how the app ended and its last lines", out)
 		}
 		if got := get("shop.localhost"); !strings.HasPrefix(got, "hits=5 ") {

@@ -62,20 +62,22 @@ registry:                 # the login of the registry, when docker login is not 
 
 ## An image that another repository releases
 
-Some apps are not yours to build: a product that ships as an image, like a chat app, an analytics tool, or a form backend. You only run it. When the image follows [the standard](../STANDARD.md), one line deploys it, from any directory:
+Some apps are not yours to build: a product that ships as an image, like a chat app, an analytics tool, or a form backend. You only run it. There are two ways.
+
+**One line.** When the image follows [the standard](../STANDARD.md), `chasen deploy` runs it at a domain, from any directory:
 
 ```bash
-chasen deploy ghcr.io/basecamp/once-campfire --domain chat.example.com
-chasen deploy ghcr.io/basecamp/once-campfire root@203.0.113.5 --domain chat.example.com   # to that server
+chasen deploy ghcr.io/acme/chat chat.example.com
+chasen deploy ghcr.io/acme/chat chat.example.com root@203.0.113.5   # to that server
+chasen -a chat status
 ```
 
 - **Nothing of the directory counts:** no `chasen.yml`, no `Dockerfile`, no secrets. Nothing is built.
-- **The app is named after the image:** `once-campfire`. `-a campfire` gives it another name. Use the name for the other commands: `chasen -a once-campfire status`.
-- **The server pulls `latest`, or the tag in the image:** `ghcr.io/basecamp/once-campfire:1.2`. `--tag` does the same.
+- **The app is named after the image:** `chat`. `-a team-chat` gives it another name. Without a domain, the app gets `chat.<base domain of the server>`. After the image, a word with an `@` is the server, and a word without one is the domain.
+- **The server pulls `latest`, or the tag in the image:** `ghcr.io/acme/chat:1.2`. `--tag` does the same.
 - **Run the same line again to update** to the newest image. The app keeps its domains and its settings. A public image needs no login. For a private one, run `docker login` first.
-- **Apps made for [ONCE](https://github.com/basecamp/once) follow the same rules:** port 80, `/up`, and the data in `/storage`. They get `SECRET_KEY_BASE` and `BASE_URL` too. Chasen does not make the `VAPID_*` keys of ONCE yet: an app that needs them for push notifications gets them as secrets, in a folder like the one below.
 
-An image that needs settings (another health path, env, a volume) gets a folder with a `chasen.yml` that names the image, and no `Dockerfile`:
+**A folder with a `chasen.yml`.** An image that needs settings (another health path, env, secrets, a volume, cron jobs) gets a folder with a `chasen.yml` that names the image, and no `Dockerfile`. The folder can go into git, so the settings of your server have a record:
 
 ```yaml
 # analytics/chasen.yml
@@ -113,7 +115,7 @@ chasen -a lognorth logs
 | `formlander` | Form backend for static sites |
 | `lognorth` | Logs, errors, alerts, and uptime |
 
-Run `chasen enable <addon>` again to update it to the newest image. An addon has one domain.
+Run `chasen enable <addon>` again to update it to the newest image. An addon has one domain. Any other product that ships as an image deploys with one line: see [An image that another repository releases](#an-image-that-another-repository-releases).
 
 ## History
 

@@ -235,7 +235,7 @@ func splitImage(ref string) (image, tag string) {
 }
 
 // deployRelease deploys an image that another repository releases, with the
-// line of its README: chasen deploy ghcr.io/basecamp/once-campfire --domain
+// line of its README: chasen deploy ghcr.io/acme/chat --domain
 // chat.example.com. Nothing of this directory counts: no chasen.yml, no
 // Dockerfile, no secrets. The app is named after the image, or -a. The same
 // line again updates the app to the newest image and keeps its settings.

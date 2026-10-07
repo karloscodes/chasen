@@ -50,7 +50,7 @@ var DefaultVolumes = []string{"/storage", "/rails/storage"}
 // settings of an app cannot set them.
 var StandardEnv = []string{"PORT", "BASE_URL", "SECRET_KEY_BASE", "PRIVATE_KEY", "STORAGE_DIR", "DATABASE_PATH", "APP_VERSION", "APP_ENV"}
 
-// The secret key of an app has two names: SECRET_KEY_BASE (Rails, ONCE) and
+// The secret key of an app has two names: SECRET_KEY_BASE (Rails) and
 // PRIVATE_KEY (matcha). The server makes the key at the first deploy and
 // keeps it. A deploy can bring the key as a secret instead: then the key is
 // the owner's, and a new server gets the same one.
