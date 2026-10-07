@@ -87,7 +87,6 @@ func TestIsImageRef(t *testing.T) {
 		"root@203.0.113.5":           false,
 		"ubuntu@matcha-prod":         false,
 		"example.com":                false,
-		"cloud":                      false,
 		"ssh://root@203.0.113.5":     false,
 		"https://api.example.com":    false,
 	} {

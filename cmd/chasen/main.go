@@ -21,7 +21,6 @@ const usage = `Usage: chasen <command>
 
   add server <user>@<host>   Log in to your own server through SSH, with no deploy
   add server <domain>    Use your own server through its address on the web, with a browser
-  login                  Log in to the Chasen cloud instead
   servers                List the servers you are logged in to, with a number. The star marks
                          the current one
   use [server]           Make another server the current one: its number in the list, or a part
@@ -39,8 +38,6 @@ Run these in the directory of your app:
                          --domain <domain> gives a new app its domain. A server with no base
                          domain needs it at the first deploy of each app
                          A folder with image: in chasen.yml and no Dockerfile: the newest image
-                         In the cloud, the first deploy of an app asks for its server:
-                         --on <id> uses one of your servers, --new creates one (--new=cx33, --new=@ash)
   check                  Test the current git commit against the standard. Changes nothing live
   restart                Start the app again with the env and the secrets of now. Same image
   rollback               Start the version before the current one again, in seconds: the server

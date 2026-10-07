@@ -161,7 +161,7 @@ type tui struct {
 	// server, or puts it at risk. The screen asks again every minute.
 	alerts        []alertRow
 	alertsChecked string // the last line: when the server looked
-	noAlerts      bool   // the server, or the cloud, has no alerts command: do not ask again
+	noAlerts      bool   // the server has no alerts command: do not ask again
 	frame         int    // for the spinner
 	events        chan any
 	now           func() time.Time
@@ -272,18 +272,13 @@ func cleanLines(output string) []string {
 	return lines
 }
 
-// parseApps reads the table of `chasen list`: NAME, VERSION, DOMAINS. The
-// cloud puts the server of each app in a first column, SERVER. The screen
-// leaves it out.
+// parseApps reads the table of `chasen list`: NAME, VERSION, DOMAINS.
 func parseApps(output string) []appRow {
 	var apps []appRow
 	lines := cleanLines(output)
-	withServer := len(lines) > 0 && strings.HasPrefix(lines[0], "SERVER")
 	for i, line := range lines {
 		cells := columns.Split(strings.TrimSpace(line), 4)
-		if withServer {
-			cells = cells[min(1, len(cells)):]
-		} else if len(cells) == 4 {
+		if len(cells) == 4 {
 			cells = append(cells[:2], cells[2]+"  "+cells[3])
 		}
 		if i == 0 || len(cells) == 0 || cells[0] == "" {
@@ -864,7 +859,7 @@ func (t *tui) handle(event any) bool {
 		if e.err != nil {
 			t.appsErr = cleanText(e.err.Error())
 			if errors.Is(e.err, protocol.ErrUnauthorized) {
-				t.appsErr = "The server does not accept the token. Close this screen (q) and log in again: chasen add server <domain>, or chasen login for the cloud."
+				t.appsErr = "The server does not accept the token. Close this screen (q) and log in again: chasen add server <user>@<host>."
 			}
 			break
 		}
@@ -901,7 +896,7 @@ func (t *tui) handle(event any) bool {
 		if e.server != t.server {
 			break
 		}
-		// A server from before the overview command, or the cloud, answers with an error.
+		// A server from before the overview command answers with an error.
 		var apps []appView
 		if e.failed || json.Unmarshal([]byte(strings.TrimSpace(e.output)), &apps) != nil {
 			t.noOverview, t.changes = true, nil
@@ -937,7 +932,7 @@ func (t *tui) handle(event any) bool {
 			}
 		}
 	case alertsEvent:
-		// A server from before the alerts command, or the cloud, answers with an error.
+		// A server from before the alerts command answers with an error.
 		t.noAlerts = e.failed
 		t.alerts, t.alertsChecked = nil, ""
 		if !e.failed {
@@ -1632,11 +1627,8 @@ func runScreen(t *tui) error {
 }
 
 // serverName is the short name of an API address: example.com for
-// https://api.example.com, and cloud for the Chasen cloud.
+// https://api.example.com.
 func serverName(address string) string {
-	if address == apiAddress("cloud") {
-		return "cloud"
-	}
 	name := strings.TrimPrefix(strings.TrimPrefix(address, "https://"), "http://")
 	return strings.TrimPrefix(name, "api.")
 }

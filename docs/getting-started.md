@@ -101,7 +101,7 @@ With both, the internet sees ports 80 and 443 through Cloudflare, and nothing el
 
 The default needs no registry. Use one when:
 
-- **The server is on the web**, with a base domain and a token: GitHub Actions, or the [cloud](https://chasenhq.com/cloud/). There is no SSH to send the image through, so the image goes to `ghcr.io/<owner>/<repository>`, from the git origin of the app on GitHub. [Deploy from GitHub Actions](github-actions.md) has the steps.
+- **The server is on the web**, with a base domain and a token: GitHub Actions. There is no SSH to send the image through, so the image goes to `ghcr.io/<owner>/<repository>`, from the git origin of the app on GitHub. [Deploy from GitHub Actions](github-actions.md) has the steps.
 - **You want the image in a registry anyway.** Name it in `chasen.yml`, and Chasen pushes it there, also through SSH: `image: ghcr.io/you/shop`, or `image: you/shop` for Docker Hub. No tag: the tag is the commit.
 - **The image is not yours to build**: an app that someone else releases, and you have no code of. Make a directory with only a `chasen.yml`, and no `Dockerfile`:
 

@@ -1239,7 +1239,8 @@ func serverDomains(name string, args []string) error {
 		}
 		return nil
 	}
-	// The cloud adds a third argument: the name that a CNAME record must point to.
+	// A service in front of servers adds a third argument: the name that a
+	// CNAME record must point to.
 	cname := ""
 	if len(args) == 3 && validDomain(args[2]) {
 		cname, args = args[2], args[:2]

@@ -23,8 +23,6 @@ An app that someone else made deploys from its image, from any directory. Run th
 chasen deploy ghcr.io/acme/chat chat.example.com
 ```
 
-No server yet? [Chasen cloud](https://chasenhq.com/cloud/) creates one for you at Hetzner and runs this same software on it.
-
 ## How it works
 
 ```
@@ -94,10 +92,6 @@ The docs are on [chasenhq.com/docs](https://chasenhq.com/docs/). Their source is
 | [The server protocol](docs/protocol.md) | The HTTP API between the CLI and the server |
 
 [`example/`](example/) is the smallest app that follows the standard.
-
-## The cloud
-
-Chasen cloud is this same software on a server that we create for you at Hetzner: `chasen login`, then `chasen deploy`. It is a separate service and it is not in this repository. The CLI talks to it with the same protocol as to your own server. See [chasenhq.com/cloud](https://chasenhq.com/cloud/).
 
 ## Development
 

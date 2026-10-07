@@ -23,12 +23,12 @@ import (
 	"github.com/karloscodes/chasen/protocol"
 )
 
-// credentials is the saved login: the API of the cloud or of a server, and the token.
+// credentials is the saved login: the API of a server, and the token.
 type credentials struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
-	// Server is the cloud server a command goes to, when the user chose one:
-	// an id, or "new", or "new:<type>". It is not saved.
+	// Server has the fields of protocol.Client, so a login converts to a
+	// client. The CLI leaves it empty.
 	Server string `json:"-"`
 }
 
@@ -41,8 +41,7 @@ func credentialsPath() string {
 }
 
 // logins is the file of saved logins. You can be logged in to several
-// servers and to the cloud. Commands go to the current one, unless chasen.yml
-// names a server.
+// servers. Commands go to the current one, unless chasen.yml names a server.
 type logins struct {
 	Current string            `json:"current"`
 	Tokens  map[string]string `json:"logins"` // by API address
@@ -74,13 +73,11 @@ func (l logins) save() error {
 	return os.WriteFile(credentialsPath(), data, 0600)
 }
 
-// apiAddress turns what a person types into the address of an API: "cloud"
-// is the Chasen cloud, example.com is https://api.example.com, and
-// a full address stays as it is.
+// apiAddress turns what a person types into the address of an API:
+// example.com is https://api.example.com, root@203.0.113.5 is reached
+// through SSH, and a full address stays as it is.
 func apiAddress(name string) string {
 	switch {
-	case name == "cloud":
-		return cmp.Or(os.Getenv("CHASEN_CLOUD"), cloudURL)
 	case strings.Contains(name, "://"):
 		return strings.TrimRight(name, "/")
 	case strings.Contains(name, "@"):
@@ -214,19 +211,7 @@ func findServer(saved logins, said string) (string, error) {
 	return "", fmt.Errorf("%s matches %s. Say more of the address, or its number in chasen servers", said, strings.Join(found, " and "))
 }
 
-// cloudURL is the Chasen cloud that `chasen login` uses. CHASEN_CLOUD sets
-// another one.
-var cloudURL = "https://cloud.chasenhq.com"
-
-const howToLogin = "Run: chasen login. For your own server, run: chasen add server <user>@<host>"
-
-// login logs in to the Chasen cloud.
-func login(args []string) error {
-	if len(args) != 0 {
-		return errors.New("usage: chasen login. For your own server: chasen add server <domain>")
-	}
-	return connect(apiAddress("cloud"))
-}
+const howToLogin = "Run: chasen add server <user>@<host>"
 
 // addServer logs in to a server you host yourself. The server example.com
 // has its API on https://api.example.com.

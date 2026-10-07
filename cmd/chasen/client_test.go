@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/karloscodes/chasen/protocol"
 )
 
 func TestSecretValues(t *testing.T) {
@@ -117,71 +115,6 @@ func TestServers(t *testing.T) {
 
 		if err == nil || !strings.Contains(err.Error(), "matches https://api.one.example.com and https://api.two.example.com") {
 			t.Errorf("use example = %v, want both matches named", err)
-		}
-	})
-}
-
-func TestChoosePlacement(t *testing.T) {
-	types := []protocol.ServerType{
-		{Name: "cx23", Location: "fsn1", Region: "Europe", Cores: 2, MemoryGB: 4, DiskGB: 40, MonthlyCents: 349},
-		{Name: "cpx11", Location: "ash", Region: "USA", Cores: 2, MemoryGB: 2, DiskGB: 40, MonthlyCents: 499},
-		{Name: "cx33", Location: "fsn1", Region: "Europe", Cores: 4, MemoryGB: 8, DiskGB: 80, MonthlyCents: 599},
-	}
-	withServer := protocol.Placement{
-		Servers:  []protocol.PlacedServer{{ID: "a1b2c3", Type: "cx23", Region: "Europe", MonthlyCents: 1249, Apps: []string{"blog"}}},
-		Types:    types,
-		FeeCents: 900, CanCreate: true,
-	}
-
-	t.Run("the default is the server you already pay for", func(t *testing.T) {
-		var out strings.Builder
-
-		choice, err := choosePlacement("shop", withServer, strings.NewReader("\n"), &out)
-
-		if err != nil || choice != "a1b2c3" {
-			t.Errorf("choice = %q, %v, want a1b2c3", choice, err)
-		}
-		for _, want := range []string{"your server a1b2c3", "runs blog", "no extra cost", "USA", "€3.49 a month at Hetzner", "Chasen is €9.00 a month for your account"} {
-			if !strings.Contains(out.String(), want) {
-				t.Errorf("the question = %q, want %q in it", out.String(), want)
-			}
-		}
-	})
-
-	t.Run("a number picks a new server of that type, in that region", func(t *testing.T) {
-		choice, err := choosePlacement("shop", withServer, strings.NewReader("9\n3\n"), io.Discard)
-
-		if err != nil || choice != "new:cpx11@ash" {
-			t.Errorf("choice = %q, %v, want new:cpx11@ash after one wrong answer", choice, err)
-		}
-	})
-
-	t.Run("without a server, the default is the cheapest type", func(t *testing.T) {
-		first := protocol.Placement{Types: types, FeeCents: 900, CanCreate: true}
-
-		choice, err := choosePlacement("shop", first, strings.NewReader("\n"), io.Discard)
-
-		if err != nil || choice != "new:cx23@fsn1" {
-			t.Errorf("choice = %q, %v, want new:cx23@fsn1", choice, err)
-		}
-	})
-
-	t.Run("one server and no way to create another: no question", func(t *testing.T) {
-		only := protocol.Placement{Servers: withServer.Servers, Reason: "this cloud cannot create servers now"}
-		var out strings.Builder
-
-		choice, err := choosePlacement("shop", only, strings.NewReader(""), &out)
-
-		if err != nil || choice != "" || out.Len() > 0 {
-			t.Errorf("choice = %q, %v, output %q, want no choice and no question", choice, err, out.String())
-		}
-	})
-
-	t.Run("no answer deploys nothing", func(t *testing.T) {
-		_, err := choosePlacement("shop", withServer, strings.NewReader(""), io.Discard)
-
-		if err == nil {
-			t.Error("want an error when the input ends without an answer")
 		}
 	})
 }

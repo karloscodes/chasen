@@ -2,7 +2,7 @@
 
 With this setup, a push to `main` deploys your app. The workflow runs the same `chasen deploy` that you run on your computer: it builds the image of the commit, pushes it to `ghcr.io`, and tells your server to pull it.
 
-You need a server that runs `chasen-server` (or a Chasen cloud account), and an app that deploys from your computer.
+You need a server that runs `chasen-server`, and an app that deploys from your computer.
 
 There are two ways for the job to reach the server. With an address on the web (a base domain, set with `chasen-server setup --domain example.com`), the job logs in with a token and the image goes through `ghcr.io`: the steps below. A server that you reach only through SSH works too, with no registry: see [Through SSH](#through-ssh).
 
@@ -18,8 +18,8 @@ The workflow needs to know where your server is and how to log in.
 
 | Secret | Value |
 |---|---|
-| `CHASEN_URL` | `https://api.example.com` for your own server (`api.` + its base domain). `https://cloud.chasenhq.com` for the cloud |
-| `CHASEN_TOKEN` | The token of the server (`chasen-server token` on the server prints it). For the cloud: the key of your account |
+| `CHASEN_URL` | `https://api.example.com` for your own server (`api.` + its base domain). |
+| `CHASEN_TOKEN` | The token of the server (`chasen-server token` on the server prints it). |
 
 ```bash
 gh secret set CHASEN_URL --body https://api.example.com

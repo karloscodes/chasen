@@ -1,6 +1,6 @@
 # The server protocol
 
-`chasen` talks to `chasen-server` over HTTP. The cloud answers the same protocol and passes each request on to the server of the app, so a client does not know which one it talks to.
+`chasen` talks to `chasen-server` over HTTP.
 
 The requests reach the API of a server in one of two ways, and they are the same in both:
 
@@ -37,7 +37,6 @@ curl -N -X POST "https://api.example.com/v1/status?arg=shop" \
 |---|---|
 | `200` | The command started. Its result is the exit code in the last line, not the status code |
 | `401` | The token is not valid. The client starts a new login |
-| `404`, `409`, `502`, `503` | The cloud only: no such server, a server choice is needed, or the server does not answer. The body is one line of text |
 
 A command that fails still answers `200`: the server already sent the output when it knows the result.
 
@@ -67,7 +66,7 @@ Every command except `logs` runs to its end on the server, also when the client 
 
 ## A command about the server
 
-One command is about the server and not about an app: `bucket`. With no arguments it prints where the backups go. With `--endpoint`, `--name`, `--access-key-id`, and `--region` as arguments, it sets the bucket; the secret access key is the first line of the request body. It is in the list `ServerCommands`, apart from the commands of the apps. A server answers it. A service that runs servers for its users, like the cloud, does not pass it on: there the bucket is not the user's to change.
+One command is about the server and not about an app: `bucket`. With no arguments it prints where the backups go. With `--endpoint`, `--name`, `--access-key-id`, and `--region` as arguments, it sets the bucket; the secret access key is the first line of the request body. It is in the list `ServerCommands`, apart from the commands of the apps. A server answers it. A service that runs servers for its users does not pass it on: there the bucket is not the user's to change.
 
 ## Two requests that are not commands
 
@@ -107,20 +106,10 @@ The login is the OAuth 2.0 device flow (RFC 8628), in [`oauth`](../oauth/oauth.g
 | Request | What it does |
 |---|---|
 | `POST /oauth/device_authorization` | Start a login. The answer has a device code, a user code, and the page to open |
-| `GET /oauth/device?user_code=...` | The page. The person types the token of the server (or the key of a cloud account) |
+| `GET /oauth/device?user_code=...` | The page. The person types the token of the server |
 | `POST /oauth/token` | The client asks until the login is approved, and gets a token of its own |
 
-In CI there is no login: the token of the server (or the key of the account) is the bearer token.
-
-## What only the cloud answers
-
-| Request | What it does |
-|---|---|
-| `GET /v1/placement?app=<app>` | Which servers the account has, and what a new one costs. JSON |
-| Header `Chasen-Server: <id>` | Send the command to this server of the account |
-| Header `Chasen-Server: new`, `new:cx33`, `new:@ash`, `new:cx33@ash` | Create a server for the app: the cheapest one, or of this type, or in this location |
-
-A plain server answers `404` to `/v1/placement`, and the client then asks no question.
+In CI there is no login: the token of the server, or a login of it, is the bearer token.
 
 ## Limits
 

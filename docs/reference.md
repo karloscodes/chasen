@@ -4,16 +4,15 @@
 
 | Command | What it does |
 |---|---|
-| `chasen login` | Log in to the Chasen cloud, with a browser |
 | `chasen deploy <user>@<host>` | Deploy to that server, through SSH. The first time, the server gets `chasen-server` and this computer gets its login |
 | `chasen add server <user>@<host>` | Log in to your own server through SSH, with no deploy |
 | `chasen add server <domain>` | Use your own server through its address on the web (`https://api.<domain>`), with a login in the browser |
 | `chasen servers` | List the servers you are logged in to. The star marks the current one |
-| `chasen use [server]` | Make another server the current one: its number in `chasen servers`, a part of its address, or `cloud`. With nothing, it shows the list and asks |
+| `chasen use [server]` | Make another server the current one: its number in `chasen servers`, or a part of its address. With nothing, it shows the list and asks |
 | `chasen logout` | Forget the login, here and on the server |
 | `chasen update` | Install the newest release of the CLI now, after a check of its checksum. At a terminal, `chasen` does it by itself once a day, after a command that works. Never in CI. `CHASEN_NO_UPDATE_CHECK=1` turns it off |
 | `chasen report` | Something is wrong with Chasen? Open a new issue on GitHub, with your version and your system filled in. It sends nothing by itself |
-| `chasen deploy` | Build the image of the current git commit, push it, and deploy it. Or deploy a static website. In a folder with an `image:` in `chasen.yml` and no `Dockerfile`: deploy the newest image, with no build. `--tag <tag>` deploys an image that is already in the registry. `--domain <domain>` gives a new app its domain. In the cloud: `--on <id>` or `--new[=type@location]` picks the server of a new app |
+| `chasen deploy` | Build the image of the current git commit, push it, and deploy it. Or deploy a static website. In a folder with an `image:` in `chasen.yml` and no `Dockerfile`: deploy the newest image, with no build. `--tag <tag>` deploys an image that is already in the registry. `--domain <domain>` gives a new app its domain. |
 | `chasen deploy <image> [domain]` | Deploy an image that another repository releases, at that domain, from any directory, with nothing of the directory: `chasen deploy ghcr.io/acme/chat chat.example.com`. The app is named after the image, or `-a <app>`. The server pulls `latest`, or the tag of the image. Run it again to update: the app keeps its settings. `<user>@<host>` can come after it. After an image, a word with no `@` is the domain of the app, not a server |
 | `chasen check` | Test the current git commit against the standard. Changes nothing live |
 | `chasen restart` | Start the app again with the env and secrets of `chasen.yml`, from the image it has |
@@ -181,7 +180,7 @@ When the network works, let SSH in only from it. With ufw and Tailscale: `ufw al
 
 ## Several servers
 
-You can be logged in to several servers and to the cloud at the same time.
+You can be logged in to several servers at the same time.
 
 ```bash
 chasen add server root@203.0.113.5   # through SSH
@@ -197,7 +196,7 @@ An app can name its server in `chasen.yml`, so `chasen deploy` always goes to th
 
 ```yaml
 name: shop
-server: root@203.0.113.5   # or a base domain like example.org, or: cloud
+server: root@203.0.113.5   # or a base domain like example.org
 ```
 
 - `chasen logout` makes the server forget the login.

@@ -91,7 +91,7 @@ func waybarAlerts(w io.Writer) error {
 }
 
 // barName is the short name of a server for the bar: the host of an SSH
-// address, the base domain of an address on the web, or cloud.
+// address, or the base domain of an address on the web.
 func barName(address string) string {
 	if protocol.IsSSH(address) {
 		if u, err := url.Parse(address); err == nil {

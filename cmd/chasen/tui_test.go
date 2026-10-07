@@ -737,15 +737,6 @@ func TestScreenIsStillWhenNothingChanges(t *testing.T) {
 	}
 }
 
-func TestParseAppsOfTheCloud(t *testing.T) {
-	apps := parseApps("SERVER  NAME   VERSION  DOMAINS\na1b2c3  shop   3f9a2c1  shop.a1b2c3.chasenhq.com\nd4e5f6  blog   9d8c7b6  blog.d4e5f6.chasenhq.com\n")
-
-	want := []appRow{{"shop", "3f9a2c1", "shop.a1b2c3.chasenhq.com"}, {"blog", "9d8c7b6", "blog.d4e5f6.chasenhq.com"}}
-	if !slices.Equal(apps, want) {
-		t.Errorf("parseApps = %+v, want %+v", apps, want)
-	}
-}
-
 func TestServerTextIsCleanedOnTheScreen(t *testing.T) {
 	t.Run("clean removes C1 controls, which some terminals act on like escape codes", func(t *testing.T) {
 		got := clean("a\u009b2J\u009d0;title\u009cb")

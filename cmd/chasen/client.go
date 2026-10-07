@@ -23,7 +23,7 @@ import (
 type appFile struct {
 	Name string `yaml:"name"`
 	// Server names the server of this app, when you have more than one:
-	// a domain like example.com, or "cloud".
+	// root@203.0.113.5, or a base domain like example.com.
 	Server string `yaml:"server"`
 	// Image is the image of the app in a registry, without a tag:
 	// ghcr.io/you/shop. The tag is the git commit, or --tag.
@@ -83,10 +83,6 @@ var watchFlag bool
 // of a Waybar module.
 var waybarFlag bool
 
-// serverFlag is the cloud server from `--on <id>`, `--new`, or `--new=<type>@<location>`, in the
-// form of protocol.ServerHeader.
-var serverFlag string
-
 func runClient(args []string) error {
 options:
 	for i := 0; i < len(args); i++ {
@@ -99,8 +95,6 @@ options:
 			break options
 		case (args[i] == "-a" || args[i] == "--app") && hasValue:
 			appFlag = args[i+1]
-		case args[i] == "--on" && hasValue:
-			serverFlag = args[i+1]
 		case args[i] == "--tag" && hasValue:
 			tagFlag = args[i+1]
 		case args[i] == "--domain" && hasValue:
@@ -117,11 +111,6 @@ options:
 			continue
 		case args[i] == "--waybar":
 			waybarFlag = true
-			args = slices.Delete(args, i, i+1)
-			i--
-			continue
-		case args[i] == "--new" || strings.HasPrefix(args[i], "--new="):
-			serverFlag = strings.Replace(strings.TrimPrefix(args[i], "--"), "=", ":", 1)
 			args = slices.Delete(args, i, i+1)
 			i--
 			continue
@@ -150,8 +139,6 @@ options:
 		if jsonFlag {
 			return overviewAll(os.Stdout)
 		}
-	case "login":
-		return login(args[1:])
 	case "add":
 		return addServer(args[1:])
 	case "servers":
@@ -205,7 +192,6 @@ options:
 	if err != nil {
 		return err
 	}
-	creds.Server = serverFlag
 	err = runCommand(creds, args)
 	// The saved login is not valid any more: log in again, then run the command again.
 	if errors.Is(err, errUnauthorized) && os.Getenv("CHASEN_TOKEN") == "" {
@@ -215,7 +201,6 @@ options:
 		if creds, err = login(); err != nil {
 			return err
 		}
-		creds.Server = serverFlag
 		return runCommand(creds, args)
 	}
 	return err
@@ -239,10 +224,6 @@ func runCommand(creds credentials, args []string) error {
 	case "enable":
 		if len(args) < 2 {
 			return errors.New("usage: chasen enable fusionaly|formlander|lognorth [domain]")
-		}
-		creds, err := placed(creds, args[1])
-		if err != nil {
-			return err
 		}
 		return remote(creds, nil, os.Stdout, args...)
 	case "run":
@@ -305,17 +286,17 @@ func runCommand(creds credentials, args []string) error {
 
 // isImageRef reports a word after deploy that names an image, not a server:
 // it has a slash, like ghcr.io/you/app or you/app. A server is root@host,
-// a domain, cloud, or an address with :// in it.
+// a domain, or an address with :// in it.
 func isImageRef(word string) bool {
 	slash := strings.Index(word, "/")
 	return slash > 0 && !strings.Contains(word, "://") && !strings.Contains(word[:slash], "@")
 }
 
-// isServer reports a word that names a server: root@203.0.113.5, cloud, or
-// an address with :// in it. A plain domain names a server too, but not
+// isServer reports a word that names a server: root@203.0.113.5, or an
+// address with :// in it. A plain domain names a server too, but not
 // after an image: there it is the domain of the app.
 func isServer(word string) bool {
-	return strings.Contains(word, "@") || strings.Contains(word, "://") || word == "cloud"
+	return strings.Contains(word, "@") || strings.Contains(word, "://")
 }
 
 func loadAppFile() (appFile, error) {
@@ -377,7 +358,7 @@ func bucket(creds credentials, args []string) error {
 	return remote(creds, strings.NewReader(secret+"\n"), os.Stdout, append([]string{"bucket"}, args...)...)
 }
 
-// remote runs one command through the API of a server, or of the cloud. It
+// remote runs one command through the API of a server. It
 // sends stdin as the request body and writes the output as it arrives.
 func remote(creds credentials, stdin io.Reader, out io.Writer, args ...string) error {
 	code, err := protocol.Client(creds).Run(context.Background(), args[0], args[1:], stdin, out)

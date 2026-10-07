@@ -31,10 +31,6 @@ func deploy(creds credentials, app appFile, command string) error {
 		return err
 	}
 	if command == "deploy" {
-		var err error
-		if creds, err = placed(creds, app.Name); err != nil {
-			return err
-		}
 		// A new app gets its secret key now, in the secrets of this directory.
 		if err := keepSecretKey(func() bool { return isDeployed(creds, app.Name) }); err != nil {
 			return err
@@ -52,7 +48,7 @@ func deploy(creds credentials, app appFile, command string) error {
 
 	// An app with a Dockerfile and no image: to a server through SSH, the
 	// image goes from this computer, with no registry on the internet. To a
-	// server on the web (CI with a token, the cloud), it goes to ghcr.io of
+	// server on the web (CI with a token), it goes to ghcr.io of
 	// the GitHub origin of the app.
 	if app.Image == "" && noDockerfile == nil {
 		if protocol.IsSSH(creds.URL) {
@@ -246,10 +242,6 @@ func deployRelease(creds credentials, ref string) error {
 		app.Name = strings.NewReplacer("_", "-", ".", "-").Replace(strings.ToLower(path.Base(image)))
 	}
 	if err := printReview(os.Stderr, reviewAppFile(app, false, "")); err != nil {
-		return err
-	}
-	creds, err := placed(creds, app.Name)
-	if err != nil {
 		return err
 	}
 	settings := protocol.Settings{Env: map[string]string{}, Domain: domainFlag, KeepSettings: true}
