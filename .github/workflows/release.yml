@@ -5,17 +5,23 @@ on:
   push:
     tags: ["v*"]
 
+# Read only by default: only the job that publishes can write the release.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # A release reaches every server the same night. It is made only from a
-  # commit that passes the end-to-end test.
+  # commit of main that passes the end-to-end test.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
@@ -27,8 +33,12 @@ jobs:
   release:
     needs: e2e
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod

@@ -76,3 +76,21 @@ func TestCommandWords(t *testing.T) {
 		}
 	})
 }
+
+func TestCheckAppName(t *testing.T) {
+	t.Run("refuses the names that the server gives its own containers", func(t *testing.T) {
+		for _, name := range []string{"api", "chasen-server", "shop-next", "chasen-check-shop", "Shop", "-shop"} {
+			if CheckAppName(name) == nil {
+				t.Errorf("%q is accepted", name)
+			}
+		}
+	})
+
+	t.Run("accepts an ordinary name", func(t *testing.T) {
+		for _, name := range []string{"shop", "next", "shop-nextgen", "lognorth-demo"} {
+			if err := CheckAppName(name); err != nil {
+				t.Errorf("%q: %v", name, err)
+			}
+		}
+	})
+}

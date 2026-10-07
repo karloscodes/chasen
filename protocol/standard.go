@@ -103,6 +103,12 @@ func CheckAppName(name string) error {
 	if name == "api" || name == "proxy" || name == "matcha-proxy" || name == "chasen-server" {
 		return fmt.Errorf("the app name %q is reserved", name)
 	}
+	// The server names containers after an app: <app>-next during a deploy,
+	// and chasen-check-<app> for a check. An app with such a name would share
+	// containers with another app.
+	if strings.HasSuffix(name, "-next") || strings.HasPrefix(name, "chasen-check-") {
+		return fmt.Errorf("the app name %q is reserved: the server names containers with -next and chasen-check-", name)
+	}
 	return nil
 }
 

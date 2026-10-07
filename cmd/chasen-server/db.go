@@ -67,9 +67,12 @@ CREATE INDEX IF NOT EXISTS activity_app ON activity (app, id);`
 
 func openServerDB() (*sql.DB, error) {
 	path := root() + "/etc/chasen/server.sqlite3"
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return nil, err
 	}
+	// The directory too: the database is born with the mode of SQLite, and
+	// gets 0600 only after its first open.
+	os.Chmod(filepath.Dir(path), 0700)
 	db, err := sqliteDB(path)
 	if err != nil {
 		return nil, err

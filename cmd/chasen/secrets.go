@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -134,9 +135,17 @@ func findKey() ([]byte, error) {
 		return nil, err
 	}
 	for {
-		data, err := os.ReadFile(filepath.Join(dir, keyFile))
+		path := filepath.Join(dir, keyFile)
+		data, err := os.ReadFile(path)
 		if err == nil {
-			return parseKey(string(data), filepath.Join(dir, keyFile))
+			// A key in a directory that others can write, like /tmp, can be
+			// anybody's: take only a key file of this user.
+			if info, err := os.Stat(path); err == nil {
+				if st, ok := info.Sys().(*syscall.Stat_t); ok && int(st.Uid) != os.Getuid() {
+					return nil, fmt.Errorf("%s belongs to another user. Use a key of your own, or set %s", path, keyEnv)
+				}
+			}
+			return parseKey(string(data), path)
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return nil, err

@@ -129,6 +129,9 @@ type pageData struct {
 }
 
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
+	// The page asks for the token of the server: no other site may frame it.
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+	w.Header().Set("X-Frame-Options", "DENY")
 	pageTemplate.Execute(w, pageData{Name: s.Name, UserCode: r.URL.Query().Get("user_code")})
 }
 
