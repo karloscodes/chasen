@@ -31,7 +31,7 @@ Add evidence to the pull request, so a reviewer can check the change without run
 
 - **A change of the screen** (`chasen` with no command): a screenshot or a short video, before and after.
 - **A change of a command:** its output in the terminal, before and after.
-- **A change of the server:** the output of the end-to-end test, or of the commands on a test server. `mise run smol` makes a test server in a small VM.
+- **A change of the server:** the output of the end-to-end test, or of the commands on a test server.
 
 ## Follow the house rules
 

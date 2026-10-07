@@ -104,10 +104,7 @@ Chasen cloud is this same software on a server that we create for you at Hetzner
 ```bash
 mise run test     # go vet and the unit tests. No Docker
 mise run e2e      # real Docker, the proxy on ports 80 and 443, an S3 store, and a private registry. Needs sudo
-mise run smol     # a disposable Chasen server in a smolvm machine
 ```
-
-`mise run smol` makes a test server in a [smolvm](https://github.com/smol-machines/smolvm) machine and prints the two variables that point the CLI at it. It needs no sudo for its network and takes no port 80 or 443 on your computer. `bin/smol delete` removes it.
 
 The two programs share one contract: [`protocol`](protocol/protocol.go) for the commands and [`oauth`](oauth/oauth.go) for the login.
 

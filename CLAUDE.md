@@ -19,7 +19,6 @@ Both packages are public API of the module: another repository imports them. Do 
 ```bash
 mise run test     # go vet + unit tests, no Docker
 mise run e2e      # full test with real Docker, the proxy, an S3 store, and a private registry. Needs sudo
-mise run smol     # a disposable test server in a smolvm machine
 ```
 
 Run `mise run e2e` after a change to the protocol, the deploy, the backups, or the login. It takes about 4 minutes. It skips itself when a `matcha-proxy` or `chasen-server` container exists, and it fails when another job replaces the proxy during the run.
