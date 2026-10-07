@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 )
@@ -35,15 +36,23 @@ const (
 // isLocalImage reports an image of the local registry.
 func isLocalImage(image string) bool { return strings.HasPrefix(image, localRegistry+"/") }
 
-// deleteEnabled lets the registry delete an image, for the cleanup.
-const deleteEnabled = "REGISTRY_STORAGE_DELETE_ENABLED=true"
+// The env of the registry. deleteEnabled lets it delete an image, for the
+// cleanup. noBlobCache turns off its cache of layers: the garbage collection
+// of the cleanup runs while the registry runs, and the cache still lists the
+// layers it removed. A push of the same image after that skipped them, and
+// left a tag with no manifest that no server could pull.
+const (
+	deleteEnabled = "REGISTRY_STORAGE_DELETE_ENABLED=true"
+	noBlobCache   = "REGISTRY_STORAGE_CACHE_BLOBDESCRIPTOR="
+)
 
 // startLocalRegistry starts the registry of this computer, when it does not
-// run yet. A registry from before the cleanup cannot delete: it is made
-// again, and its volume keeps the images.
+// run yet. A registry from before has another env: it is made again, and its
+// volume keeps the images. The next push puts back what a cache lost.
 func startLocalRegistry() error {
-	env, _ := exec.Command("docker", "inspect", "-f", "{{.Config.Env}}", localRegistryContainer).Output()
-	if len(env) > 0 && !bytes.Contains(env, []byte(deleteEnabled)) {
+	var env []string
+	if out, err := exec.Command("docker", "inspect", "-f", "{{json .Config.Env}}", localRegistryContainer).Output(); err == nil && json.Unmarshal(out, &env) == nil &&
+		(!slices.Contains(env, deleteEnabled) || !slices.Contains(env, noBlobCache)) {
 		exec.Command("docker", "rm", "-f", localRegistryContainer).Run()
 	}
 	if out, _ := exec.Command("docker", "ps", "-q", "--filter", "name=^"+localRegistryContainer+"$").Output(); len(bytes.TrimSpace(out)) > 0 {
@@ -52,7 +61,7 @@ func startLocalRegistry() error {
 	if exec.Command("docker", "start", localRegistryContainer).Run() != nil {
 		fmt.Println("Starting the registry of chasen on this computer. The image goes from here to the server, through SSH.")
 		out, err := exec.Command("docker", "run", "-d", "--name", localRegistryContainer, "--restart", "unless-stopped",
-			"-e", deleteEnabled, "-p", localRegistry+":5000", "-v", localRegistryContainer+":/var/lib/registry", "registry:2").CombinedOutput()
+			"-e", deleteEnabled, "-e", noBlobCache, "-p", localRegistry+":5000", "-v", localRegistryContainer+":/var/lib/registry", "registry:2").CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("cannot start the registry of chasen on this computer: %s", lastLineOf(string(out)))
 		}

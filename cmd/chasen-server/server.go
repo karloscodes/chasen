@@ -1019,9 +1019,16 @@ func unhealthyReport(app matcha.AppConfig, failed *matcha.UnhealthyError) string
 	case failed.OOMKilled:
 		fmt.Fprintf(&report, "Docker stopped it: it used more than its memory, %s. Give it more in chasen.yml, for example: memory: 1g\n", cmp.Or(app.Memory, protocol.DefaultMemory))
 	case failed.Status != "running" || failed.Restarts > 0:
-		fmt.Fprintf(&report, "It stopped with exit code %d", failed.ExitCode)
+		report.WriteString("It stopped")
+		// A container that Docker started again runs now: its exit code is the
+		// one of this run, 0, not the one of the run that stopped.
+		times := " %d times"
+		if failed.Status != "running" {
+			fmt.Fprintf(&report, " with exit code %d", failed.ExitCode)
+			times = "," + times
+		}
 		if failed.Restarts > 0 {
-			fmt.Fprintf(&report, ", %d times", failed.Restarts+1)
+			fmt.Fprintf(&report, times, failed.Restarts+1)
 		}
 		report.WriteString(". Its last lines say why.\n")
 	case len(others) > 0 && !slices.Contains(failed.Listening, app.Port):

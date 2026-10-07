@@ -28,6 +28,14 @@ func TestUnhealthyReport(t *testing.T) {
 		}
 	})
 
+	t.Run("an app that Docker started again does not get the exit code of the run that goes on", func(t *testing.T) {
+		report := unhealthyReport(app, &matcha.UnhealthyError{Err: proxy, Status: "running", ExitCode: 0, Restarts: 8, Logs: "broken"})
+
+		if !strings.Contains(report, "It stopped 9 times. Its last lines say why.") || strings.Contains(report, "exit code") {
+			t.Errorf("report = %q", report)
+		}
+	})
+
 	t.Run("an app on another port is told which port to declare", func(t *testing.T) {
 		report := unhealthyReport(app, &matcha.UnhealthyError{Err: proxy, Status: "running", Listening: []int{3000}})
 
