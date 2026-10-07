@@ -9,8 +9,9 @@ cd "$(dirname "$0")/.."
 out=tmp/e2e
 s3=chasen-e2e-s3
 registry=chasen-e2e-registry
+open=chasen-e2e-open-registry
 mkdir -p "$out"
-trap 'docker rm -f $s3 $registry >/dev/null 2>&1 || true' EXIT
+trap 'docker rm -f $s3 $registry $open >/dev/null 2>&1 || true' EXIT
 
 CGO_ENABLED=0 go build -o "$out/" ./cmd/...
 go test -c -o "$out/e2e.test" ./cmd/chasen-server
@@ -28,5 +29,9 @@ docker rm -f $registry >/dev/null 2>&1 || true
 docker run -d --name $registry -p 127.0.0.1:5055:5000 -v "$PWD/$out/htpasswd:/htpasswd:ro" \
   -e REGISTRY_AUTH=htpasswd -e REGISTRY_AUTH_HTPASSWD_REALM=chasen -e REGISTRY_AUTH_HTPASSWD_PATH=/htpasswd registry:2 >/dev/null
 
+# A registry with no login, like a public one: auto-update pulls with no login.
+docker rm -f $open >/dev/null 2>&1 || true
+docker run -d --name $open -p 127.0.0.1:5056:5000 registry:2 >/dev/null
+
 CHASEN_TEST_S3="http://$ip:9000" go test -count=1 -run TestOffsite ./cmd/chasen-server
-sudo CHASEN_TEST_S3="http://$ip:9000" CHASEN_TEST_REGISTRY=localhost:5055 CHASEN_BIN="$PWD/$out" "$out/e2e.test" -test.run TestEndToEnd "$@"
+sudo CHASEN_TEST_S3="http://$ip:9000" CHASEN_TEST_REGISTRY=localhost:5055 CHASEN_TEST_OPEN_REGISTRY=localhost:5056 CHASEN_BIN="$PWD/$out" "$out/e2e.test" -test.run TestEndToEnd "$@"

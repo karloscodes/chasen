@@ -106,6 +106,8 @@ func runServer(args []string) error {
 		if len(args) == 0 {
 			return backupAll()
 		}
+	case "auto-update":
+		return serverAutoUpdate(args)
 	}
 
 	if len(args) == 0 {
@@ -773,15 +775,11 @@ func serverDeploy(name, version string) error {
 	if err != nil {
 		return err
 	}
-	// An image alone changes the image: the port, the env, and the rest stay.
-	if settings.KeepSettings {
-		saved, err := loadSettings(name)
-		if err != nil {
-			return err
-		}
-		saved.Image, saved.Registry, saved.Domain = settings.Image, settings.Registry, settings.Domain
-		settings = saved
+	saved, err := loadSettings(name)
+	if err != nil {
+		return err
 	}
+	settings = mergeSettings(saved, settings)
 	if err := saveSettings(name, settings); err != nil {
 		return err
 	}
@@ -895,6 +893,13 @@ func serverRestart(name string) error {
 			return err
 		}
 		if sent {
+			// A restart sends no image, and says nothing about auto-update: both stay.
+			if saved, err := loadSettings(name); err == nil {
+				settings.Image = cmp.Or(settings.Image, saved.Image)
+				if settings.AutoUpdate == nil {
+					settings.AutoUpdate = saved.AutoUpdate
+				}
+			}
 			if err := saveSettings(name, settings); err != nil {
 				return err
 			}
@@ -1310,7 +1315,8 @@ func serverStatus(name string) error {
 	var image struct{ Size int64 }
 	dockerAPI("GET", "/images/"+app.Image+"/json", nil, &image)
 	fmt.Printf("Disk:     data %s · backups %s in %d · image %s\n", megabytes(data), megabytes(dirSize(backupsDir(name), nil)), len(localBackups(name)), megabytes(image.Size))
-	if settings, _ := loadSettings(name); settings.Jobs != "" {
+	settings, _ := loadSettings(name)
+	if settings.Jobs != "" {
 		jobs := all.of(jobsName(name)).Status
 		fmt.Printf("Jobs:     %s (%s)\n", cmp.Or(jobs, "not running"), settings.Jobs)
 	}
@@ -1333,6 +1339,9 @@ func serverStatus(name string) error {
 	}
 	fmt.Printf("Backup:   %s\n", last)
 	fmt.Printf("Replica:  %s\n", replica)
+	if autoUpdates(settings) {
+		fmt.Printf("Updates:  each night at %02d:%02d UTC, the newest %s\n", autoUpdateHour, autoUpdateMinute, settings.Image)
+	}
 	return nil
 }
 

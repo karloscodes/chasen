@@ -41,6 +41,12 @@ func deploy(creds credentials, app appFile, command string) error {
 		return err
 	}
 	settings.Domain = domainFlag
+	settings.AutoUpdate = autoUpdateFlag
+	// A directory with a Dockerfile and no tag builds its image: there is
+	// nothing for the server to pull at night.
+	if _, tag := splitImage(app.Image); autoUpdates(settings) && noDockerfile == nil && cmp.Or(tagFlag, tag) == "" {
+		return errors.New(noAutoUpdate)
+	}
 	// The values of the secrets are here now: check the ones that have a rule.
 	if err := settings.Check(); err != nil {
 		return fmt.Errorf("the settings of the deploy: %w", err)
@@ -150,6 +156,11 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 		fmt.Printf("No Dockerfile here: chasen deploys the newest %s. For one version: chasen deploy --tag <version>\n", app.Image)
 		tag, build = "latest", false
 	}
+	// The server pulls the newest image at night. An image that this deploy
+	// builds, or that comes from this computer, is in no registry it can reach.
+	if autoUpdates(settings) && (build || isLocalImage(app.Image)) {
+		return errors.New(noAutoUpdate)
+	}
 	if build {
 		var err error
 		if tag, err = headCommit(); err != nil {
@@ -244,7 +255,7 @@ func deployRelease(creds credentials, ref string) error {
 	if err := printReview(os.Stderr, reviewAppFile(app, false, "")); err != nil {
 		return err
 	}
-	settings := protocol.Settings{Env: map[string]string{}, Domain: domainFlag, KeepSettings: true}
+	settings := protocol.Settings{Env: map[string]string{}, Domain: domainFlag, KeepSettings: true, AutoUpdate: autoUpdateFlag}
 	return deployImage(creds, app, settings, "deploy")
 }
 
@@ -258,6 +269,9 @@ func isDeployed(creds credentials, name string) bool {
 // deployWebsite sends the files of the current commit. The server puts them
 // in a Caddy image.
 func deployWebsite(creds credentials, app appFile, settings protocol.Settings, command string) error {
+	if autoUpdates(settings) {
+		return errors.New(noAutoUpdate)
+	}
 	if _, err := os.Stat("index.html"); err != nil {
 		return errors.New("nothing to deploy here: no Dockerfile for an app, and no index.html for a website")
 	}
@@ -402,6 +416,15 @@ func restart(creds credentials, app appFile) error {
 	}
 	return remote(creds, settings.Body(nil), os.Stdout, "restart", app.Name)
 }
+
+// autoUpdates reports a deploy that turns auto-update on.
+func autoUpdates(settings protocol.Settings) bool {
+	return settings.AutoUpdate != nil && *settings.AutoUpdate
+}
+
+// noAutoUpdate is what a deploy says when it cannot auto-update.
+const noAutoUpdate = `--auto-update needs an image in a registry: the server pulls the newest one each night. This deploy builds its image here, or sends it from this computer, so there is nothing for the server to pull.
+Deploy an image that another repository releases instead: chasen deploy ghcr.io/acme/chat chat.example.com --auto-update`
 
 // noImage is what a deploy says for an app with a Dockerfile and no image.
 const noImage = `Chasen does not know where the image of this app goes. It pushes the image to a registry, and the server pulls it. It does not build on the server.

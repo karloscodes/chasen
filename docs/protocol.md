@@ -91,6 +91,7 @@ The shell is a WebSocket because a WebSocket passes every proxy that can be in f
 - The server uses `registry` for one pull and does not keep it.
 - A website has no `image`. Its files follow the line of the settings, as a `tar.gz` archive. The server puts them in a Caddy image; it is the only image a server makes.
 - `restart` with an empty body keeps the settings that the server has.
+- `"auto_update": true` or `false` turns the nightly deploy of the newest image of the tag on or off. Without the field the app keeps what it has.
 - `"keep_settings": true` on a `deploy` changes the image and keeps the other settings that the app has. `image`, `registry`, and `domain` come from the body. `chasen deploy <image>` sends it.
 
 ```bash

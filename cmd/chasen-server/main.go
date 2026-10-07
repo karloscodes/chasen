@@ -27,6 +27,8 @@ Run these on the server, as root:
   load                           Show the load, the memory, and the disk of the server
   quiet-hour                     Print the hour of the day with the fewest requests, from the last week
   backup                         Back up every app now
+  auto-update [app]              Deploy the newest image of each app deployed with --auto-update,
+                                 now. The API does it each night at 05:30 UTC
   adopt <app>                    Take over an app that matcha runs on this server. Nothing restarts
   adopt --undo <app>             Give it back to matcha
 

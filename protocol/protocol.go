@@ -89,6 +89,11 @@ type Settings struct {
 	// app has: `chasen deploy <image>`, which runs again to update an app.
 	// Image, Registry, and Domain come from the deploy.
 	KeepSettings bool `json:"keep_settings,omitempty"`
+
+	// AutoUpdate deploys the newest image of the tag each night: `--auto-update`
+	// is true, `--no-auto-update` is false. Without either, nil, the app keeps
+	// what it has. Only for an image in a registry: the server pulls it.
+	AutoUpdate *bool `json:"auto_update,omitempty"`
 }
 
 // Registry is the login of an image registry, like ghcr.io or Docker Hub.

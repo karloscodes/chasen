@@ -80,6 +80,8 @@ Apps that others release run from their image, in any directory:
                          Deploy the newest image, like ghcr.io/acme/chat, at that
                          domain. Nothing of the directory counts. The app is named after the
                          image, or -a <app>. Run it again to update: the settings of the app stay
+                         --auto-update: the server deploys the newest image of the tag each night,
+                         at 05:30 UTC. --no-auto-update stops it. A public image only
 
 Addons run from a ready image, with the same backups:
   enable <addon> [domain]   Run fusionaly, formlander, or lognorth. Run it again to update

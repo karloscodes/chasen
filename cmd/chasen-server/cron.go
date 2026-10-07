@@ -41,7 +41,15 @@ func cronLoop(self string) {
 	running := map[cronJob]bool{}
 	for {
 		time.Sleep(time.Until(time.Now().Truncate(time.Minute).Add(time.Minute)))
-		for _, due := range dueCron(time.Now()) {
+		jobs, from, to := dueCron(time.Now())
+		if autoUpdateDue(from, to) {
+			go func() {
+				if err := run(self, "auto-update"); err != nil {
+					log.Print("auto-update: ", err)
+				}
+			}()
+		}
+		for _, due := range jobs {
 			mu.Lock()
 			busy := running[due]
 			running[due] = true
@@ -62,13 +70,14 @@ func cronLoop(self string) {
 }
 
 // dueCron returns the jobs that are due in the minutes after the last look,
-// up to now, and saves now as the last look.
-func dueCron(now time.Time) []cronJob {
+// up to now, and saves now as the last look. from and to are the minutes it
+// looked at; from is after to when it looked at none.
+func dueCron(now time.Time) (due []cronJob, from, to time.Time) {
 	now = now.UTC().Truncate(time.Minute)
 	db, err := openServerDB()
 	if err != nil {
 		log.Print("cron: ", err)
-		return nil
+		return nil, now, time.Time{}
 	}
 	defer db.Close()
 	var last time.Time
@@ -77,23 +86,22 @@ func dueCron(now time.Time) []cronJob {
 		last, _ = time.Parse(time.RFC3339, saved)
 	}
 	if !now.After(last) {
-		return nil
+		return nil, now, time.Time{}
 	}
-	from := last.Add(time.Minute)
+	from = last.Add(time.Minute)
 	if now.Sub(last) > cronCatchUp {
 		from = now
 	}
 	if _, err := db.Exec("INSERT INTO cron_state (id, minute) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET minute = excluded.minute", now.Format(time.RFC3339)); err != nil {
 		log.Print("cron: ", err)
-		return nil
+		return nil, now, time.Time{}
 	}
 
 	apps, err := listApps()
 	if err != nil {
 		log.Print("cron: ", err)
-		return nil
+		return nil, from, now
 	}
-	var due []cronJob
 	for _, name := range matcha.ListAppsSorted(apps) {
 		settings, err := loadSettings(name)
 		if err != nil {
@@ -112,7 +120,7 @@ func dueCron(now time.Time) []cronJob {
 			}
 		}
 	}
-	return due
+	return due, from, now
 }
 
 // runCron runs one job and keeps the run in the history of its app.

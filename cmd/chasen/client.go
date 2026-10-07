@@ -72,6 +72,11 @@ var tagFlag string
 // app at its first deploy.
 var domainFlag string
 
+// autoUpdateFlag is `--auto-update` (true) or `--no-auto-update` (false):
+// the server deploys the newest image of the tag each night. nil keeps what
+// the app has.
+var autoUpdateFlag *bool
+
 // jsonFlag is `overview --json`: every server with its apps, as JSON.
 var jsonFlag bool
 
@@ -106,6 +111,12 @@ options:
 			continue
 		case args[i] == "--watch" && len(args) > 0 && args[0] == "overview":
 			watchFlag = true
+			args = slices.Delete(args, i, i+1)
+			i--
+			continue
+		case args[i] == "--auto-update" || args[i] == "--no-auto-update":
+			on := args[i] == "--auto-update"
+			autoUpdateFlag = &on
 			args = slices.Delete(args, i, i+1)
 			i--
 			continue

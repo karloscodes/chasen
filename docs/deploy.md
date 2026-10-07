@@ -76,6 +76,16 @@ chasen -a chat status
 - **The app is named after the image:** `chat`. `-a team-chat` gives it another name. Without a domain, the app gets `chat.<base domain of the server>`. After the image, a word with an `@` is the server, and a word without one is the domain.
 - **The server pulls `latest`, or the tag in the image:** `ghcr.io/acme/chat:1.2`. `--tag` does the same.
 - **Run the same line again to update** to the newest image. The app keeps its domains and its settings. A public image needs no login. For a private one, run `docker login` first.
+- **Or let the server update it each night** with `--auto-update`:
+
+  ```bash
+  chasen deploy ghcr.io/acme/chat chat.example.com --auto-update
+  ```
+
+  Each night at 05:30 UTC, the server pulls the tag that you deployed: `latest`, or a channel like `ghcr.io/acme/chat:2`. When the image is new, it deploys it like `chasen deploy`: a backup first, and the old version keeps the traffic when the new one does not answer `/up`. `chasen status` shows it, and `chasen history` shows each such deploy as `auto-update`. Once a night on purpose: a bad release has a day to be pulled before it reaches your server. `--no-auto-update` stops it, and a deploy with neither flag keeps what the app has.
+  - **A public image only.** The server keeps no registry login, so it cannot pull a private image at night.
+  - **Not for an image that you build:** the server has nothing to pull. A deploy that builds its image refuses the flag.
+  - **To update now,** run the line again, or `chasen-server auto-update <app>` on the server.
 
 **A folder with a `chasen.yml`.** An image that needs settings (another health path, env, secrets, a volume, cron jobs) gets a folder with a `chasen.yml` that names the image, and no `Dockerfile`. The folder can go into git, so the settings of your server have a record:
 

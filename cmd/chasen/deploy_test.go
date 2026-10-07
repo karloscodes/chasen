@@ -50,7 +50,7 @@ func TestDeployAnImage(t *testing.T) {
 		t.Setenv("CHASEN_URL", api.URL)
 		t.Setenv("CHASEN_TOKEN", server.Token)
 		t.Setenv("GHCR_TOKEN", "test")
-		t.Cleanup(func() { appFlag, tagFlag, domainFlag = "", "", "" })
+		t.Cleanup(func() { appFlag, tagFlag, domainFlag, autoUpdateFlag = "", "", "", nil })
 
 		if err := runClient(args); err != nil {
 			t.Fatal(err)
@@ -65,8 +65,17 @@ func TestDeployAnImage(t *testing.T) {
 			t.Errorf("args = %v, want chat latest", sent.args)
 		}
 		s := sent.settings
-		if s.Image != "ghcr.io/acme/chat:latest" || s.Domain != "chat.example.com" || !s.KeepSettings || len(s.Env) != 0 {
-			t.Errorf("settings = %+v, want the image, the domain, keep_settings, and no env", s)
+		if s.Image != "ghcr.io/acme/chat:latest" || s.Domain != "chat.example.com" || !s.KeepSettings || len(s.Env) != 0 || s.AutoUpdate != nil {
+			t.Errorf("settings = %+v, want the image, the domain, keep_settings, no env, and nothing about auto-update", s)
+		}
+	})
+
+	t.Run("--auto-update turns it on, and --no-auto-update off", func(t *testing.T) {
+		on := deployTo(t, "deploy", "ghcr.io/acme/chat", "chat.example.com", "--auto-update").settings.AutoUpdate
+		off := deployTo(t, "deploy", "ghcr.io/acme/chat", "--no-auto-update").settings.AutoUpdate
+
+		if on == nil || !*on || off == nil || *off {
+			t.Errorf("auto_update = %v and %v, want true, then false", on, off)
 		}
 	})
 
@@ -77,6 +86,22 @@ func TestDeployAnImage(t *testing.T) {
 			t.Errorf("args = %v, image = %s, want team-chat 1.2", sent.args, sent.settings.Image)
 		}
 	})
+}
+
+func TestAutoUpdateNeedsARegistry(t *testing.T) {
+	// A directory with a Dockerfile builds its image: nothing for the server to pull at night.
+	t.Chdir(t.TempDir())
+	os.WriteFile("Dockerfile", []byte("FROM scratch\n"), 0644)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CHASEN_URL", "http://127.0.0.1:1")
+	t.Setenv("CHASEN_TOKEN", "test")
+	t.Cleanup(func() { autoUpdateFlag = nil })
+
+	err := runClient([]string{"deploy", "--auto-update"})
+
+	if err == nil || !strings.Contains(err.Error(), "--auto-update needs an image in a registry") {
+		t.Errorf("deploy --auto-update of a build = %v, want the refusal before the build", err)
+	}
 }
 
 func TestIsImageRef(t *testing.T) {

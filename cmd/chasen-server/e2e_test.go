@@ -789,6 +789,57 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("--auto-update deploys a newer image of the tag, and nothing when the newest runs", func(t *testing.T) {
+		open := os.Getenv("CHASEN_TEST_OPEN_REGISTRY")
+		if open == "" {
+			t.Skip("set CHASEN_TEST_OPEN_REGISTRY to a registry with no login")
+		}
+		// The release of another repository, in a registry with no login.
+		commit := strings.TrimSpace(must(app, "git", "rev-parse", "HEAD"))
+		release := func(version string) {
+			t.Helper()
+			build := exec.Command("docker", "build", "-q", "-t", open+"/example:latest", "-")
+			build.Stdin = strings.NewReader(fmt.Sprintf("FROM %s/example:%s\nLABEL org.opencontainers.image.version=%s\n", registry, commit, version))
+			if out, err := build.CombinedOutput(); err != nil {
+				t.Fatalf("docker build: %s", out)
+			}
+			must(".", "docker", "push", "-q", open+"/example:latest")
+		}
+		t.Cleanup(func() {
+			run(".", server, "remove", "nightly")
+			docker("rmi", open+"/example:latest")
+		})
+		release("1.0.0")
+
+		must(t.TempDir(), bin, "deploy", open+"/example", "-a", "nightly", "--auto-update")
+
+		if status := must(".", server, "status", "nightly"); !strings.Contains(status, "Version:  1.0.0") || !strings.Contains(status, "Updates:  each night at 05:30 UTC") {
+			t.Errorf("status = %q, want version 1.0.0 and the nightly updates", status)
+		}
+		if out := must(".", server, "auto-update", "nightly"); !strings.Contains(out, "runs already") {
+			t.Errorf("auto-update with the newest image running = %q, want nothing to do", out)
+		}
+
+		release("1.1.0")
+		out := must(".", server, "auto-update", "nightly")
+
+		if !strings.Contains(out, "Deployed nightly 1.1.0") {
+			t.Errorf("auto-update after a new release = %q, want the deploy of 1.1.0", out)
+		}
+		if history := must(".", server, "history", "nightly"); !strings.Contains(history, "auto-update") {
+			t.Errorf("history = %q, want the auto-update", history)
+		}
+
+		must(t.TempDir(), bin, "deploy", open+"/example", "-a", "nightly", "--no-auto-update")
+
+		if status := must(".", server, "status", "nightly"); strings.Contains(status, "Updates:") {
+			t.Errorf("status after --no-auto-update = %q, want no nightly updates", status)
+		}
+		if out, err := run(".", server, "auto-update", "nightly"); err == nil || !strings.Contains(out, "does not auto-update") {
+			t.Errorf("auto-update after --no-auto-update = %q, %v, want a refusal", out, err)
+		}
+	})
+
 	t.Run("a deploy that does not get healthy keeps the previous version live", func(t *testing.T) {
 		commit("app.py", "raise SystemExit('broken')\n")
 

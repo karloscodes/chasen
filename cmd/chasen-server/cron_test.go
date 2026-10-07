@@ -40,8 +40,8 @@ func TestDueCron(t *testing.T) {
 		server(t)
 		dueCron(at("2026-10-03 03:59:00"))
 
-		first := dueCron(at("2026-10-03 04:00:00"))
-		again := dueCron(at("2026-10-03 04:00:30"))
+		first, _, _ := dueCron(at("2026-10-03 04:00:00"))
+		again, _, _ := dueCron(at("2026-10-03 04:00:30"))
 
 		if got := runs(first); len(got) != 2 || got[0] != "shop bin/reset" || got[1] != "shop bin/sync" {
 			t.Errorf("at 04:00 the due jobs are %q, want bin/reset and bin/sync", got)
@@ -56,7 +56,7 @@ func TestDueCron(t *testing.T) {
 		dueCron(at("2026-10-03 03:58:00"))
 
 		// The API is away at 03:59 and 04:00, and looks again at 04:01.
-		due := dueCron(at("2026-10-03 04:01:00"))
+		due, _, _ := dueCron(at("2026-10-03 04:01:00"))
 
 		if got := runs(due); len(got) != 2 {
 			t.Errorf("after the restart the due jobs are %q, want the two of 04:00", got)
@@ -67,7 +67,7 @@ func TestDueCron(t *testing.T) {
 		server(t)
 		dueCron(at("2026-10-03 01:00:00"))
 
-		due := dueCron(at("2026-10-03 04:05:00"))
+		due, _, _ := dueCron(at("2026-10-03 04:05:00"))
 
 		if len(due) != 0 {
 			t.Errorf("after three hours away it runs %q, want none: 04:05 matches no job", runs(due))

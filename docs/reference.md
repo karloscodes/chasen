@@ -13,7 +13,7 @@
 | `chasen update` | Install the newest release of the CLI now, after a check of its checksum. At a terminal, `chasen` does it by itself once a day, after a command that works. Never in CI. `CHASEN_NO_UPDATE_CHECK=1` turns it off |
 | `chasen report` | Something is wrong with Chasen? Open a new issue on GitHub, with your version and your system filled in. It sends nothing by itself |
 | `chasen deploy` | Build the image of the current git commit, push it, and deploy it. Or deploy a static website. In a folder with an `image:` in `chasen.yml` and no `Dockerfile`: deploy the newest image, with no build. `--tag <tag>` deploys an image that is already in the registry. `--domain <domain>` gives a new app its domain. |
-| `chasen deploy <image> [domain]` | Deploy an image that another repository releases, at that domain, from any directory, with nothing of the directory: `chasen deploy ghcr.io/acme/chat chat.example.com`. The app is named after the image, or `-a <app>`. The server pulls `latest`, or the tag of the image. Run it again to update: the app keeps its settings. `<user>@<host>` can come after it. After an image, a word with no `@` is the domain of the app, not a server |
+| `chasen deploy <image> [domain]` | Deploy an image that another repository releases, at that domain, from any directory, with nothing of the directory: `chasen deploy ghcr.io/acme/chat chat.example.com`. The app is named after the image, or `-a <app>`. The server pulls `latest`, or the tag of the image. Run it again to update: the app keeps its settings. `--auto-update` makes the server deploy the newest image of the tag each night at 05:30 UTC (a public image only), `--no-auto-update` stops it. `<user>@<host>` can come after it. After an image, a word with no `@` is the domain of the app, not a server |
 | `chasen check` | Test the current git commit against the standard. Changes nothing live |
 | `chasen restart` | Start the app again with the env and secrets of `chasen.yml`, from the image it has |
 | `chasen rollback` | Start the version before the current one again, in seconds: the server keeps its image. The data stays as it is: `chasen restore` brings back a backup. A second rollback goes forward again |
@@ -51,6 +51,7 @@ On the server, as root:
 | `chasen-server list` | List all apps |
 | `chasen-server quiet-hour` | Print the hour of the day with the fewest requests in the last week, for work that takes the server away |
 | `chasen-server backup` | Back up every app now |
+| `chasen-server auto-update [app]` | Deploy the newest image of each app deployed with `--auto-update`, now, or of one app. The API does it each night at 05:30 UTC |
 | `chasen-server adopt <app>` | Take over an app that [matcha](https://github.com/karloscodes/matcha) runs on this server. See "Coming from matcha" below |
 
 ## Run a command in the app
