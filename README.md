@@ -75,19 +75,6 @@ Chasen is a mix of two ideas from 37signals.
 
 What neither has: one small program that stays on the server for checked backups, a live replica of each database, the history of every deploy, and alerts. And one server holds many apps.
 
-## How Chasen differs from Kamal
-
-[Kamal](https://kamal-deploy.org) and Chasen share an idea and a proxy: build an image, put it on a server you own, swap containers with kamal-proxy. They are for different jobs.
-
-| | Kamal | Chasen |
-|---|---|---|
-| Made for | A team that runs an app on several servers, with roles, accessories, and its own database servers | One person with one server and many small apps, each with its data in SQLite |
-| Configuration | `config/deploy.yml` with the servers, the registry, the proxy, and the accessories | None for an app on GitHub that follows [the standard](STANDARD.md). `chasen.yml` only for what differs |
-| On the server | The containers and a few files. Nothing of Kamal runs between deploys | `chasen-server` runs all the time: backups, the live replica, history, alerts |
-| Data | Yours to back up | Hourly checked snapshots and a live replica to S3, built in. `chasen restore` and `chasen download` |
-| Watching it | `kamal app logs`, `kamal app details` | The screen: every app, its history, backups, logs, and the alerts of the server |
-| Many apps on one server | Each app has its own `deploy.yml` and its own deploy | One server holds them all. `chasen list` shows them, and the screen moves between them |
-
 When your app needs several servers or Postgres, use Kamal. When it is one app or ten on a single machine, and the data is a SQLite file you cannot lose, use Chasen.
 
 ## Documents
