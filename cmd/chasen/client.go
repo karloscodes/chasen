@@ -167,9 +167,10 @@ options:
 	// `chasen deploy root@203.0.113.5` names the server of the deploy. The
 	// first time, that is all it takes: the server gets Chasen, this computer
 	// gets its login, and the app goes live.
-	// `chasen deploy ghcr.io/you/app chat.example.com` deploys that image, with
-	// nothing of this directory, at that domain. With an image, a word with no
-	// @ is the domain of the app, and a word with @ is the server.
+	// `chasen deploy ghcr.io/you/app --domain chat.example.com` deploys that
+	// image, with nothing of this directory. A word with @ after the image is
+	// the server. A word with no @ is the domain, the form of v0.10 that the
+	// docs no longer show.
 	login := func() (credentials, error) { return loadCredentials(app.Server) }
 	if args[0] == "deploy" && len(args) > 1 {
 		var server, image, domain string

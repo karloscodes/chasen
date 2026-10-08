@@ -58,8 +58,8 @@ func TestDeployAnImage(t *testing.T) {
 		return sent
 	}
 
-	t.Run("deploys the newest image at the domain after it, named after it, with nothing of the directory", func(t *testing.T) {
-		sent := deployTo(t, "deploy", "ghcr.io/acme/chat", "chat.example.com")
+	t.Run("deploys the newest image at its --domain, named after it, with nothing of the directory", func(t *testing.T) {
+		sent := deployTo(t, "deploy", "ghcr.io/acme/chat", "--domain", "chat.example.com")
 
 		if strings.Join(sent.args, " ") != "chat latest" {
 			t.Errorf("args = %v, want chat latest", sent.args)
@@ -70,8 +70,16 @@ func TestDeployAnImage(t *testing.T) {
 		}
 	})
 
+	t.Run("the domain as a plain word after the image still works, as in v0.10", func(t *testing.T) {
+		sent := deployTo(t, "deploy", "ghcr.io/acme/chat", "chat.example.com")
+
+		if sent.settings.Domain != "chat.example.com" {
+			t.Errorf("domain = %q, want chat.example.com", sent.settings.Domain)
+		}
+	})
+
 	t.Run("--auto-update turns it on, and --no-auto-update off", func(t *testing.T) {
-		on := deployTo(t, "deploy", "ghcr.io/acme/chat", "chat.example.com", "--auto-update").settings.AutoUpdate
+		on := deployTo(t, "deploy", "ghcr.io/acme/chat", "--domain", "chat.example.com", "--auto-update").settings.AutoUpdate
 		off := deployTo(t, "deploy", "ghcr.io/acme/chat", "--no-auto-update").settings.AutoUpdate
 
 		if on == nil || !*on || off == nil || *off {

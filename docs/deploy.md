@@ -64,22 +64,22 @@ registry:                 # the login of the registry, when docker login is not 
 
 Some apps are not yours to build: a product that ships as an image, like a chat app, an analytics tool, or a form backend. You only run it. There are two ways.
 
-**One line.** When the image follows [the standard](../STANDARD.md), `chasen deploy` runs it at a domain, from any directory:
+**One line.** When the image follows [the standard](../STANDARD.md), `chasen deploy` runs it, from any directory:
 
 ```bash
-chasen deploy ghcr.io/acme/chat chat.example.com
-chasen deploy ghcr.io/acme/chat chat.example.com root@203.0.113.5   # to that server
+chasen deploy ghcr.io/acme/chat --domain chat.example.com
+chasen deploy ghcr.io/acme/chat root@203.0.113.5 --domain chat.example.com   # to that server
 chasen -a chat status
 ```
 
 - **Nothing of the directory counts:** no `chasen.yml`, no `Dockerfile`, no secrets. Nothing is built.
-- **The app is named after the image:** `chat`. `-a team-chat` gives it another name. Without a domain, the app gets `chat.<base domain of the server>`. After the image, a word with an `@` is the server, and a word without one is the domain.
+- **The app is named after the image:** `chat`. `-a team-chat` gives it another name. Without a domain, the app gets `chat.<base domain of the server>`.
 - **The server pulls `latest`, or the tag in the image:** `ghcr.io/acme/chat:1.2`. `--tag` does the same.
 - **Run the same line again to update** to the newest image. The app keeps its domains and its settings. A public image needs no login. For a private one, run `docker login` first.
 - **Or let the server update it each night** with `--auto-update`:
 
   ```bash
-  chasen deploy ghcr.io/acme/chat chat.example.com --auto-update
+  chasen deploy ghcr.io/acme/chat --domain chat.example.com --auto-update
   ```
 
   Each night at 05:30 UTC, the server pulls the tag that you deployed: `latest`, or a channel like `ghcr.io/acme/chat:2`. When the image is new, it deploys it like `chasen deploy`: a backup first, and the old version keeps the traffic when the new one does not answer `/up`. `chasen status` shows it, and `chasen history` shows each such deploy as `auto-update`. Once a night on purpose: a bad release has a day to be pulled before it reaches your server. `--no-auto-update` stops it, and a deploy with neither flag keeps what the app has.

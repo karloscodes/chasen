@@ -76,9 +76,9 @@ Run these in the directory of your app:
                          It asks for the secret access key
 
 Apps that others release run from their image, in any directory:
-  deploy <image> [<domain>] [<user>@<host>]
-                         Deploy the newest image, like ghcr.io/acme/chat, at that
-                         domain. Nothing of the directory counts. The app is named after the
+  deploy <image> [<user>@<host>] [--domain <domain>]
+                         Deploy the newest image, like ghcr.io/acme/chat. Nothing of the
+                         directory counts. The app is named after the
                          image, or -a <app>. Run it again to update: the settings of the app stay
                          --auto-update: the server deploys the newest image of the tag each night,
                          at 05:30 UTC. --no-auto-update stops it. A public image only
