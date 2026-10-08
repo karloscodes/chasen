@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -179,6 +180,62 @@ func TestRailsMasterKey(t *testing.T) {
 
 		if _, ok := env["RAILS_MASTER_KEY"]; ok || err != nil {
 			t.Errorf("env = %v, %v, want no key", env, err)
+		}
+	})
+}
+
+func TestServerFlag(t *testing.T) {
+	// Two logins: the current one, and the mock server that --server names.
+	setup := func(t *testing.T) (api string, got *[]string) {
+		server := mock.New(time.Now())
+		server.Wait = func(context.Context, time.Duration) bool { return true }
+		var paths []string
+		mockAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			paths = append(paths, r.URL.Path)
+			server.ServeHTTP(w, r)
+		}))
+		t.Cleanup(mockAPI.Close)
+		t.Chdir(t.TempDir())
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		t.Setenv("CHASEN_URL", "")
+		t.Setenv("CHASEN_TOKEN", "")
+		t.Setenv("GHCR_TOKEN", "test")
+		saved := logins{Current: "http://127.0.0.1:1", Tokens: map[string]string{"http://127.0.0.1:1": "other", mockAPI.URL: server.Token}}
+		if err := saved.save(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { appFlag, tagFlag, domainFlag, serverFlag, autoUpdateFlag = "", "", "", "", nil })
+		return mockAPI.URL, &paths
+	}
+
+	t.Run("deploy goes to the server of --server, not to the current login", func(t *testing.T) {
+		api, paths := setup(t)
+
+		err := runClient([]string{"deploy", "ghcr.io/acme/chat", "--server", api, "--domain", "chat.example.com"})
+
+		if err != nil || !slices.Contains(*paths, "/v1/deploy") {
+			t.Errorf("deploy --server = %v, requests %v, want the deploy on that server", err, *paths)
+		}
+	})
+
+	t.Run("any command goes to the server of --server", func(t *testing.T) {
+		api, paths := setup(t)
+
+		err := runClient([]string{"--server", api, "-a", "shop", "status"})
+
+		if err != nil || !slices.Contains(*paths, "/v1/status") {
+			t.Errorf("--server status = %v, requests %v, want the status from that server", err, *paths)
+		}
+	})
+
+	t.Run("two different servers are an error", func(t *testing.T) {
+		setup(t)
+
+		err := runClient([]string{"deploy", "root@203.0.113.5", "--server", "root@198.51.100.7"})
+
+		if err == nil || !strings.Contains(err.Error(), "two servers") {
+			t.Errorf("deploy with two servers = %v, want an error that names both", err)
 		}
 	})
 }

@@ -4,7 +4,7 @@
 
 | Command | What it does |
 |---|---|
-| `chasen deploy <user>@<host>` | Deploy to that server, through SSH. The first time, the server gets `chasen-server` and this computer gets its login |
+| `chasen deploy --server <user>@<host>` | Deploy to that server, through SSH. The first time, the server gets `chasen-server` and this computer gets its login |
 | `chasen add server <user>@<host>` | Log in to your own server through SSH, with no deploy |
 | `chasen add server <domain>` | Use your own server through its address on the web (`https://api.<domain>`), with a login in the browser |
 | `chasen servers` | List the servers you are logged in to. The star marks the current one |
@@ -23,6 +23,7 @@
 | `chasen logs` | Follow the app logs. `chasen logs jobs` follows the jobs container |
 | `chasen enable <addon> [domain]` | Run fusionaly, formlander, or lognorth from its image |
 | `chasen -a <app> <command>` | Run a command for an addon, or for an app of another directory |
+| `chasen --server <server> <command>` | Run a command on another server you are logged in to: `root@203.0.113.5`, or a base domain like `example.com`. It wins over `server:` in `chasen.yml`. For `deploy`, a server that this computer does not know yet is set up and logged in to first |
 | `chasen run <command>` | Run one command in the container of the app, with its env and its storage: `chasen run bin/rails db:migrate`. The output comes back as it is written, and the exit code is the one of the command. The history keeps it. See "Run a command in the app" below |
 | `chasen ssh` | Open a shell in the container of the app. See "A shell in the app" below |
 | `chasen history [id]` | Show the deploys and changes of the app, or the output of one |
@@ -207,7 +208,7 @@ server: root@203.0.113.5   # or a base domain like example.org
 
 | | Through SSH | On the web |
 |---|---|---|
-| You type | `chasen deploy root@203.0.113.5`, or `chasen add server root@203.0.113.5` for a login with no deploy | `chasen add server example.com` |
+| You type | `chasen deploy --server root@203.0.113.5`, or `chasen add server root@203.0.113.5` for a login with no deploy | `chasen add server example.com` |
 | The server needs | SSH, as root or with `sudo` and no password | a base domain, a DNS record for `api.<domain>`, and a certificate, which it gets by itself |
 | The login | who can log in with SSH owns the server | the token of the server, typed in a browser |
 | Good for | your own computers. No DNS, no open port but SSH | CI with a token, and people with no SSH access |

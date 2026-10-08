@@ -21,7 +21,7 @@ curl -fsSL https://chasenhq.com/cli | sh
 
 ```bash
 cd shop
-chasen deploy root@203.0.113.5 --domain shop.example.com
+chasen deploy --server root@203.0.113.5 --domain shop.example.com
 # chasen-server is not on this server yet. Installing it.
 # Setting up the server.
 #   Installing Docker. This takes a minute or two.
@@ -93,7 +93,7 @@ The server creates the bucket when it does not exist, and tests it before it sav
 Two free services make a server much harder to attack, and Chasen needs no setting for either of them:
 
 1. **Cloudflare in front of your apps.** Turn the proxy on for the DNS records of your apps, and set SSL to Full (strict). Visitors see the addresses of Cloudflare, not the one of your server, and Cloudflare takes the load of a traffic spike. Then let ports 80 and 443 of the server take traffic only from Cloudflare. [Domains](domains.md) has the details.
-2. **SSH only from your private network.** Install [Tailscale](https://tailscale.com) on the server and on your computer: it is the easiest. To run the network yourself, use [Headscale](https://github.com/juanfont/headscale) or [NetBird](https://netbird.io), which are open source, or plain [WireGuard](https://www.wireguard.com). Then close SSH to the internet. `chasen deploy` works the same, with the name of the server in the network: `chasen deploy root@shop-server`.
+2. **SSH only from your private network.** Install [Tailscale](https://tailscale.com) on the server and on your computer: it is the easiest. To run the network yourself, use [Headscale](https://github.com/juanfont/headscale) or [NetBird](https://netbird.io), which are open source, or plain [WireGuard](https://www.wireguard.com). Then close SSH to the internet. `chasen deploy` works the same, with the name of the server in the network: `chasen deploy --server root@shop-server`.
 
 With both, the internet sees ports 80 and 443 through Cloudflare, and nothing else. `chasen alerts` tells you what is still open. [Keep SSH off the internet](reference.md#keep-ssh-off-the-internet) has the firewall lines.
 

@@ -30,7 +30,7 @@ chasen deploy --domain shop.example.com
 The first deploy to a server names the server too, and that is the whole setup of the server:
 
 ```bash
-chasen deploy root@203.0.113.5 --domain shop.example.com
+chasen deploy --server root@203.0.113.5 --domain shop.example.com
 ```
 
 Point a DNS record for that name to the server. The certificate comes on the first HTTPS request after DNS resolves. After the first deploy the app keeps its domains, and the command is `chasen deploy`. `chasen domains add` gives it more.
@@ -68,7 +68,7 @@ Some apps are not yours to build: a product that ships as an image, like a chat 
 
 ```bash
 chasen deploy ghcr.io/acme/chat --domain chat.example.com
-chasen deploy ghcr.io/acme/chat root@203.0.113.5 --domain chat.example.com   # to that server
+chasen deploy ghcr.io/acme/chat --server root@203.0.113.5 --domain chat.example.com   # to that server
 chasen -a chat status
 ```
 

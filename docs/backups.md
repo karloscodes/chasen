@@ -66,7 +66,7 @@ The data is yours. Look at it on your computer, keep a copy of your own, or take
 
 ## When the server is gone
 
-1. Get a new server, and give it the same bucket: `chasen deploy root@<its address> --domain <domain of the app>` sets it up, then `chasen bucket` with the same values as before.
+1. Get a new server, and give it the same bucket: `chasen deploy --server root@<its address> --domain <domain of the app>` sets it up, then `chasen bucket` with the same values as before.
 2. Point the DNS records of your apps at the new server.
 3. Run `chasen deploy` for each app. The new server has no data for the app and the bucket has a copy, so the deploy restores it first: the live replica, or the newest snapshot.
 4. Add the custom domains again with `chasen domains add`, and run `chasen enable` for each addon.

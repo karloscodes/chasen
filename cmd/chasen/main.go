@@ -31,7 +31,8 @@ const usage = `Usage: chasen <command>
 
 Run these in the directory of your app:
   deploy                 Build the image of the current git commit, push it, and deploy it.
-  deploy <user>@<host>   The same, to that server, through SSH. The first time, the server
+  deploy --server <user>@<host>
+                         The same, to that server, through SSH. The first time, the server
                          gets Chasen and this computer gets its login: no other step
                          A directory with an index.html and no Dockerfile is a website
                          --tag <tag> deploys an image that is already in the registry. No build
@@ -76,7 +77,7 @@ Run these in the directory of your app:
                          It asks for the secret access key
 
 Apps that others release run from their image, in any directory:
-  deploy <image> [<user>@<host>] [--domain <domain>]
+  deploy <image> [--server <user>@<host>] [--domain <domain>]
                          Deploy the newest image, like ghcr.io/acme/chat. Nothing of the
                          directory counts. The app is named after the
                          image, or -a <app>. Run it again to update: the settings of the app stay
@@ -86,6 +87,8 @@ Apps that others release run from their image, in any directory:
 Addons run from a ready image, with the same backups:
   enable <addon> [domain]   Run fusionaly, formlander, or lognorth. Run it again to update
   -a <app> <command>        Run a command for an addon, or for an app of another directory
+  --server <server> <command>  Run a command on another server you are logged in to:
+                            root@203.0.113.5, or a base domain like example.com
 `
 
 func main() {

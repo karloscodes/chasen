@@ -111,7 +111,7 @@ func loadCredentials(server string) (credentials, error) {
 }
 
 // serverLogin returns the login of the server that a command names, like
-// `chasen deploy root@203.0.113.5`. A server that this computer does not
+// `chasen deploy --server root@203.0.113.5`. A server that this computer does not
 // know yet is added first: it gets Chasen when it has none, and this
 // computer gets its login. A server that it knows is used for this command
 // only: the current server stays the current one.

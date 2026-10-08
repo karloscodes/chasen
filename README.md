@@ -11,7 +11,7 @@ It is free and open source, and it runs on a server you own. The site is [chasen
 ```bash
 curl -fsSL https://chasenhq.com/cli | sh
 cd myapp
-chasen deploy root@203.0.113.5 --domain myapp.example.com
+chasen deploy --server root@203.0.113.5 --domain myapp.example.com
 # the first time, this installs Chasen on the server, through SSH
 # Deployed myapp 3f9a2c1
 #   https://myapp.example.com

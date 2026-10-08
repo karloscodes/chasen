@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -72,6 +73,10 @@ var tagFlag string
 // app at its first deploy.
 var domainFlag string
 
+// serverFlag is the server of a command, from `--server root@203.0.113.5`,
+// or a base domain like example.com. It wins over `server:` in chasen.yml.
+var serverFlag string
+
 // autoUpdateFlag is `--auto-update` (true) or `--no-auto-update` (false):
 // the server deploys the newest image of the tag each night. nil keeps what
 // the app has.
@@ -102,6 +107,8 @@ options:
 			appFlag = args[i+1]
 		case args[i] == "--tag" && hasValue:
 			tagFlag = args[i+1]
+		case args[i] == "--server" && hasValue:
+			serverFlag = args[i+1]
 		case args[i] == "--domain" && hasValue:
 			domainFlag = strings.ToLower(args[i+1])
 		case args[i] == "--json" && len(args) > 0 && args[0] == "overview":
@@ -164,16 +171,16 @@ options:
 	if err != nil {
 		return err
 	}
-	// `chasen deploy root@203.0.113.5` names the server of the deploy. The
-	// first time, that is all it takes: the server gets Chasen, this computer
-	// gets its login, and the app goes live.
+	// `chasen deploy --server root@203.0.113.5` names the server of the
+	// deploy. The first time, that is all it takes: the server gets Chasen,
+	// this computer gets its login, and the app goes live.
 	// `chasen deploy ghcr.io/you/app --domain chat.example.com` deploys that
-	// image, with nothing of this directory. A word with @ after the image is
-	// the server. A word with no @ is the domain, the form of v0.10 that the
-	// docs no longer show.
-	login := func() (credentials, error) { return loadCredentials(app.Server) }
-	if args[0] == "deploy" && len(args) > 1 {
-		var server, image, domain string
+	// image, with nothing of this directory. The forms of v0.10 still work,
+	// and the docs no longer show them: the server as a word with @, and the
+	// domain as a word with no @ after the image.
+	login := func() (credentials, error) { return loadCredentials(cmp.Or(serverFlag, app.Server)) }
+	if args[0] == "deploy" {
+		server, image, domain := "", "", ""
 		if i := slices.IndexFunc(args[1:], isImageRef); i >= 0 {
 			image = args[1+i]
 			args = slices.Delete(args, 1+i, 2+i)
@@ -185,7 +192,7 @@ options:
 			case server == "" && (image == "" || isServer(arg)):
 				server = arg
 			default:
-				return errors.New("usage: chasen deploy [<user>@<host>] [--domain <domain>] [--tag <tag>]\n       chasen deploy <image> [<domain>] [<user>@<host>]")
+				return errors.New("usage: chasen deploy [<image>] [--server <user>@<host>] [--domain <domain>] [--tag <tag>]")
 			}
 		}
 		args = args[:1]
@@ -196,7 +203,10 @@ options:
 		if domain != "" {
 			domainFlag = strings.ToLower(domain)
 		}
-		if server != "" {
+		if server != "" && serverFlag != "" && server != serverFlag {
+			return fmt.Errorf("two servers: %s and --server %s. Name one", server, serverFlag)
+		}
+		if server = cmp.Or(serverFlag, server); server != "" {
 			login = func() (credentials, error) { return serverLogin(server) }
 		}
 	}
