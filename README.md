@@ -71,7 +71,7 @@ Chasen is a mix of two ideas from 37signals.
 |---|---|---|---|
 | What you run | Your own app | A product someone made, like Campfire | Your own apps, and the images that others release |
 | How it gets there | `kamal deploy` from your computer, through a registry | One install command on the server | `chasen deploy` from your computer, through SSH, with no registry |
-| Updates | When you deploy | Each night, by itself | When you deploy, or each night with `--auto-update` |
+| Updates | When you deploy | By itself | When you deploy, or each night with `--auto-update` |
 
 What neither has: one small program that stays on the server for checked backups, a live replica of each database, the history of every deploy, and alerts. And one server holds many apps.
 
