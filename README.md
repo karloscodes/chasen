@@ -60,6 +60,21 @@ The keys do what the CLI does: `r` restarts, `b` backs up, `enter` on a backup r
 
 On [Omarchy](https://omarchy.org), it takes the colors of your theme and changes with it.
 
+## Between Kamal and ONCE
+
+Chasen is a mix of two ideas from 37signals.
+
+- From [Kamal](https://kamal-deploy.org): build the image of your app, put it on a server you own, and swap containers without downtime with kamal-proxy, all from your computer.
+- From [ONCE](https://once.com): one server, the data in SQLite, and an app that installs with one line and updates itself.
+
+| | Kamal | ONCE | Chasen |
+|---|---|---|---|
+| What you run | Your own app | A product someone made, like Campfire | Your own apps, and the images that others release |
+| How it gets there | `kamal deploy` from your computer, through a registry | One install command on the server | `chasen deploy` from your computer, through SSH, with no registry |
+| Updates | When you deploy | Each night, by itself | When you deploy, or each night with `--auto-update` |
+
+What neither has: one small program that stays on the server for checked backups, a live replica of each database, the history of every deploy, and alerts. And one server holds many apps.
+
 ## How Chasen differs from Kamal
 
 [Kamal](https://kamal-deploy.org) and Chasen share an idea and a proxy: build an image, put it on a server you own, swap containers with kamal-proxy. They are for different jobs.
