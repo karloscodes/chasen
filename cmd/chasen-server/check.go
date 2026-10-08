@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -143,6 +144,19 @@ func serverCheck(name, version string) error {
 	}
 	report(len(stray) == 0, "no database outside the storage%s", suffix(strings.Join(stray, ", ")))
 
+	// Rule 9: logs go to stdout and stderr, where `chasen logs` reads them.
+	// Log files in the storage only grow it. A warning, not a failure: the
+	// app works.
+	var dirs []string
+	for _, v := range sh.Volumes {
+		dirs = append(dirs, filepath.Join(appDir(scratch), path.Base(v)))
+	}
+	if files := logFiles(dirs); len(files) == 0 {
+		report(true, "no log files in the storage")
+	} else {
+		fmt.Printf("  warn  log files in the storage: %s. Write logs to stdout and stderr instead: chasen logs shows them, and the storage keeps only data\n", strings.Join(files, ", "))
+	}
+
 	// Rule 7: a restart runs the migrations again. They must not fail the second time.
 	docker("restart", "-t", "10", container)
 	if elapsed, problem = waitHealthy(container, sh); problem == "" {
@@ -190,6 +204,26 @@ func waitHealthy(container string, sh shape) (time.Duration, string) {
 		time.Sleep(time.Second)
 	}
 	return time.Since(start), fmt.Sprintf("%s on port %d in %d seconds", last, sh.Port, sh.HealthTimeout)
+}
+
+// logFiles returns the log files under the folders of the storage, by their
+// path in it: name.log, and the copies a rotation keeps, like name.log.1 or
+// name-2026-10-08.log.gz.
+func logFiles(dirs []string) []string {
+	var files []string
+	for _, dir := range dirs {
+		filepath.WalkDir(dir, func(file string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			if name := d.Name(); strings.HasSuffix(name, ".log") || strings.Contains(name, ".log.") {
+				rel, _ := filepath.Rel(filepath.Dir(dir), file)
+				files = append(files, rel)
+			}
+			return nil
+		})
+	}
+	return files
 }
 
 func suffix(problem string) string {
