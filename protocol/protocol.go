@@ -84,6 +84,11 @@ type Settings struct {
 	// bin/jobs. The container runs the image of the app, with its env and its
 	// volumes, and deploys with the web container as one unit.
 	Jobs string `json:"jobs,omitempty"`
+	// AssetPath is the folder of the fingerprinted files in the image, like
+	// /rails/public/assets: `asset_path:` in chasen.yml. During a deploy it
+	// serves the files of the new version and of the version before, so a
+	// page of the version before finds its files.
+	AssetPath string `json:"asset_path,omitempty"`
 
 	// KeepSettings deploys the image and keeps the other settings that the
 	// app has: `chasen deploy <image>`, which runs again to update an app.

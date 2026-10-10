@@ -70,12 +70,14 @@ func localBackups(name string) []string {
 // A process that closes a file loses every lock it holds on that file. So the
 // live replica gives the files it holds in open: those count as databases and
 // stay closed. A -wal or -shm file is never a database, and is never opened.
-func findDatabases(dir string, open map[string]os.FileInfo) ([]string, error) {
+//
+// skip is a folder that holds no database: the asset folder (assets.go).
+func findDatabases(dir string, open map[string]os.FileInfo, skip string) ([]string, error) {
 	var dbs []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		// Skip what is not live data: the backups, the databases a restore moved
-		// aside, and the local state of the live replica.
-		if err == nil && d.IsDir() && (d.Name() == "backups" || strings.HasPrefix(d.Name(), "pre-restore-") || strings.HasSuffix(d.Name(), "-litestream")) {
+		// aside, the local state of the live replica, and the assets.
+		if err == nil && d.IsDir() && (d.Name() == "backups" || strings.HasPrefix(d.Name(), "pre-restore-") || strings.HasSuffix(d.Name(), "-litestream") || path == skip) {
 			return fs.SkipDir
 		}
 		if err != nil || !d.Type().IsRegular() {
@@ -236,7 +238,7 @@ func backupFiles(dir string) ([]string, error) {
 // backupApp backs up every SQLite database of the app. It returns the stamp
 // of the backup, or "" when the app has no database yet.
 func backupApp(name string, cfg serverConfig) (string, error) {
-	dbs, err := findDatabases(appDir(name), nil)
+	dbs, err := findDatabases(appDir(name), nil, assetDir(name))
 	if err != nil || len(dbs) == 0 {
 		return "", err
 	}

@@ -67,7 +67,7 @@ func reviewAppFile(app appFile, dockerfile bool, tag string) []finding {
 	for _, name := range app.Secrets {
 		env[name] = ""
 	}
-	settings := protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes, Memory: app.Memory, Cron: app.Cron, Jobs: app.Jobs}
+	settings := protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes, Memory: app.Memory, Cron: app.Cron, Jobs: app.Jobs, AssetPath: app.AssetPath}
 	for _, err := range unjoin(settings.Check()) {
 		f := finding{true, "chasen.yml: " + err.Error(), "", docsAppFile}
 		if strings.HasPrefix(err.Error(), "chasen sets ") {
@@ -149,7 +149,7 @@ func inspectImage(image string) (imageFacts, error) {
 // no word: the defaults apply, and a deploy that fails says what the app did.
 func reviewImage(app appFile, image imageFacts) []finding {
 	var found []finding
-	settings := protocol.Settings{Port: app.Port, Volumes: app.Volumes}
+	settings := protocol.Settings{Port: app.Port, Volumes: app.Volumes, AssetPath: app.AssetPath}
 	if _, err := protocol.ShapeOf(settings, image.Ports, image.Volumes); err != nil {
 		found = append(found, finding{true, firstSentence(err), strings.TrimSpace(strings.TrimPrefix(err.Error(), firstSentence(err)+".")), docsDockerfile})
 	}

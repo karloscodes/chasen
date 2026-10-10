@@ -97,7 +97,7 @@ func appSettings(app appFile) (protocol.Settings, error) {
 		return protocol.Settings{}, err
 	}
 	return protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes, Memory: app.Memory,
-		NoBackup: app.Backup != nil && !*app.Backup, Cron: app.Cron, Jobs: app.Jobs}, nil
+		NoBackup: app.Backup != nil && !*app.Backup, Cron: app.Cron, Jobs: app.Jobs, AssetPath: app.AssetPath}, nil
 }
 
 // railsMasterKey gives a Rails app the key of its credentials. The key on

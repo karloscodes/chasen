@@ -34,6 +34,47 @@ func TestSettingsCheck(t *testing.T) {
 	}
 }
 
+// The engine maps each mount to a folder of the host by its last name, so the
+// asset path stays apart from the volumes.
+func TestAssetPath(t *testing.T) {
+	t.Run("in chasen.yml", func(t *testing.T) {
+		cases := []struct {
+			name    string
+			assets  string
+			volumes []string
+			want    string // a part of the error, or "" for settings that are right
+		}{
+			{"the assets of Rails next to its storage", "/rails/public/assets", []string{"/rails/storage"}, ""},
+			{"a relative path", "public/assets", nil, "absolute path"},
+			{"the root of the image", "/", nil, "absolute path"},
+			{"a reserved name", "/app/backups", nil, "reserved"},
+			{"the last name of a volume", "/rails/public/storage", []string{"/rails/storage"}, "end in the same name"},
+			{"inside a volume", "/rails/storage/assets", []string{"/rails/storage"}, "one inside the other"},
+			{"around a volume", "/rails/public", []string{"/rails/public/uploads"}, "one inside the other"},
+		}
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				err := Settings{AssetPath: c.assets, Volumes: c.volumes}.Check()
+
+				if c.want == "" && err != nil {
+					t.Errorf("Check() = %v, want no error", err)
+				}
+				if c.want != "" && (err == nil || !strings.Contains(err.Error(), c.want)) {
+					t.Errorf("Check() = %v, want an error with %q", err, c.want)
+				}
+			})
+		}
+	})
+
+	t.Run("against the volumes of the image", func(t *testing.T) {
+		_, err := ShapeOf(Settings{AssetPath: "/app/public/storage"}, nil, []string{"/app/storage"})
+
+		if err == nil || !strings.Contains(err.Error(), "end in the same name") {
+			t.Errorf("ShapeOf() = %v, want the clash with the VOLUME of the image", err)
+		}
+	})
+}
+
 func TestMemory(t *testing.T) {
 	for memory, valid := range map[string]bool{
 		"512m": true, "64m": true, "1g": true, "16g": true,

@@ -178,6 +178,13 @@ func (s Settings) Check() error {
 			problems = append(problems, fmt.Errorf("jobs: %w", err))
 		}
 	}
+	if s.AssetPath != "" {
+		if err := CheckVolumes([]string{s.AssetPath}); err != nil {
+			problems = append(problems, fmt.Errorf("asset_path: %w", err))
+		} else if err := checkAssetPath(s.AssetPath, s.Volumes); err != nil {
+			problems = append(problems, err)
+		}
+	}
 	return errors.Join(problems...)
 }
 
@@ -229,5 +236,24 @@ func ShapeOf(settings Settings, ports []int, volumes []string) (Shape, error) {
 	if len(s.Volumes) == 0 {
 		s.Volumes = DefaultVolumes
 	}
+	if settings.AssetPath != "" {
+		if err := checkAssetPath(settings.AssetPath, s.Volumes); err != nil {
+			return s, err
+		}
+	}
 	return s, nil
+}
+
+// checkAssetPath refuses an asset path that the engine cannot keep apart from
+// the volumes: it maps each mount to a folder of the host by its last name.
+func checkAssetPath(assets string, volumes []string) error {
+	for _, v := range volumes {
+		switch {
+		case path.Base(v) == path.Base(assets):
+			return fmt.Errorf("asset_path %s and the volume %s end in the same name. Rename one", assets, v)
+		case strings.HasPrefix(assets+"/", v+"/") || strings.HasPrefix(v+"/", assets+"/"):
+			return fmt.Errorf("asset_path %s and the volume %s are one inside the other. The assets come from the image, the data from the volume: keep them apart", assets, v)
+		}
+	}
+	return nil
 }

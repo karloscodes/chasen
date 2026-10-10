@@ -69,7 +69,7 @@ func TestFindDatabasesOfTheReplica(t *testing.T) {
 			t.Fatalf("the open read holds no lock: database %v, index %v", onDatabase, onIndex)
 		}
 
-		dbs, err := findDatabases(dir, map[string]os.FileInfo{path: held})
+		dbs, err := findDatabases(dir, map[string]os.FileInfo{path: held}, "")
 
 		if err != nil || !slices.Equal(dbs, []string{"storage/db.sqlite3"}) {
 			t.Fatalf("found %v, %v", dbs, err)
@@ -95,7 +95,7 @@ func TestFindDatabasesOfTheReplica(t *testing.T) {
 		os.Rename(path, filepath.Join(dir, "pre-restore-1", "db.sqlite3"))
 		os.WriteFile(path, []byte("not a database"), 0644)
 
-		dbs, err := findDatabases(dir, map[string]os.FileInfo{path: held})
+		dbs, err := findDatabases(dir, map[string]os.FileInfo{path: held}, "")
 
 		if err != nil || len(dbs) != 0 {
 			t.Fatalf("found %v, %v", dbs, err)

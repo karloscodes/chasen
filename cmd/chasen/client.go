@@ -51,6 +51,10 @@ type appFile struct {
 	// Jobs is the command of a second container for the jobs of the app,
 	// like the job role of Kamal: bin/jobs.
 	Jobs string `yaml:"jobs"`
+	// AssetPath is the folder of the fingerprinted files in the image, like
+	// the asset_path of Kamal: /rails/public/assets. A page of the version
+	// before a deploy still finds its files.
+	AssetPath string `yaml:"asset_path"`
 
 	Port          int      `yaml:"port"`
 	Memory        string   `yaml:"memory"`

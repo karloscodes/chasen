@@ -168,6 +168,27 @@ chasen deploy
 
 When CI pushes your images to a registry, deploy the image that is there, with no build: `chasen deploy --tag <the full hash of the commit>`.
 
+## Assets during a deploy
+
+Most frameworks put a fingerprint in the name of each CSS and JavaScript file, like `application-4f3a2b.js`, so a browser can keep the file for a year. A new version has new names, and its image has no files of the version before. A page that a visitor opened before the deploy still asks for the old names: a script that loads on the first click, an image, a font. Without them, that click fails until the visitor reloads.
+
+`asset_path` names the folder of those files in the image:
+
+```yaml
+asset_path: /rails/public/assets   # Rails. Vite: /rails/public/vite
+```
+
+Then a deploy serves the files of the new version and of the version before it:
+
+- Before the new version starts, the server copies the files of its image into a folder of the server. The app sees that folder at `asset_path`, in place of the folder of the image.
+- A file with the same name in both versions, like the manifest of the assets, is the one of the new version.
+- After the deploy, the server removes the files that neither version has. So the folder holds two versions, never more.
+- A deploy that fails puts the files of the version that runs back. A rollback does the same as a deploy.
+
+The folder is not data: backups and the live replica skip it. Each deploy fills it again from the image. Links in the image are not copied, so put real files in the folder.
+
+`asset_path` must not be inside a volume, or hold one. Its last name must differ from the last name of each volume: `/rails/public/assets` and `/rails/storage` are fine together.
+
 ## Background jobs
 
 Jobs run in a container of their own, like the job role of Kamal. Name its command in `chasen.yml`:
@@ -277,6 +298,9 @@ backup: false
 
 # The command of the jobs container. See Background jobs.
 jobs: bin/jobs
+
+# The folder of the fingerprinted files in the image. See Assets during a deploy.
+asset_path: /rails/public/assets
 
 # Commands on a schedule, in UTC. See Cron jobs.
 cron:

@@ -46,7 +46,7 @@ func TestRootDoesNotFollowTheLinksOfAnApp(t *testing.T) {
 		os.Symlink(serverDB, filepath.Join(storage, "db.sqlite3"))
 		os.Symlink(filepath.Dir(serverDB), filepath.Join(storage, "sub"))
 
-		dbs, err := findDatabases(appDir("shop"), nil)
+		dbs, err := findDatabases(appDir("shop"), nil, "")
 
 		if err != nil || len(dbs) != 0 {
 			t.Errorf("found %v, %v; want nothing", dbs, err)
@@ -60,7 +60,7 @@ func TestRootDoesNotFollowTheLinksOfAnApp(t *testing.T) {
 		}
 		done := make(chan error, 1)
 
-		go func() { _, err := findDatabases(appDir("shop"), nil); done <- err }()
+		go func() { _, err := findDatabases(appDir("shop"), nil, ""); done <- err }()
 
 		select {
 		case err := <-done:

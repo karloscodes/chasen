@@ -350,6 +350,45 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("asset_path serves the files of the version before too, and drops older ones", func(t *testing.T) {
+		before, _ := os.ReadFile(filepath.Join(app, "chasen.yml"))
+		// The tests after this one find the image of the newest commit.
+		defer func() {
+			commit("chasen.yml", string(before))
+			must(app, bin, "deploy")
+		}()
+		os.MkdirAll(filepath.Join(app, "assets"), 0755)
+		commit("Dockerfile", "FROM python:3.13-alpine\nCOPY app.py /app.py\nCOPY assets /app/assets\nUSER 1000:1000\nCMD [\"python\", \"-u\", \"/app.py\"]\n")
+		os.WriteFile(filepath.Join(app, "chasen.yml"), append(before, "asset_path: /app/assets\n"...), 0644)
+		// ls lists the asset folder of the container that has the traffic. No
+		// GET: the app counts each request, and the tests after this one count them.
+		ls := func() string {
+			web, _ := docker("ps", "-q", "--filter", "name=^example(-next)?$")
+			out, _ := docker("exec", web, "ls", "-A", "/app/assets")
+			return strings.Join(strings.Fields(out), " ")
+		}
+		deploy := func(file string) {
+			t.Helper()
+			matches, _ := filepath.Glob(filepath.Join(app, "assets", "*"))
+			for _, m := range matches {
+				os.Remove(m)
+			}
+			commit("assets/"+file, file)
+			must(app, bin, "deploy")
+		}
+
+		deploy("app-1.js")
+		deploy("app-2.js")
+
+		if got := ls(); got != "app-1.js app-2.js" {
+			t.Errorf("the asset folder has %q, want the files of this version and of the one before: app-1.js app-2.js", got)
+		}
+		deploy("app-3.js")
+		if got := ls(); got != "app-2.js app-3.js" {
+			t.Errorf("the asset folder has %q, want app-2.js app-3.js: the files of two versions before go", got)
+		}
+	})
+
 	t.Run("overview gives the state and the version of each app in one call", func(t *testing.T) {
 		out := must(app, bin, "overview")
 

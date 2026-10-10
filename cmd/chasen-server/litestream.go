@@ -138,7 +138,7 @@ func serverReplicate() error {
 			}
 			// The search leaves the registered databases closed: to open and
 			// close one would drop the locks of its replica.
-			dbs, err := findDatabases(appDir(name), registered)
+			dbs, err := findDatabases(appDir(name), registered, assetDir(name))
 			if err != nil {
 				slog.Error("cannot read the data directory", "app", name, "error", err)
 			}
