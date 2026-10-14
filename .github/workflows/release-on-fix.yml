@@ -1,13 +1,13 @@
 name: Release on fix
 
 # When a Dependabot update that touches what ships (go.mod, go.sum)
-# is merged and "Test" passes on main, tag the next patch version and start
+# is merged and "CI" passes on main, tag the next patch version and start
 # the release. The release still runs its own end-to-end tests before it
 # publishes, and servers take the new version on their next nightly update.
 # Updates of tests, CI, or the website merge with no release.
 on:
   workflow_run:
-    workflows: ["Test"]
+    workflows: ["CI"]
     types: [completed]
     branches: [main]
 
