@@ -43,3 +43,7 @@ updates:
         patterns: ["*"]
       actions:
         patterns: ["*"]
+      # merge-security-updates.yml knows a security update by this group name.
+      security:
+        applies-to: security-updates
+        patterns: ["*"]

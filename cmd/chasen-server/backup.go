@@ -246,7 +246,10 @@ func backupApp(name string, cfg serverConfig) (string, error) {
 	stamp := time.Now().UTC().Format(stampLayout)
 	dir := filepath.Join(backupsDir(name), stamp)
 	// Two backups in the same second (a deploy right after another) would share a name. Wait for the next second.
-	for exists(dir) || exists(dir+".tmp") {
+	for try := 0; exists(dir) || exists(dir+".tmp"); try++ {
+		if try == 3 {
+			return "", fmt.Errorf("a backup named %s is already there", stamp)
+		}
 		time.Sleep(time.Until(time.Now().Truncate(time.Second).Add(time.Second)))
 		stamp = time.Now().UTC().Format(stampLayout)
 		dir = filepath.Join(backupsDir(name), stamp)
