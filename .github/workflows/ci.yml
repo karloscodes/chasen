@@ -47,6 +47,9 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
+          # A build cache restored from another job confuses gosec's loader.
+          cache: false
+      - run: go version
       # The server runs docker and reads paths and URLs from its own settings by
       # design, so gosec's taint rules (G702 command, G703 path, G704 SSRF) are
       # off; every other high-severity, high-confidence rule fails the build.
