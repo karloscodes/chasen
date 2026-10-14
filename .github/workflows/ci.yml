@@ -48,12 +48,12 @@ jobs:
         with:
           go-version-file: go.mod
       # gosec v2.29.0 pins a golang.org/x/tools too old to read Go 1.27.2
-      # packages, so it is built with the newest x/tools.
+      # packages, so it is built with x/tools v0.52.0.
       - name: Build gosec
         run: |
           cd "$(mktemp -d)"
           go mod init gosec-build
-          go get github.com/securego/gosec/v2/cmd/gosec@v2.29.0 golang.org/x/tools@latest
+          go get github.com/securego/gosec/v2/cmd/gosec@v2.29.0 golang.org/x/tools@v0.52.0
           go build -o "$RUNNER_TEMP/gosec" github.com/securego/gosec/v2/cmd/gosec
       # The server runs docker and reads paths and URLs from its own settings by
       # design, so gosec's taint rules (G702 command, G703 path, G704 SSRF) are
@@ -68,7 +68,7 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
-      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   gitleaks:
     name: gitleaks
