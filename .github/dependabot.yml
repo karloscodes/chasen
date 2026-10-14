@@ -1,5 +1,7 @@
-# Monthly, grouped version updates, each a week old at least. Security
-# updates come as their own pull requests, as soon as an advisory is out.
+# Monthly, grouped version updates, each a week old at least.
+# Security updates come as soon as an advisory is out, in the "security" group.
+# Security and patch updates merge by themselves when CI passes:
+# .github/workflows/merge-security-updates.yml.
 # A merged update that touches what ships starts a patch release:
 # .github/workflows/release-on-fix.yml.
 version: 2
@@ -14,6 +16,10 @@ updates:
     open-pull-requests-limit: 3
     groups:
       go:
+        patterns: ["*"]
+      # merge-security-updates.yml knows a security update by this group name.
+      security:
+        applies-to: security-updates
         patterns: ["*"]
     ignore:
       # First-party modules: bumped by hand when a new version is cut.

@@ -1,11 +1,9 @@
 name: govulncheck
 
 # Vulnerabilities that the code of this repository actually calls, from the Go
-# team's database. Weekly, and when the modules change. A red run emails you.
+# team's database. Weekly, for newly disclosed CVEs; pull requests and main are
+# scanned by the govulncheck job of ci.yml. A red run emails you.
 on:
-  push:
-    branches: [main]
-    paths: [go.mod, go.sum]
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
@@ -23,4 +21,4 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

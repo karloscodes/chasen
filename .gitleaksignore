@@ -1,0 +1,4 @@
+# Made-up values in tests, not real secrets: a test app's key and a test
+# docker login, both written to a temp directory.
+80ebbf5ac6261f5a77a2b74c53b2af3c84877651:cmd/chasen-server/e2e_test.go:generic-api-key:318
+bb4f5839bf477c696557109d33df026976471dfc:cmd/chasen/client_test.go:generic-api-key:175
