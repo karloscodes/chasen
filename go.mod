@@ -1,11 +1,11 @@
 module github.com/karloscodes/chasen
 
-go 1.27.1
+go 1.27.2
 
 require (
 	github.com/benbjohnson/litestream v0.5.17
 	github.com/karloscodes/matcha v0.17.0
-	golang.org/x/net v0.55.0
+	golang.org/x/net v0.60.0
 	golang.org/x/term v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.49.1
@@ -57,9 +57,9 @@ require (
 	github.com/superfly/ltx v0.5.2 // indirect
 	github.com/tetratelabs/wazero v1.2.1 // indirect
 	github.com/wasilibs/go-re2 v1.3.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	modernc.org/libc v1.72.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
