@@ -41,7 +41,7 @@ func TestAddressesOfTheApp(t *testing.T) {
 		}{
 			{"no DNS record", nil, wrap(&net.DNSError{Err: "no such host", Name: "shop.example.com", IsNotFound: true}), "DNS has no record for shop.example.com yet. Add an A record"},
 			{"no certificate yet", nil, wrap(x509.UnknownAuthorityError{}), "the certificate is not there yet"},
-			{"a firewall drops it", nil, wrap(&net.OpError{Op: "dial", Err: timeoutError{}}), "nothing answers on port 443. A firewall drops the traffic"},
+			{"a firewall, or the network of this machine, drops it", nil, wrap(&net.OpError{Op: "dial", Err: timeoutError{}}), "ports 80 and 443 are open on the server and at your provider. If they are, the network of this machine blocks the address"},
 			{"another machine refuses it", nil, wrap(&net.OpError{Op: "dial", Err: errors.New("connect: connection refused")}), "refuses port 443. Does its DNS record point to this server?"},
 			{"Cloudflare cannot reach the server", &http.Response{StatusCode: 522, Header: http.Header{"Server": {"cloudflare"}}}, nil, "Cloudflare cannot reach the app (error 522)"},
 		}

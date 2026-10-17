@@ -81,7 +81,7 @@ func reachable(url string, resp *http.Response, err error) string {
 	case errors.As(err, &unknown), errors.As(err, &invalid), errors.As(err, &hostname), errors.As(err, &alert):
 		return fmt.Sprintf("✗ %s: the certificate is not there yet. Let's Encrypt gives it when %s points to the server and port 80 is open. Try again in a minute.", url, host)
 	case isTimeout(err):
-		return fmt.Sprintf("✗ %s: nothing answers on port 443. A firewall drops the traffic: open ports 80 and 443 on the server, and at your provider.", url)
+		return fmt.Sprintf("✗ %s: nothing answers on port 443 from here. Check that ports 80 and 443 are open on the server and at your provider. If they are, the network of this machine blocks the address: try from another network.", url)
 	case strings.Contains(err.Error(), "connection refused"):
 		return fmt.Sprintf("✗ %s: the address of %s refuses port 443. Does its DNS record point to this server?", url, host)
 	}
