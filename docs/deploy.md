@@ -170,12 +170,33 @@ When CI pushes your images to a registry, deploy the image that is there, with n
 
 ## Assets during a deploy
 
-Each version has new names for its fingerprinted CSS and JavaScript files. The new image has none of the old files, and Chasen keeps no copy of them: there is no `asset_path`.
+Each version has new names for its fingerprinted CSS and JavaScript files, like `application-8b441ae0.css`. The new image has none of the old files, and Chasen keeps no copy of them. So after the swap, the app answers 404 for an old file.
 
-A page that is open across a deploy still gets its files:
+A page that a visitor opened before the deploy already has its files. It needs a new one only on the next click, and the framework handles that click:
 
-- Most frameworks see the new names on the next click and load the full page again.
-- A CDN in front of the app serves the old files from its cache.
+| Stack | What loads the new version | What you do |
+|---|---|---|
+| Rails with Turbo | Turbo sees new names in the head and loads the full page again. | Keep `"data-turbo-track": "reload"` on `stylesheet_link_tag`. A new Rails app has it, and `javascript_importmap_tags` adds it. |
+| Inertia | The server sends the asset version. On a mismatch it answers 409, and the browser loads the full page. | Set the version from the build manifest. Most adapters do it. |
+| Vite, with files that load later (`import()`) | Nothing, until you add the listener below. | Add the listener below. |
+
+For Vite, load the page again when a file of the old version is gone:
+
+```js
+window.addEventListener("vite:preloadError", () => {
+  window.location.reload()
+})
+```
+
+**A CDN in front of the app keeps the old files.** Cloudflare or CloudFront serves them from its cache after the swap. Send `Cache-Control: public, max-age=31536000` with the fingerprinted files. A new Rails app does it in `config/environments/production.rb`.
+
+**Check a deploy.** Ask for a file of the version before. The app answers 404, and a CDN answers from its cache:
+
+```bash
+curl -sI https://shop.example.com/assets/application-8b441ae0.css | grep -i -E "^HTTP|cf-cache-status|x-cache"
+```
+
+**Coming from another deploy tool with `asset_path`?** Leave it out of `chasen.yml`: an unknown key is an error.
 
 ## Background jobs
 
