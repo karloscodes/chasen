@@ -833,11 +833,6 @@ func serverDeploy(name, version string) error {
 	if err := prepareData(name, image, sh.Volumes, cfg); err != nil {
 		return err
 	}
-	if settings.AssetPath != "" {
-		if _, err := syncAssets(name, image, settings.AssetPath); err != nil {
-			return err
-		}
-	}
 
 	app := matcha.AppConfig{
 		Image:         image,
@@ -845,20 +840,13 @@ func serverDeploy(name, version string) error {
 		Port:          sh.Port,
 		HealthPath:    sh.Health,
 		HealthTimeout: sh.HealthTimeout,
-		Volumes:       mounts(sh, settings),
+		Volumes:       sh.Volumes,
 		Env:           appEnv(settings, domains, version, privateKey, sh),
 		Memory:        settings.Memory,
 	}
 	fmt.Printf("Starting %s %s\n", name, version)
 	if err := apply(name, app); err != nil {
-		// The version before runs on: its files win again.
-		if settings.AssetPath != "" && oldErr == nil {
-			syncAssets(name, old.Image, settings.AssetPath)
-		}
 		return err
-	}
-	if settings.AssetPath != "" {
-		pruneAssets(name, settings.AssetPath, image, old.Image)
 	}
 
 	pruneImages(name, image, old.Image)
@@ -925,14 +913,8 @@ func serverRestart(name string) error {
 		if err := prepareVolumes(name, app.Image, sh.Volumes); err != nil {
 			return err
 		}
-		// A restart can bring the asset path: the folder needs the files first.
-		if settings.AssetPath != "" {
-			if _, err := syncAssets(name, app.Image, settings.AssetPath); err != nil {
-				return err
-			}
-		}
 		version := app.Image[strings.LastIndex(app.Image, ":")+1:]
-		app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, mounts(sh, settings), settings.Memory
+		app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes, settings.Memory
 		app.Env = appEnv(settings, strings.Split(app.Domain, ","), version, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
 	}
 	fmt.Println("Restarting", name)
@@ -980,24 +962,12 @@ func serverRollback(name string) error {
 	if err := prepareVolumes(name, image, sh.Volumes); err != nil {
 		return err
 	}
-	if settings.AssetPath != "" {
-		if _, err := syncAssets(name, image, settings.AssetPath); err != nil {
-			return err
-		}
-	}
-	runs := app.Image
 	app.Image = image
-	app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, mounts(sh, settings), settings.Memory
+	app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes, settings.Memory
 	app.Env = appEnv(settings, strings.Split(app.Domain, ","), previous, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
 	fmt.Printf("Starting %s %s again, the version before %s\n", name, previous, current)
 	if err := apply(name, app); err != nil {
-		if settings.AssetPath != "" {
-			syncAssets(name, runs, settings.AssetPath)
-		}
 		return err
-	}
-	if settings.AssetPath != "" {
-		pruneAssets(name, settings.AssetPath, image, runs)
 	}
 	fmt.Printf("\nRolled back %s to %s. The data is as it was: chasen restore brings back a backup.\n", name, previous)
 	return nil
@@ -1091,7 +1061,7 @@ func prepareData(name, image string, volumes []string, cfg serverConfig) error {
 		fmt.Printf("%s: no backup. chasen.yml says backup: false\n", name)
 		return nil
 	}
-	dbs, err := findDatabases(appDir(name), nil, assetDir(name))
+	dbs, err := findDatabases(appDir(name), nil)
 	if err != nil {
 		return err
 	}

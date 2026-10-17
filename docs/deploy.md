@@ -170,24 +170,12 @@ When CI pushes your images to a registry, deploy the image that is there, with n
 
 ## Assets during a deploy
 
-Most frameworks put a fingerprint in the name of each CSS and JavaScript file, like `application-4f3a2b.js`, so a browser can keep the file for a year. A new version has new names, and its image has no files of the version before. A page that a visitor opened before the deploy still asks for the old names: a script that loads on the first click, an image, a font. Without them, that click fails until the visitor reloads.
+Each version has new names for its fingerprinted CSS and JavaScript files. The new image has none of the old files, and Chasen keeps no copy of them: there is no `asset_path`.
 
-`asset_path` names the folder of those files in the image:
+A page that is open across a deploy still gets its files:
 
-```yaml
-asset_path: /rails/public/assets   # Rails. Vite: /rails/public/vite
-```
-
-Then a deploy serves the files of the new version and of the version before it:
-
-- Before the new version starts, the server copies the files of its image into a folder of the server. The app sees that folder at `asset_path`, in place of the folder of the image.
-- A file with the same name in both versions, like the manifest of the assets, is the one of the new version.
-- After the deploy, the server removes the files that neither version has. So the folder holds two versions, never more.
-- A deploy that fails puts the files of the version that runs back. A rollback does the same as a deploy.
-
-The folder is not data: backups and the live replica skip it. Each deploy fills it again from the image. Links in the image are not copied, so put real files in the folder.
-
-`asset_path` must not be inside a volume, or hold one. Its last name must differ from the last name of each volume: `/rails/public/assets` and `/rails/storage` are fine together.
+- Most frameworks see the new names on the next click and load the full page again.
+- A CDN in front of the app serves the old files from its cache.
 
 ## Background jobs
 
@@ -298,9 +286,6 @@ backup: false
 
 # The command of the jobs container. See Background jobs.
 jobs: bin/jobs
-
-# The folder of the fingerprinted files in the image. See Assets during a deploy.
-asset_path: /rails/public/assets
 
 # Commands on a schedule, in UTC. See Cron jobs.
 cron:
