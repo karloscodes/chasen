@@ -97,6 +97,8 @@ Two free services make a server much harder to attack, and Chasen needs no setti
 
 With both, the internet sees ports 80 and 443 through Cloudflare, and nothing else. `chasen alerts` tells you what is still open. [Keep SSH off the internet](reference.md#keep-ssh-off-the-internet) has the firewall lines.
 
+Leave out the base domain too. With one, the API answers on port 443 to anyone who finds it. Without one, the CLI and CI reach the server through SSH, from the private network. [Keep the API off the internet](reference.md#keep-the-api-off-the-internet) has the steps.
+
 ## An image in a registry
 
 The default needs no registry. Use one when:
@@ -142,6 +144,8 @@ Give the server a base domain when you want two more things:
 
 - **A name for each new app with no flag.** With the base domain `example.com` and a wildcard DNS record (`*.example.com` points to the server), a new app gets `<app>.example.com`.
 - **The API on the web**, at `https://api.example.com`. Then a computer needs no SSH access to the server: it logs in with a browser, and CI deploys with a token.
+
+The cost: the API is on the internet, and `chasen alerts` warns about it. I recommend SSH from a private network instead: [Keep the API off the internet](reference.md#keep-the-api-off-the-internet).
 
 Run this on the server, as root:
 

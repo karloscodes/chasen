@@ -4,7 +4,7 @@ With this setup, a push to `main` deploys your app. The workflow runs the same `
 
 You need a server that runs `chasen-server`, and an app that deploys from your computer.
 
-There are two ways for the job to reach the server. With an address on the web (a base domain, set with `chasen-server setup --domain example.com`), the job logs in with a token and the image goes through `ghcr.io`: the steps below. A server that you reach only through SSH works too, with no registry: see [Through SSH](#through-ssh).
+There are two ways for the job to reach the server. With an address on the web (a base domain, set with `chasen-server setup --domain example.com`), the job logs in with a token and the image goes through `ghcr.io`: the steps below. A server that you reach only through SSH works too, with no registry: see [Through SSH](#through-ssh). The SSH way keeps the API off the internet, and I recommend it: [Keep the API off the internet](reference.md#keep-the-api-off-the-internet).
 
 ## 1. Nothing to configure for the image
 
@@ -129,6 +129,8 @@ jobs:
 ```
 
 The token is a login like the one of your computer: `chasen logout` with it ends it, and the token of the server never leaves the server. Do not run `chasen add server` in the job: each run would add a new login.
+
+When SSH is open only to your private network, the job joins the network before `chasen deploy`. Tailscale has an action for it: [tailscale/github-action](https://github.com/tailscale/github-action). Then use the name of the server in the network, in `CHASEN_URL` and in `ssh-keyscan`: `ssh://root@shop-server`.
 
 ## A website with no Dockerfile
 

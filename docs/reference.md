@@ -161,6 +161,7 @@ A restart, a restore, and the removal of a domain ask first. Each action is a co
 | Less than 10% of the memory is free | warning | `memory` |
 | SSH accepts passwords | warning | `ssh` |
 | No firewall runs on the server (ufw, or nftables that drops what it does not allow) | warning | `firewall` |
+| The API answers on the internet: the server has a base domain | warning | `api` |
 | The server does not install its security updates by itself (Debian and Ubuntu) | warning | `updates` |
 | An update waits for a reboot for more than a day | warning | `reboot` |
 | The nightly update of `chasen-server` is off | warning | `auto_update` |
@@ -179,6 +180,14 @@ A firewall that lets in only SSH, 80, and 443 is good. Better: SSH only from you
 | [WireGuard](https://www.wireguard.com) | No service at all: it is in the Linux kernel. One file on the server and one on your computer. Best for one server and a few computers |
 
 When the network works, let SSH in only from it. With ufw and Tailscale: `ufw allow in on tailscale0 to any port 22 && ufw delete allow OpenSSH`. Keep a way back before you close the door: the console of your provider. When an alert does not apply, turn it off by its name on the server, for example when the firewall of your provider protects the server: `chasen-server settings quiet_alerts firewall`.
+
+### Keep the API off the internet
+
+A server with a base domain answers at `https://api.<domain>`, on port 443, to anyone who finds it. A login there needs the token, but a bot can try. Without a base domain, the API has no address on the web: the CLI reaches it through SSH. With SSH only from your private network, nothing of Chasen is on the internet. The internet sees your apps on ports 80 and 443, and nothing else.
+
+- **Set up the server with no base domain:** `chasen-server setup`. Each app brings its domain at its first deploy: `chasen deploy --domain shop.example.com`.
+- **Deploy from CI through SSH.** The job joins the private network first, then deploys like your computer does. [Through SSH](github-actions.md#through-ssh) has the workflow.
+- **A server that has a base domain keeps the API on the web.** No command takes it off yet. When you want it there, for CI with a token or a login with a browser, turn the alert off: `chasen-server settings quiet_alerts api`.
 
 ## Several servers
 

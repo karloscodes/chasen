@@ -59,6 +59,7 @@ func checkAlerts(cfg serverConfig, now time.Time) []alert {
 		memoryAlerts,
 		sshAlerts,
 		firewallAlerts,
+		func() []alert { return apiAlerts(cfg) },
 		updateAlerts,
 		func() []alert { return rebootAlerts(now) },
 		func() []alert { return selfUpdateAlerts(cfg) },
@@ -284,6 +285,17 @@ func firewallAlerts() []alert {
 	}
 	return []alert{{"firewall", false, "no firewall runs on this server: every port that a program opens is open to the internet",
 		"Let in SSH, 80, and 443: ufw allow OpenSSH && ufw allow 80,443/tcp && ufw enable. SSH only from a private network is better: https://chasenhq.com/docs/reference/#keep-ssh-off-the-internet. When the firewall of your provider does it, run: chasen-server settings quiet_alerts firewall"}}
+}
+
+// apiAlerts reports an API on the internet. A base domain gives the API a
+// route on the proxy, at api.<domain> on port 443, for anyone who finds it.
+// The settings say it: no DNS lookup, so the check stays as fast as a file.
+func apiAlerts(cfg serverConfig) []alert {
+	if cfg.Domain == "" || isLocal(cfg.Domain) {
+		return nil
+	}
+	return []alert{{"api", false, "the API answers on the internet, at https://api." + cfg.Domain + ": anyone who finds it can try a token",
+		"SSH from a private network keeps it off the internet: https://chasenhq.com/docs/reference/#keep-the-api-off-the-internet. When CI or a login with a browser needs it there, run: chasen-server settings quiet_alerts api"}}
 }
 
 // updateAlerts reports a Debian or Ubuntu server that does not install its

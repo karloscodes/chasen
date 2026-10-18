@@ -89,6 +89,24 @@ func TestAlertsOfTheHost(t *testing.T) {
 	})
 }
 
+func TestAlertsOfTheAPI(t *testing.T) {
+	t.Run("a base domain puts the API on the internet", func(t *testing.T) {
+		found := apiAlerts(serverConfig{Domain: "example.com"})
+
+		if ids(found) != "api" || found[0].Error || !strings.Contains(found[0].What, "https://api.example.com") {
+			t.Errorf("alerts = %v, want one warning that names the address", found)
+		}
+	})
+
+	t.Run("with no base domain, or a local one, the API has no address on the internet", func(t *testing.T) {
+		for _, domain := range []string{"", "localhost", "dev.localhost"} {
+			if found := apiAlerts(serverConfig{Domain: domain}); len(found) != 0 {
+				t.Errorf("domain %q: alerts = %v", domain, found)
+			}
+		}
+	})
+}
+
 func TestAlertsOfTheBackups(t *testing.T) {
 	t.Setenv("CHASEN_ROOT", t.TempDir())
 	saveApp("shop", matcha.AppConfig{Image: "chasen.invalid/shop:1", Domain: "shop.localhost"})
