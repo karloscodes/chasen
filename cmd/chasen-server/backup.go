@@ -241,12 +241,19 @@ func backupApp(name string, cfg serverConfig) (string, error) {
 		return "", err
 	}
 
-	stamp, tmp, err := claimBackup(name)
-	if err != nil {
-		return "", err
+	stamp := time.Now().UTC().Format(stampLayout)
+	dir := filepath.Join(backupsDir(name), stamp)
+	// Two backups in the same second (a deploy right after another) would share a name. Wait for the next second.
+	for try := 0; exists(dir) || exists(dir+".tmp"); try++ {
+		if try == 3 {
+			return "", fmt.Errorf("a backup named %s is already there", stamp)
+		}
+		time.Sleep(time.Until(time.Now().Truncate(time.Second).Add(time.Second)))
+		stamp = time.Now().UTC().Format(stampLayout)
+		dir = filepath.Join(backupsDir(name), stamp)
 	}
-	dir := strings.TrimSuffix(tmp, ".tmp")
-	// Build the backup in its .tmp directory. A backup that stops halfway never shows as complete.
+	// Build the backup in a .tmp directory. A backup that stops halfway never shows as complete.
+	tmp := dir + ".tmp"
 	defer os.RemoveAll(tmp)
 	for _, db := range dbs {
 		path := filepath.Join(appDir(name), db)
@@ -274,37 +281,6 @@ func backupApp(name string, cfg serverConfig) (string, error) {
 		}
 	}
 	return stamp, prune(name, cfg)
-}
-
-// claimBackup takes the name of a new backup of the app: the time of now, to the
-// second, or a later second when a backup has that one. Backups run in more than
-// one process (a deploy holds the lock; `chasen-server backup` and the hourly run
-// do not), so a look for a free name is not enough: two looks in the same second
-// both see it free. Making the .tmp directory is the claim, because only one
-// os.Mkdir of a path succeeds. It returns the stamp and the .tmp directory, which
-// the caller owns and removes.
-func claimBackup(name string) (stamp, tmp string, err error) {
-	if err := os.MkdirAll(backupsDir(name), 0700); err != nil {
-		return "", "", err
-	}
-	for try := range 5 {
-		if try > 0 {
-			time.Sleep(time.Until(time.Now().Truncate(time.Second).Add(time.Second)))
-		}
-		stamp = time.Now().UTC().Format(stampLayout)
-		dir := filepath.Join(backupsDir(name), stamp)
-		if err := os.Mkdir(dir+".tmp", 0700); errors.Is(err, fs.ErrExist) {
-			continue // another backup builds this one now
-		} else if err != nil {
-			return "", "", err
-		}
-		if exists(dir) { // another backup finished with this name
-			os.Remove(dir + ".tmp")
-			continue
-		}
-		return stamp, dir + ".tmp", nil
-	}
-	return "", "", fmt.Errorf("no free name for a backup of %s: %s and the 4 seconds before it are taken", name, stamp)
 }
 
 // printBackup runs one backup and tells the user about it.

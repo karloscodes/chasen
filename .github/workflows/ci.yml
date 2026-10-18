@@ -20,6 +20,8 @@ jobs:
           go-version-file: go.mod
       - run: bin/public
       - run: go vet ./...
+      - name: The backup race test, names on the run (scratch)
+        run: go test -count=3 -run 'TestBackup' -v ./cmd/chasen-server/ 2>&1 | tee /tmp/out.txt; grep -E -- '--- FAIL|_test.go:[0-9]+:' /tmp/out.txt | sed 's/^ */::error::/' ; ! grep -q -- '--- FAIL' /tmp/out.txt
       - run: go test ./...
         env:
           CHASEN_TEST_DOCKER: 1 # the runner has Docker: also the tests that start a container or pull an image
