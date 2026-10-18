@@ -119,7 +119,7 @@ func TestIsImageRef(t *testing.T) {
 		"acme/chat:1.2":              true,
 		"ghcr.io/you/app@sha256:abc": true,
 		"root@203.0.113.5":           false,
-		"ubuntu@matcha-prod":         false,
+		"ubuntu@shop-server":         false,
 		"example.com":                false,
 		"ssh://root@203.0.113.5":     false,
 		"https://api.example.com":    false,

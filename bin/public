@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 
 # Names that exist only inside the cloud. "The cloud creates a server at
 # Hetzner" is public, and passes.
-inside='HCLOUD_|CLOUDFLARE_API|CLOUDFLARE_ZONE|api\.hetzner\.cloud|api\.cloudflare\.com|\.env\.cloud|chasen-cloud|first-boot script|chasen-quiet|bin/chasen-reboot|chasen-reboot(-hour)?\.(sh|timer|service)|quiet reboot|edge (machine|server|of the cloud)|the edge left'
+inside='HCLOUD_|CLOUDFLARE_API|CLOUDFLARE_ZONE|api\.hetzner\.cloud|api\.cloudflare\.com|\.env\.cloud|chasen-cloud|first-boot script|chasen-quiet|bin/chasen-reboot|chasen-reboot(-hour)?\.(sh|timer|service)|quiet reboot|edge (machine|server|of the cloud)|the edge left|cloud\.chasenhq\.com|cloud account'
 # The check began after this commit. Older messages stay as they are.
 since=dd0bedb
 

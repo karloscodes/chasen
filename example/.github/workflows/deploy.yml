@@ -2,8 +2,8 @@
 # you run on your computer. Copy this file to .github/workflows/ of your app.
 #
 # Set two secrets in the repository:
-#   CHASEN_URL    https://api.example.com (your server), or https://cloud.chasenhq.com
-#   CHASEN_TOKEN  the token of the server, or the key of your cloud account
+#   CHASEN_URL    https://api.example.com, the address of your server
+#   CHASEN_TOKEN  the token of the server
 name: Deploy
 on:
   push:
