@@ -124,8 +124,8 @@ func TestBackup(t *testing.T) {
 			t.Errorf("stamps = %v, want %d different ones", stamps, n)
 		}
 		for _, stamp := range stamps {
-			if !exists(filepath.Join(backupsDir("shop"), stamp, "db.sqlite3.gz")) {
-				t.Errorf("backup %s has no db.sqlite3.gz", stamp)
+			if !exists(filepath.Join(backupsDir("shop"), stamp, "storage", "db.sqlite3.gz")) {
+				t.Errorf("backup %s has no storage/db.sqlite3.gz", stamp)
 			}
 		}
 	})
