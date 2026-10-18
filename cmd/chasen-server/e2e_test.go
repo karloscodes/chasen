@@ -297,6 +297,24 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("domain none takes the API off its address, and setup gives it back", func(t *testing.T) {
+		must(".", server, "settings", "domain", "none")
+		must(".", server, "settings", "domain", "none") // a second run finds nothing left to do
+
+		if out := must(".", server, "settings"); !strings.Contains(out, "none: each app brings its domain") {
+			t.Errorf("settings = %q, want no base domain", out)
+		}
+		if out, err := run(app, bin, "list"); err == nil {
+			t.Errorf("list at http://api.localhost with no route = %q, want a failure", out)
+		}
+
+		setup()
+
+		if out := must(app, bin, "list"); !strings.Contains(out, "example.localhost") {
+			t.Errorf("list after setup gave the address back = %q, want the example app", out)
+		}
+	})
+
 	t.Run("the next deploy keeps the data, applies new env, and makes a backup first", func(t *testing.T) {
 		commit("chasen.yml", yml+"env:\n  GREETING: hola\nsecrets: [TOKEN]\nsecrets_command: echo TOKEN=s3cret\n")
 		// A tag deploys an image that is in the registry. It builds nothing.

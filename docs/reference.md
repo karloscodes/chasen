@@ -49,6 +49,7 @@ On the server, as root:
 | `chasen-server update` | Install the newest release now. The timer does this each night |
 | `chasen-server check` | The same as `chasen alerts`, on the server |
 | `chasen-server settings quiet_alerts <name,name>` | Turn alerts off by their name: `firewall` when the firewall of your provider does that job. An empty value turns them all on again |
+| `chasen-server settings domain none` | Remove the base domain. The API no longer answers at `https://api.<domain>`, and the apps keep their domains. `chasen-server setup --domain <domain>` gives it back |
 | `chasen-server list` | List all apps |
 | `chasen-server quiet-hour` | Print the hour of the day with the fewest requests in the last week, for work that takes the server away |
 | `chasen-server backup` | Back up every app now |
@@ -187,7 +188,8 @@ A server with a base domain answers at `https://api.<domain>`, on port 443, to a
 
 - **Set up the server with no base domain:** `chasen-server setup`. Each app brings its domain at its first deploy: `chasen deploy --domain shop.example.com`.
 - **Deploy from CI through SSH.** The job joins the private network first, then deploys like your computer does. [Through SSH](github-actions.md#through-ssh) has the workflow.
-- **A server that has a base domain keeps the API on the web.** No command takes it off yet. When you want it there, for CI with a token or a login with a browser, turn the alert off: `chasen-server settings quiet_alerts api`.
+- **A server that has a base domain:** run `chasen-server settings domain none` on it. The API leaves the web, and the apps keep their domains. A computer or CI that logged in at `https://api.<domain>` comes through SSH from then on: `chasen add server root@shop-server`.
+- **When you want the API on the web**, for CI with a token or a login with a browser, keep the base domain and turn the alert off: `chasen-server settings quiet_alerts api`.
 
 ## Several servers
 

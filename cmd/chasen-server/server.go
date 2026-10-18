@@ -360,6 +360,25 @@ func serverSettings(args []string) error {
 			fmt.Println("The server calls the URL after each hourly backup that worked.")
 		}
 		return nil
+	case len(args) == 2 && args[0] == "domain" && args[1] == "none":
+		// The route goes first: if the save fails, a second run finds the route gone and saves.
+		if err := unrouteAgent(); err != nil {
+			return err
+		}
+		had := cfg.Domain
+		cfg.Domain = ""
+		if err := saveServerConfig(cfg); err != nil {
+			return err
+		}
+		if had == "" {
+			fmt.Println("This server has no base domain: the API has no address on the web.")
+			return nil
+		}
+		fmt.Printf("The base domain %s is gone, and the API no longer answers at https://api.%s.\n", had, had)
+		fmt.Println("The apps keep their domains. A new app brings its own: chasen deploy --domain shop.example.com")
+		fmt.Println("A computer or CI that logged in at https://api." + had + " now comes through SSH: chasen add server root@<this server>")
+		fmt.Println("To give the API its address again: chasen-server setup --domain " + had)
+		return nil
 	case len(args) == 2 && args[0] == "quiet_alerts":
 		cfg.QuietAlerts = nil
 		for _, name := range strings.Split(args[1], ",") {
@@ -377,7 +396,7 @@ func serverSettings(args []string) error {
 		}
 		return nil
 	}
-	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url> | quiet_alerts <name,name>]")
+	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url> | quiet_alerts <name,name> | domain none]")
 }
 
 // serverBucket sets the S3 bucket for the offsite backups and the live

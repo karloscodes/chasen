@@ -278,6 +278,21 @@ func startAgent(self string) error {
 	return nil
 }
 
+// unrouteAgent takes the route of the API off the proxy. It looks first, so a
+// second run, or a run after one that stopped halfway, finds nothing to do.
+func unrouteAgent() error {
+	if running, _ := docker("ps", "-q", "--filter", "name=^matcha-proxy$"); running == "" {
+		return nil // no proxy, so no route
+	}
+	if routes, _ := docker("exec", "matcha-proxy", "kamal-proxy", "list"); !strings.Contains(routes, agentContainer) {
+		return nil
+	}
+	if out, err := docker("exec", "matcha-proxy", "kamal-proxy", "remove", agentContainer); err != nil {
+		return fmt.Errorf("cannot take the route of the API off the proxy: %s", out)
+	}
+	return nil
+}
+
 // routeAgent makes the proxy serve the API on api.<base domain>, with a
 // certificate. It reports false when the proxy does not run yet.
 func routeAgent(domain string) (bool, error) {

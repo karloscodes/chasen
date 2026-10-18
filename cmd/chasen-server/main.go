@@ -20,6 +20,7 @@ Run these on the server, as root:
   settings                       Show the settings of the server
   settings auto_update on|off    Turn the nightly update on or off
   settings heartbeat_url <url>   Call this URL after each hourly backup that worked. "" turns it off
+  settings domain none           Remove the base domain: the API leaves the web, the apps keep theirs
   token                          Print the login token
   update                         Install the newest release now. A timer does this each night
   check                          Check the security of the server (with no arguments)

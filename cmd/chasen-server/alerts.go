@@ -295,7 +295,7 @@ func apiAlerts(cfg serverConfig) []alert {
 		return nil
 	}
 	return []alert{{"api", false, "the API answers on the internet, at https://api." + cfg.Domain + ": anyone who finds it can try a token",
-		"SSH from a private network keeps it off the internet: https://chasenhq.com/docs/reference/#keep-the-api-off-the-internet. When CI or a login with a browser needs it there, run: chasen-server settings quiet_alerts api"}}
+		"chasen-server settings domain none takes it off, and the CLI and CI come through SSH from a private network: https://chasenhq.com/docs/reference/#keep-the-api-off-the-internet. When CI or a login with a browser needs it there, run: chasen-server settings quiet_alerts api"}}
 }
 
 // updateAlerts reports a Debian or Ubuntu server that does not install its
