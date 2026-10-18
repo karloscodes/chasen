@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -92,6 +93,40 @@ func TestBackup(t *testing.T) {
 		}
 		if got := query(t, db, "SELECT name FROM orders"); got != "live" {
 			t.Errorf("orders = %q, want %q", got, "live")
+		}
+	})
+
+	t.Run("backups that start in the same second each get their own name", func(t *testing.T) {
+		// A deploy backs up with the lock; `chasen-server backup` and the hourly
+		// run back up without it. They can start in the same second.
+		t.Setenv("CHASEN_ROOT", t.TempDir())
+		os.MkdirAll(dataDir("shop"), 0755)
+		query(t, filepath.Join(dataDir("shop"), "db.sqlite3"), "CREATE TABLE orders (name); INSERT INTO orders VALUES ('live')")
+
+		const n = 3
+		stamps, errs := make([]string, n), make([]error, n)
+		var wg sync.WaitGroup
+		for i := range n {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				stamps[i], errs[i] = backupApp("shop", serverConfig{})
+			}()
+		}
+		wg.Wait()
+
+		for i, err := range errs {
+			if err != nil {
+				t.Errorf("backup %d: %v", i, err)
+			}
+		}
+		if slices.Sort(stamps); len(slices.Compact(stamps)) != n {
+			t.Errorf("stamps = %v, want %d different ones", stamps, n)
+		}
+		for _, stamp := range stamps {
+			if !exists(filepath.Join(backupsDir("shop"), stamp, "db.sqlite3.gz")) {
+				t.Errorf("backup %s has no db.sqlite3.gz", stamp)
+			}
 		}
 	})
 
