@@ -432,12 +432,17 @@ func serverBucket(args []string) error {
 	if err := s3.createBucket(); err != nil {
 		return fmt.Errorf("the bucket does not work, nothing changed: %w", err)
 	}
-	probe := filepath.Join(os.TempDir(), "chasen-bucket-check")
-	if err := os.WriteFile(probe, []byte("chasen"), 0600); err != nil {
+	// A new file with a name of its own: a fixed name in /tmp can be a link that another user made.
+	probe, err := os.CreateTemp("", "chasen-bucket-check-")
+	if err != nil {
 		return err
 	}
-	defer os.Remove(probe)
-	if err := s3.putFile("chasen-bucket-check", probe); err != nil {
+	defer os.Remove(probe.Name())
+	_, err = probe.WriteString("chasen")
+	if err := errors.Join(err, probe.Close()); err != nil {
+		return err
+	}
+	if err := s3.putFile("chasen-bucket-check", probe.Name()); err != nil {
 		return fmt.Errorf("the bucket does not work, nothing changed: %w", err)
 	}
 	if err := s3.delete("chasen-bucket-check"); err != nil {

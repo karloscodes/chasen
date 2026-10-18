@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/karloscodes/chasen/oauth"
 	"github.com/karloscodes/chasen/protocol"
@@ -309,7 +310,8 @@ func serverToken(address string) (string, error) {
 		fmt.Println("chasen-server is not on this server yet. Installing it.")
 		script := installScript
 		// CHASEN_DOWNLOADS names another place for the release: a test uses it.
-		if from := os.Getenv("CHASEN_DOWNLOADS"); from != "" && !strings.Contains(from, "'") {
+		// A quote or a line break would end the line in the script, so such a value is left out.
+		if from := os.Getenv("CHASEN_DOWNLOADS"); from != "" && !strings.Contains(from, "'") && !strings.ContainsFunc(from, unicode.IsControl) {
 			script = "export CHASEN_DOWNLOADS='" + from + "'\n" + script
 		}
 		if out, problem, err := onServer(address, "sh", script); err != nil {
