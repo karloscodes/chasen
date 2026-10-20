@@ -240,11 +240,13 @@ func TestScreen(t *testing.T) {
 		sc.shows("WHEN (UTC)")
 	})
 
-	t.Run("b backs up the app and shows what the server says", func(t *testing.T) {
+	t.Run("b backs up the app after a yes, and shows what the server says", func(t *testing.T) {
 		s := newTestServer(t)
 		sc := openScreen(t, s, "shop")
 
 		sc.press("b")
+		sc.shows("Back up shop now?")
+		sc.press("y")
 
 		sc.shows("backup shop", "✓ done", "shop: backup 20261001T120000Z")
 		if !s.got("backup shop") {
@@ -274,13 +276,47 @@ func TestScreen(t *testing.T) {
 		}
 	})
 
+	t.Run("every action that changes something asks first, and nothing reaches the server before the yes", func(t *testing.T) {
+		s := newTestServer(t)
+		sc := openScreen(t, s, "shop")
+		actions := []struct {
+			keys    []string
+			command string
+		}{
+			{[]string{"r"}, "restart shop"},
+			{[]string{"b"}, "backup shop"},
+			{[]string{"R"}, "rollback shop"},
+			{[]string{"3", "enter"}, "restore shop 20261001T110000Z"},
+			{[]string{"4", "down", "x"}, "domains shop rm shop.com"},
+			{[]string{"4", "a", "x", ".", "i", "o", "enter"}, "domains shop add x.io"},
+			{[]string{":", "b", "a", "c", "k", "u", "p", "enter"}, "backup shop"},
+			{[]string{":", "r", "e", "m", "o", "v", "e", "enter"}, "remove shop"},
+		}
+		for _, a := range actions {
+			// Back to the map, then down to shop: the server, blog, lognorth, shop.
+			sc.press("esc", "esc", "down", "down", "down", "1")
+
+			sc.press(a.keys...)
+
+			if !strings.HasSuffix(strings.TrimSpace(lastLineOf(sc.text())), "(y/n)") {
+				t.Errorf("%v does not ask, the last line is %q", a.keys, lastLineOf(sc.text()))
+			}
+			sc.press("n")
+			if s.got(a.command) {
+				t.Errorf("%v sent %q with no yes", a.keys, a.command)
+			}
+		}
+	})
+
 	t.Run("a adds the domain that the user types, and x removes the chosen one", func(t *testing.T) {
 		s := newTestServer(t)
 		sc := openScreen(t, s, "shop")
 
 		sc.press("4", "a", "s", "h", "o", "p", "x", "backspace", ".", "o", "r", "g")
 		sc.shows("Add a domain to shop: shop.org")
-		sc.press("enter", "esc", "down", "x", "y")
+		sc.press("enter")
+		sc.shows("Add the domain shop.org to shop?")
+		sc.press("y", "esc", "down", "x", "y")
 
 		if !s.got("domains shop add shop.org") || !s.got("domains shop rm shop.com") {
 			t.Errorf("the server got %v", s.commands)
@@ -364,7 +400,7 @@ func TestScreen(t *testing.T) {
 		sc.shows("$ chasen -a shop status")
 		sc.press("3")
 		sc.shows("$ chasen -a shop backups")
-		sc.press("b")
+		sc.press("b", "y")
 		sc.shows("$ chasen -a shop backup")
 		sc.press("esc", "down", "enter", "y")
 		sc.shows("$ chasen -a shop restore 20261001T100000Z")
@@ -410,7 +446,7 @@ func TestScreen(t *testing.T) {
 		opened := ""
 		sc.tui.openURL = func(page string) error { opened = page; return nil }
 
-		sc.press("up", "up", "b")
+		sc.press("up", "up", "b", "y")
 		sc.shows("backup blog", "✗ failed", "the disk of the server is full", "! report this")
 		sc.press("!")
 
@@ -743,11 +779,11 @@ func TestScreenOnTheMockServer(t *testing.T) {
 	t.Run("a backup, a new domain, and the logs all answer", func(t *testing.T) {
 		sc := open(t)
 
-		sc.press("b", "esc", "3")
+		sc.press("b", "y", "esc", "3")
 		if rows := sc.tui.rows(); len(rows) != 8 {
 			t.Errorf("want 7 backups and the live replica, got %q", rows)
 		}
-		sc.press("4", "a", "x", ".", "i", "o", "enter", "esc")
+		sc.press("4", "a", "x", ".", "i", "o", "enter", "y", "esc")
 		sc.shows("x.io")
 		sc.press("5")
 		sc.shows("shop GET /up 200")

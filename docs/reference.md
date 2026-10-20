@@ -164,7 +164,7 @@ The screen does not deploy. A deploy needs the directory of an app, and the scre
 
 **When an action fails,** `!` opens a new issue in the browser with the command and the end of its output. You read it and send it; the screen sends nothing by itself.
 
-A restart, a restore, and the removal of a domain ask first. Each action is a command of this page, so the screen can do nothing that the commands cannot. Without a terminal, or without a login, `chasen` prints its usage.
+Every action that changes something asks first, with a `y` to go on: a restart, a rollback, a backup, a restore, a domain added or removed, and each command of the `:` line that is not only a look. Each action is a command of this page, so the screen can do nothing that the commands cannot. Without a terminal, or without a login, `chasen` prints its usage.
 
 **The alerts of the server** are in the top line, and `!` shows them with their fix. They refresh every minute.
 

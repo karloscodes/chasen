@@ -774,10 +774,18 @@ func (w *lineWriter) flush() {
 	}
 }
 
-// act runs a protocol command that changes something, and shows its output
-// while it runs, under the line of the CLI that does the same. When it ends,
-// the screen loads the app again.
-func (t *tui) act(args ...string) {
+// act asks the question, and on a yes runs a protocol command that changes
+// something. Every action of the screen goes through here: an action on a
+// server is never one key (user, 20 October 2026: "invasive actions always
+// need it").
+func (t *tui) act(question string, args ...string) {
+	t.confirm(question, func() { t.start(args...) })
+}
+
+// start runs a protocol command, and shows its output while it runs, under
+// the line of the CLI that does the same. When it ends, the screen loads the
+// app again. Only a command that changes nothing starts with no question.
+func (t *tui) start(args ...string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	o := &overlay{title: strings.Join(args, " "), command: commandLine(args...), running: true, follow: true, cancel: cancel}
 	if args[0] == "restart" {
@@ -1127,11 +1135,9 @@ func (t *tui) key(key string) bool {
 	app := t.app()
 	switch key {
 	case "r":
-		t.confirm("Restart "+app+"? It starts again from the same image, with the same settings.", func() {
-			t.act("restart", app)
-		})
+		t.act("Restart "+app+"? It starts again from the same image, with the same settings.", "restart", app)
 	case "b":
-		t.act("backup", app)
+		t.act("Back up "+app+" now? The server copies its databases, and the bucket gets the copy.", "backup", app)
 	case "R":
 		t.chooseRollback(app)
 	case "o":
@@ -1140,16 +1146,14 @@ func (t *tui) key(key string) bool {
 		if t.tab == tabDomains {
 			t.prompt = &prompt{label: "Add a domain to " + app + ":", text: true, done: func(domain string) {
 				if domain = strings.TrimSpace(domain); domain != "" {
-					t.act("domains", app, "add", domain)
+					t.act("Add the domain "+domain+" to "+app+"? The app restarts with it.", "domains", app, "add", domain)
 				}
 			}}
 		}
 	case "x":
 		if rows := t.rows(); t.tab == tabDomains && t.inPane && t.cursor < len(rows) {
 			domain := strings.Fields(rows[t.cursor] + " ")[0]
-			t.confirm("Remove the domain "+domain+" from "+app+"?", func() {
-				t.act("domains", app, "rm", domain)
-			})
+			t.act("Remove the domain "+domain+" from "+app+"?", "domains", app, "rm", domain)
 		}
 	}
 	return true
@@ -1222,14 +1226,12 @@ func (t *tui) open() {
 		if first == "live" {
 			what = "the newest state of the live replica"
 		}
-		t.confirm("Restore "+app+" to "+what+"? The databases of now move aside.", func() {
-			t.act("restore", app, first)
-		})
+		t.act("Restore "+app+" to "+what+"? The databases of now move aside.", "restore", app, first)
 	}
 }
 
 // The commands that the : line runs with no question: they change nothing.
-var harmless = []string{"list", "load", "status", "history", "backups", "logs", "backup"}
+var harmless = []string{"list", "load", "status", "history", "backups", "logs"}
 
 // runLine runs what the user typed after the colon: a command of the CLI,
 // for the chosen app. ":restore live" is `chasen -a shop restore live`.
@@ -1268,10 +1270,10 @@ func (t *tui) runLine(line string) {
 		return
 	}
 	if slices.Contains(harmless, command) || (command == "domains" && len(words) == 1) {
-		t.act(args...)
+		t.start(args...)
 		return
 	}
-	t.confirm("Run "+commandLine(args...)+"?", func() { t.act(args...) })
+	t.act("Run "+commandLine(args...)+"?", args...)
 }
 
 // mouse acts on a click or on the wheel. A click chooses what is under it:
@@ -1374,7 +1376,7 @@ func (t *tui) chooseRollback(app string) {
 	kept := statusValues(t.pane(app, tabOverview).lines, "Kept")
 	switch {
 	case len(kept) == 0:
-		t.confirm("Roll back "+app+" to the version before? The data stays as it is.", func() { t.act("rollback", app) })
+		t.act("Roll back "+app+" to the version before? The data stays as it is.", "rollback", app)
 		return
 	case kept[0] == "none":
 		t.message = "The server keeps no other version of " + app + ". Deploy an older commit from its directory: chasen deploy --tag <hash>"
@@ -1387,9 +1389,7 @@ func (t *tui) chooseRollback(app string) {
 	}
 	o := &overlay{title: "roll back " + app + " to", command: commandLine("rollback", app, "<version>"), choices: choices}
 	o.pick = func(i int) {
-		t.confirm("Roll back "+app+" to "+shortVersion(versions[i])+"? The data stays as it is: a restore brings back a backup.", func() {
-			t.act("rollback", app, versions[i])
-		})
+		t.act("Roll back "+app+" to "+shortVersion(versions[i])+"? The data stays as it is: a restore brings back a backup.", "rollback", app, versions[i])
 	}
 	t.overlay = o
 }
