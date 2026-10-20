@@ -104,7 +104,7 @@ func openScreen(t *testing.T, s *testServer, cwdApp string) *screen {
 		return client.Run(ctx, args[0], args[1:], nil, out)
 	}, "example.com", cwdApp)
 	// These tests are about an app and its tabs: the map has its own.
-	ui.home = false
+	ui.onServer = false
 	ui.width, ui.height = 100, 30
 	ui.now = func() time.Time { return time.Date(2026, 10, 1, 14, 0, 0, 0, time.UTC) }
 	colorsOn = true
@@ -343,11 +343,14 @@ func TestScreen(t *testing.T) {
 		sc.settle()
 		sc.shows(" servers", " example.com", "▸ ● shop", " example.org", "○ wiki")
 
-		// shop is the last app of example.com: down goes on to the first app of example.org.
+		// shop is the last app of example.com: down goes on to example.org and its
+		// map, then to its first app.
 		sc.press("down")
-		sc.shows("chasen  example.org", "1 app", "▸ ● wiki", "○ blog", "○ shop")
+		sc.shows("chasen  example.org", "1 app", "▸example.org", "map   example.org", "○ blog", "○ shop")
+		sc.press("down")
+		sc.shows("▸ ● wiki")
 
-		sc.press("up")
+		sc.press("up", "up")
 		sc.shows("chasen  example.com", "▸ ● shop", "○ wiki")
 
 		// s still lists the servers, for one that has no app yet.
@@ -422,10 +425,10 @@ func TestScreen(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 		sc.text() // the drawing says where things are
 
-		// The first app of the list is in line 5.
-		sc.press("mouse:0:6:5")
+		// The server is in line 5, and its first app in line 6.
+		sc.press("mouse:0:6:6")
 		sc.shows("▸ ● blog")
-		sc.press("mouse:0:6:7")
+		sc.press("mouse:0:6:8")
 		sc.shows("▸ ● shop")
 
 		// The name of the second tab starts at column 37, in line 3.
@@ -555,7 +558,7 @@ func TestScreen(t *testing.T) {
 		ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 			return client.Run(ctx, args[0], args[1:], nil, out)
 		}, "example.com", "")
-		ui.home = false // the map has its own tests: tui_map_test.go
+		ui.onServer = false // these tests start on the first app; the map has its own tests
 		sc := &screen{t, ui}
 
 		ui.loadApps()
@@ -628,7 +631,7 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 			return client.Run(ctx, args[0], args[1:], nil, out)
 		}, "mock", "shop")
-		ui.home = false // the map has its own tests: tui_map_test.go
+		ui.onServer = false // these tests start on the first app; the map has its own tests
 		ui.width, ui.height = 100, 30
 		sc := &screen{t, ui}
 		t.Cleanup(ui.stopLogs)
@@ -702,7 +705,7 @@ func TestScreenOnTheMockServer(t *testing.T) {
 			return client.Run(ctx, args[0], args[1:], nil, out)
 		}
 		ui := newTUI(run, "mock", "")
-		ui.home = false // the map has its own tests: tui_map_test.go
+		ui.onServer = false // these tests start on the first app; the map has its own tests
 		ui.width, ui.height = 110, 34
 		sc := &screen{t, ui}
 		ui.loadApps()
@@ -802,7 +805,7 @@ func TestServerTextIsCleanedOnTheScreen(t *testing.T) {
 		ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 			return client.Run(ctx, args[0], args[1:], nil, out)
 		}, "example.com", "shop")
-		ui.home = false // the map has its own tests: tui_map_test.go
+		ui.onServer = false // these tests start on the first app; the map has its own tests
 		sc := &screen{t, ui}
 
 		ui.loadApps()

@@ -111,8 +111,6 @@ type hits struct {
 	rowTop   int       // the line of the first row of the tab
 	rowFirst int       // which row that is
 	tree     []treeRef // with several servers: what each line of the list is, from appTop
-	mapTop   int       // on the map: the line of the first line of the body
-	mapRefs  []treeRef // on the map: the app of each line of the body, from mapTop
 }
 
 // treeRef is a line of the list of servers and apps: a server, or an app of it.
@@ -165,14 +163,14 @@ type tui struct {
 	alertsChecked string // the last line: when the server looked
 	noAlerts      bool   // the server has no alerts command: do not ask again
 	frame         int    // for the spinner
-	// The map: the first page. home is true while it shows; esc in an app
-	// comes back to it.
-	home        bool
-	maps        map[string]*serverMap
-	mapChosen   treeRef
-	mapAlertsAt time.Time // when the map last asked for the alerts
-	events      chan any
-	now         func() time.Time
+	// onServer is true while the server, not one of its apps, is chosen on
+	// the left: the right side shows its map. overview is what the last
+	// overview of the server said, for the map.
+	onServer       bool
+	overview       []appView
+	overviewLoaded bool
+	events         chan any
+	now            func() time.Time
 }
 
 // The events of the loop.
@@ -229,7 +227,7 @@ type (
 
 func newTUI(run runner, server, cwdApp string) *tui {
 	return &tui{
-		run: run, server: server, cwdApp: cwdApp, home: true,
+		run: run, server: server, cwdApp: cwdApp, onServer: true,
 		width: 80, height: 24,
 		panes: map[string]*pane{}, logsFollow: true, watching: map[string]string{}, finished: map[string]string{}, openURL: openURL,
 		events: make(chan any, 256), now: time.Now,
@@ -346,6 +344,9 @@ func (t *tui) stampText(stamp string) string {
 // --- the events --------------------------------------------------------------
 
 func (t *tui) app() string {
+	if t.onServer {
+		return "" // the server is chosen, not an app
+	}
 	if t.selected < len(t.apps) {
 		return t.apps[t.selected].Name
 	}
@@ -492,7 +493,7 @@ func (t *tui) loadTree() {
 }
 
 // switchServer makes another server the current one, with app chosen, or
-// its first app. The apps it had are in the tree, so the list does not
+// with the server chosen: its map. The apps it had are in the tree, so the list does not
 // empty while the server answers.
 func (t *tui) switchServer(name, app string) {
 	run, name, err := t.change(name)
@@ -508,6 +509,7 @@ func (t *tui) switchServer(name, app string) {
 	t.run, t.server = run, name
 	t.panes, t.stats, t.noStats = map[string]*pane{}, nil, false
 	t.changes, t.noOverview, t.watching, t.finished = nil, false, map[string]string{}, map[string]string{}
+	t.overview, t.overviewLoaded, t.onServer = nil, false, app == ""
 	t.alerts, t.alertsChecked, t.noAlerts = nil, "", false
 	t.apps, t.appsLoaded, t.listed, t.selected = t.tree[name], len(t.tree[name]) > 0, false, 0
 	t.cursor, t.scroll, t.filter, t.want = 0, 0, "", app
@@ -522,29 +524,63 @@ func (t *tui) switchServer(name, app string) {
 	t.loadApps()
 }
 
-// crossServer goes from the first or the last app of a server to the next
-// server that has apps, in the direction of by. It reports whether it went.
+// moveInList goes up or down the list on the left: the server first, then
+// its apps. One step past an end goes to the server before or after.
+func (t *tui) moveInList(by int) {
+	at := t.selected
+	if t.onServer {
+		at = -1
+	}
+	next := at + by
+	if (next < -1 || next >= len(t.apps)) && (by == 1 || by == -1) && t.crossServer(by) {
+		return
+	}
+	next = max(-1, min(next, len(t.apps)-1))
+	if next == at {
+		return
+	}
+	if t.onServer = next < 0; !t.onServer {
+		t.selected = next
+	}
+	t.cursor, t.scroll, t.filter = 0, 0, ""
+	t.show()
+}
+
+// showMap chooses the server on the left: its map shows on the right.
+func (t *tui) showMap() {
+	t.onServer, t.inPane, t.filter = true, false, ""
+	t.stopLogs()
+}
+
+// crossServer goes to the server after this one, or to the last app of the
+// one before. It reports whether it went.
 func (t *tui) crossServer(by int) bool {
 	if len(t.servers) < 2 || t.change == nil {
 		return false
 	}
-	step := 1
-	if by < 0 {
-		step = -1
+	i := slices.Index(t.servers, t.server) + by
+	if i < 0 || i >= len(t.servers) {
+		return false
 	}
-	for i := slices.Index(t.servers, t.server) + step; i >= 0 && i < len(t.servers); i += step {
-		apps := t.tree[t.servers[i]]
-		if len(apps) == 0 {
-			continue
-		}
-		app := apps[0].Name
-		if step < 0 {
-			app = apps[len(apps)-1].Name
-		}
-		t.switchServer(t.servers[i], app)
-		return true
+	app := ""
+	if apps := t.tree[t.servers[i]]; by < 0 && len(apps) > 0 {
+		app = apps[len(apps)-1].Name
 	}
-	return false
+	t.switchServer(t.servers[i], app)
+	return true
+}
+
+// cleanApps cleans the text of each app of an overview, for the map.
+func cleanApps(apps []appView) []appView {
+	for i := range apps {
+		a := &apps[i]
+		a.App, a.State, a.Version, a.Running = clean(a.App), clean(a.State), clean(a.Version), clean(a.Running)
+		a.Jobs, a.Backup, a.Replica = clean(a.Jobs), clean(a.Backup), clean(a.Replica)
+		for j := range a.Domains {
+			a.Domains[j] = clean(a.Domains[j])
+		}
+	}
+	return apps
 }
 
 // sameApps reports whether the overview and the list have the same apps.
@@ -846,17 +882,6 @@ func (t *tui) handle(event any) bool {
 		t.width, t.height = e.width, e.height
 	case tickEvent:
 		t.frame++
-		if t.home {
-			// The map asks every 10 seconds, and every 5 while a change runs.
-			every := 80
-			if t.mapRunning() {
-				every = 40
-			}
-			if t.frame%every == 0 && t.overlay == nil && t.prompt == nil {
-				t.loadMaps()
-			}
-			break
-		}
 		// Every 10 seconds, ask again for what the screen shows, and for
 		// what runs: a deploy from somewhere else shows up in the overview. A
 		// server from before it shows it in the history of each app. Every
@@ -926,6 +951,7 @@ func (t *tui) handle(event any) bool {
 			t.noOverview, t.changes = true, nil
 			break
 		}
+		t.overview, t.overviewLoaded = cleanApps(apps), true
 		changes := map[string][2]string{}
 		for _, a := range apps {
 			if a.Running != "" {
@@ -955,8 +981,6 @@ func (t *tui) handle(event any) bool {
 				t.watch(app)
 			}
 		}
-	case mapEvent:
-		t.gotMap(e)
 	case alertsEvent:
 		// A server from before the alerts command answers with an error.
 		t.noAlerts = e.failed
@@ -1034,9 +1058,6 @@ func (t *tui) key(key string) bool {
 		t.overlayKey(o, key)
 		return true
 	}
-	if t.home {
-		return t.mapKey(key)
-	}
 
 	switch key {
 	case "q":
@@ -1069,21 +1090,16 @@ func (t *tui) key(key string) bool {
 		case t.inPane:
 			t.inPane = false
 		default:
-			t.goHome()
-			return true
+			t.showMap()
 		}
 	case "left", "h":
-		if !t.inPane {
-			t.goHome()
-			return true
-		}
 		t.inPane = false
 	case "/":
 		t.startFilter()
 	case ":":
 		t.prompt = &prompt{label: ":", text: true, done: t.runLine}
 	case "right", "l":
-		t.inPane = len(t.apps) > 0
+		t.inPane = t.app() != ""
 	case "tab":
 		t.setTab(t.tab + 1)
 	case "shift+tab":
@@ -1140,6 +1156,9 @@ func (t *tui) key(key string) bool {
 }
 
 func (t *tui) setTab(tab int) {
+	if t.onServer {
+		return // the map has no tabs
+	}
 	t.tab = (tab + len(tabNames)) % len(tabNames)
 	t.cursor, t.scroll, t.filter = 0, 0, ""
 	// Who picks a tab wants to be in it.
@@ -1155,15 +1174,7 @@ func (t *tui) pageSize() int { return max(1, t.height-8) }
 func (t *tui) move(by int) {
 	switch {
 	case !t.inPane:
-		if next := t.selected + by; (next < 0 || next >= len(t.apps)) && t.crossServer(by) {
-			return
-		}
-		before := t.selected
-		t.selected = max(0, min(t.selected+by, len(t.apps)-1))
-		if t.selected != before {
-			t.cursor, t.scroll, t.filter = 0, 0, ""
-			t.show()
-		}
+		t.moveInList(by)
 	case t.tab == tabLogs:
 		last := max(0, len(t.filtered(t.logs))-t.pageSize())
 		if t.logsFollow {
@@ -1181,7 +1192,7 @@ func (t *tui) move(by int) {
 // open acts on the chosen row: it shows a history entry, or restores a backup.
 func (t *tui) open() {
 	if !t.inPane {
-		t.inPane = len(t.apps) > 0
+		t.inPane = t.app() != ""
 		return
 	}
 	app, rows := t.app(), t.rows()
@@ -1283,24 +1294,6 @@ func (t *tui) mouse(button, x, y int) {
 		}
 		return
 	}
-	if t.home {
-		switch button {
-		case wheelUp:
-			t.mapMove(-1)
-		case wheelDown:
-			t.mapMove(1)
-		case left:
-			if row := y - t.hit.mapTop; row >= 0 && row < len(t.hit.mapRefs) && t.hit.mapRefs[row].app != "" {
-				r := t.hit.mapRefs[row]
-				if r == t.mapChoice() {
-					t.openFromMap()
-				} else {
-					t.mapChosen = r
-				}
-			}
-		}
-		return
-	}
 	onApps := x <= t.hit.left
 	switch button {
 	case wheelUp, wheelDown:
@@ -1308,7 +1301,7 @@ func (t *tui) mouse(button, x, y int) {
 		if button == wheelUp {
 			by = -by
 		}
-		t.inPane = !onApps && len(t.apps) > 0
+		t.inPane = !onApps && t.app() != ""
 		t.move(by)
 	case left:
 		for tab, columns := range t.hit.tabs {
@@ -1323,8 +1316,13 @@ func (t *tui) mouse(button, x, y int) {
 			switch {
 			case r.server != t.server:
 				t.switchServer(r.server, r.app)
-			case r.app != "":
-				t.move(slices.IndexFunc(t.apps, func(a appRow) bool { return a.Name == r.app }) - t.selected)
+			case r.app == "":
+				t.showMap()
+			default:
+				t.onServer = false
+				t.selected = max(0, slices.IndexFunc(t.apps, func(a appRow) bool { return a.Name == r.app }))
+				t.cursor, t.scroll, t.filter = 0, 0, ""
+				t.show()
 			}
 			return
 		}
@@ -1504,13 +1502,12 @@ func (t *tui) overlayKey(o *overlay, key string) {
 
 var helpLines = strings.Split(strings.TrimSpace(`
 The map
-  up, down (k, j)     choose an app, on any server
-  enter, right (l)    open the app: its overview, history, backups, domains, and logs
-  esc, left (h)       from the list of apps, back to the map
-  o                   open the chosen app in the browser
-  !                   the alerts of the server of the chosen app
-  A line moves when its path is open: the traffic to an app that answers, a
-  live replica, a backup that runs. It does not count requests.
+  The server on the left, above its apps, shows its map on the right: the
+  traffic from the internet through the proxy to each app, and where the
+  data of each app goes. A line moves when its path is open: the traffic to
+  an app that answers, a live replica, a backup that runs. It does not count
+  requests. The map only shows: choose an app on the left to act on it.
+  esc                 from the list of apps, back to the map
 
 Move
   left, right (h, l)  go to the apps on the left, or to the tab on the right
@@ -1691,11 +1688,7 @@ func runScreen(t *tui) error {
 		}
 	}()
 
-	if t.home {
-		t.loadMaps()
-	} else {
-		t.loadApps()
-	}
+	t.loadApps()
 	drawn := ""
 	for {
 		// The clock ticks eight times a second for the spinner. Most ticks

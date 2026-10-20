@@ -205,9 +205,6 @@ func (t *tui) commandHelp(width int, typed string, room int) []string {
 }
 
 func (t *tui) firstLine(width int) string {
-	if t.home {
-		return t.mapFirstLine(width)
-	}
 	count := ""
 	switch {
 	case t.appsLoaded && len(t.apps) == 1:
@@ -309,10 +306,10 @@ func (t *tui) keys() [][2]string {
 		return [][2]string{{"!", "report this, with its output"}, {"↑↓", "scroll"}, {"esc", "close"}}
 	case t.overlay != nil:
 		return [][2]string{{"↑↓", "scroll"}, {"esc", "close"}}
-	case t.home:
-		return [][2]string{{"↑↓", "app"}, {"enter", "open it"}, {"o", "open the site"}, {"!", "alerts"}, {"t", "theme"}, {"g", "load again"}, {"?", "keys"}, {"q", "close"}}
 	case len(t.apps) == 0:
-		return [][2]string{{"esc", "map"}, {"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
+		return [][2]string{{"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
+	case t.onServer:
+		return [][2]string{{"↓", "its apps"}, {"s", "servers"}, {"!", "alerts"}, {"t", "theme"}, {"g", "load again"}, {"?", "keys"}, {"q", "close"}}
 	case !t.inPane:
 		// The line drops the keys at its end when the window is narrow: the
 		// ones that are hard to guess come first. s and ! are in the top line.
@@ -390,8 +387,6 @@ func (t *tui) body(width, height int) []string {
 	switch {
 	case t.overlay != nil:
 		lines = t.overlayLines(t.overlay, width, height)
-	case t.home:
-		lines = t.mapLines(width, height)
 	case !t.appsLoaded && t.appsErr == "":
 		lines = t.splash(width, height)
 	case t.appsErr != "":
@@ -418,7 +413,7 @@ func (t *tui) columns(width, height int) []string {
 	for _, app := range t.apps {
 		left = max(left, utf8.RuneCountInString(app.Name)+7)
 	}
-	for _, server := range t.servers {
+	for _, server := range t.mapServers() {
 		left = max(left, utf8.RuneCountInString(server)+3)
 		for _, app := range t.tree[server] {
 			left = max(left, utf8.RuneCountInString(app.Name)+7)
@@ -431,24 +426,22 @@ func (t *tui) columns(width, height int) []string {
 	if !t.inPane {
 		label = colorAccent
 	}
-	leftLines := []string{paint(fit(" apps", left), label), strings.Repeat(" ", left)}
-	// For the mouse: the body starts at line 3, the apps two lines lower, and
-	// the tab starts after the side of the apps and the line between them.
-	if len(t.servers) > 1 && t.change != nil {
-		leftLines[0] = paint(fit(" servers", left), label)
-		refs, lines, chosen := t.treeLines(left)
-		start, end := window(len(lines), height-2, chosen)
-		leftLines = append(leftLines, lines[start:end]...)
-		t.hit = hits{left: left, appTop: 5, tree: refs[start:end]}
-	} else {
-		start, end := window(len(t.apps), height-2, t.selected)
-		for i := start; i < end; i++ {
-			leftLines = append(leftLines, t.appLine(i, left))
-		}
-		t.hit = hits{left: left, appTop: 5, appFirst: start}
+	heading := " server"
+	if len(t.mapServers()) > 1 {
+		heading = " servers"
 	}
+	leftLines := []string{paint(fit(heading, left), label), strings.Repeat(" ", left)}
+	// For the mouse: the body starts at line 3, the list two lines lower, and
+	// the tab starts after the side of the list and the line between them.
+	refs, list, chosen := t.treeLines(left)
+	start, end := window(len(list), height-2, chosen)
+	leftLines = append(leftLines, list[start:end]...)
+	t.hit = hits{left: left, appTop: 5, tree: refs[start:end]}
 	column := left + 4
 	for _, name := range tabNames {
+		if t.onServer {
+			break // the map has no tabs to click
+		}
 		t.hit.tabs = append(t.hit.tabs, [2]int{column, column + utf8.RuneCountInString(name) - 1})
 		column += utf8.RuneCountInString(name) + 3
 	}
@@ -461,8 +454,12 @@ func (t *tui) columns(width, height int) []string {
 		leftLines = append(leftLines, corner...)
 	}
 
-	rightLines := []string{t.tabLine(right), ""}
-	rightLines = append(rightLines, t.tabLines(right, height-2)...)
+	var rightLines []string
+	if t.onServer {
+		rightLines = append([]string{t.mapTitle(right), ""}, t.mapLines(right, height-2)...)
+	} else {
+		rightLines = append([]string{t.tabLine(right), ""}, t.tabLines(right, height-2)...)
+	}
 
 	lines := make([]string, height)
 	for i := range lines {
@@ -478,21 +475,26 @@ func (t *tui) columns(width, height int) []string {
 	return lines
 }
 
-// treeLines draws every server with its apps under it. The current server
-// has its apps with their state; the others have their names, dim, until the
-// keys go there. It returns what each line is, for the mouse, and the line of
-// the chosen app.
+// treeLines draws every server with its apps under it. A server is a line to
+// choose too: its map shows on the right. The current server has its apps
+// with their state; the others have their names, dim, until the keys go
+// there. It returns what each line is, for the mouse, and the chosen line.
 func (t *tui) treeLines(width int) (refs []treeRef, lines []string, chosen int) {
-	for _, server := range t.servers {
+	for _, server := range t.mapServers() {
 		color := colorDim
 		if server == t.server {
 			color = colorBold
 		}
 		refs = append(refs, treeRef{server: server})
-		lines = append(lines, paint(fit(" "+server, width), color))
+		if server == t.server && t.onServer {
+			chosen = len(lines)
+			lines = append(lines, spread(width, []cell{{"▸", colorAccent}, {server, colorBold}}, nil))
+		} else {
+			lines = append(lines, paint(fit(" "+server, width), color))
+		}
 		if server == t.server {
 			for i, app := range t.apps {
-				if i == t.selected {
+				if i == t.selected && !t.onServer {
 					chosen = len(lines)
 				}
 				refs = append(refs, treeRef{server, app.Name})
@@ -529,7 +531,7 @@ func (t *tui) appLine(i, width int) string {
 	if id, _ := t.running(app.Name); id != "" {
 		dot = cell{spinner[t.frame%len(spinner)] + " ", colorAccent}
 	}
-	if i == t.selected {
+	if i == t.selected && !t.onServer {
 		// The marker has the accent on the side that has the keys.
 		marker := colorAccent
 		if t.inPane {

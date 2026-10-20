@@ -47,7 +47,7 @@ func TestRecordTheScreen(t *testing.T) {
 	ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 		return client.Run(ctx, args[0], args[1:], nil, out)
 	}, "example.com", "shop")
-	ui.home = false // the script of keys starts in the shop; the map is a frame of its own to record
+	ui.onServer = false // the script of keys starts on an app
 	ui.width, ui.height = 112, 30
 	ui.now = func() time.Time { return now }
 	ui.servers = []string{"example.com", "example.org"}
