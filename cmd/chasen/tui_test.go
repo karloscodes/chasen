@@ -168,6 +168,24 @@ func TestScreen(t *testing.T) {
 			"https://shop.example.com", "https://shop.com", "Oct 1 11:00 UTC · 3 h ago", "Last changes", "deploy 6cff7df", "✗ failed", "Oct 1 12:03 · 1 h ago")
 	})
 
+	t.Run("on a server from before kept versions, R goes back one version, and a version is refused", func(t *testing.T) {
+		s := newTestServer(t)
+		sc := openScreen(t, s, "shop")
+
+		sc.press("R")
+		sc.shows("Roll back shop to the version before?")
+		sc.press("y", "esc")
+		sc.press(":", "r", "o", "l", "l", "b", "a", "c", "k", " ", "a", "b", "c", "enter")
+
+		if !s.got("rollback shop") {
+			t.Errorf("the server got %q, want rollback shop", s.commands)
+		}
+		sc.shows("This server goes back one version only")
+		if s.got("rollback shop abc") {
+			t.Error("the server got a version that it would ignore")
+		}
+	})
+
 	t.Run("the arrows go to another app and another tab", func(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 
@@ -625,6 +643,22 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		sc.shows("3 apps", "▸ ● shop", "Up 3 hours (healthy)", "https://shop.com", "✗ failed", "deploy 3f9a2c1")
 	})
 
+	t.Run("R lists the versions that the server keeps, and starts the chosen one again", func(t *testing.T) {
+		sc := open(t)
+
+		sc.press("R")
+		sc.shows("roll back shop to", "727846a", "chasen -a shop rollback <version>")
+		sc.press("enter")
+		sc.shows("Roll back shop to 727846a?")
+		sc.press("y")
+		sc.shows("rollback shop 727846a", "Starting shop 727846a again, in place of 3f9a2c1")
+		sc.press("esc")
+
+		sc.shows("Version   727846a")
+		sc.press("R")
+		sc.shows("3f9a2c1")
+	})
+
 	t.Run("a restart changes the state, and the history has it", func(t *testing.T) {
 		sc := open(t)
 
@@ -786,6 +820,19 @@ func TestServerTextIsCleanedOnTheScreen(t *testing.T) {
 			if err := openURL(page); err == nil {
 				t.Errorf("openURL(%q) opened it", page)
 			}
+		}
+	})
+}
+
+func TestRollbackTakesAVersion(t *testing.T) {
+	t.Run("a server that lists what it keeps takes a version, and one from before does not", func(t *testing.T) {
+		old := newTestServer(t)
+
+		if takesVersion(credentials{URL: old.URL, Token: "token"}, "shop") {
+			t.Error("a server from before takes a version: it would start the version before instead")
+		}
+		if !takesVersion(mockServer(t), "shop") {
+			t.Error("the mock server, which lists what it keeps, does not take a version")
 		}
 	})
 }

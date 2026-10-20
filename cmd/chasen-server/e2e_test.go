@@ -367,6 +367,22 @@ func TestEndToEnd(t *testing.T) {
 		if out := must(app, bin, "history"); !strings.Contains(out, "rollback") {
 			t.Errorf("history = %q, want the rollbacks", out)
 		}
+
+		// A version by name: status lists the ones the server keeps.
+		if status := must(app, bin, "status"); !strings.Contains(status, "Kept:     "+older+", built ") {
+			t.Fatalf("status = %q, want %s in the kept versions", status, older)
+		}
+		must(app, bin, "rollback", older[:7])
+		if now := version(); now != older {
+			t.Errorf("rollback %s runs %s", older[:7], now)
+		}
+		if out, err := run(app, bin, "rollback", "abcdef0"); err == nil || !strings.Contains(out, "keeps no version abcdef0") {
+			t.Errorf("rollback abcdef0 = %q, %v, want a refusal with the kept versions", out, err)
+		}
+		must(app, bin, "rollback", newest)
+		if now := version(); now != newest {
+			t.Errorf("rollback %s runs %s", newest, now)
+		}
 	})
 
 	t.Run("overview gives the state and the version of each app in one call", func(t *testing.T) {

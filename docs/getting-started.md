@@ -134,7 +134,7 @@ If you use the GitHub CLI, this does the same with no token to copy: `gh auth lo
 | See what runs | `chasen status`, `chasen logs`, `chasen history` |
 | Give the app a secret | `chasen secrets edit`, then `chasen restart` |
 | Change a setting | Edit `chasen.yml`, then `chasen restart` |
-| Go back to the version before | `chasen rollback`: in seconds, with the same data |
+| Go back to the version before | `chasen rollback`: in seconds, with the same data. `chasen rollback <version>` goes to one of the last 5 |
 | Restore the data | `chasen backups`, then `chasen restore` |
 | Deploy on every `git push` | [Deploy from GitHub Actions](github-actions.md) |
 

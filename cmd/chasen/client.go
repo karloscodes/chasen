@@ -252,6 +252,15 @@ func runCommand(creds credentials, args []string) error {
 		if len(args) < 2 {
 			return errors.New("usage: chasen run <command> [arguments]. For example: chasen run bin/rails db:migrate")
 		}
+	case "rollback":
+		app, err := loadAppFile()
+		if err != nil {
+			return err
+		}
+		if len(args) > 1 && !takesVersion(creds, app.Name) {
+			return errors.New("this server goes back one version only, until its next update: chasen rollback, with no version")
+		}
+		return remote(creds, nil, os.Stdout, append([]string{"rollback", app.Name}, args[1:]...)...)
 	case "restart":
 		// Start the app again with the env and the secrets of chasen.yml, from the image it has.
 		app, err := loadAppFile()
@@ -304,6 +313,17 @@ func runCommand(creds credentials, args []string) error {
 		checkAddresses(os.Stdout, appURLs("  https://"+strings.ToLower(args[2])+"\n"))
 	}
 	return nil
+}
+
+// takesVersion reports a server whose rollback takes a version. A server from
+// before ignores the version and starts the one before, so the CLI asks
+// first: the status of a newer server lists what it keeps, even none.
+func takesVersion(creds credentials, app string) bool {
+	var status strings.Builder
+	if err := remote(creds, nil, &status, "status", app); err != nil {
+		return false
+	}
+	return len(statusValues(cleanLines(status.String()), "Kept")) > 0
 }
 
 // isImageRef reports a word after deploy that names an image, not a server:

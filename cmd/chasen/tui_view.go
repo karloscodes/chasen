@@ -316,7 +316,7 @@ func (t *tui) keys() [][2]string {
 	case !t.inPane:
 		// The line drops the keys at its end when the window is narrow: the
 		// ones that are hard to guess come first. s and ! are in the top line.
-		return [][2]string{{"↑↓", "app"}, {":", "command"}, {"t", "theme"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"→", "its " + tabNames[t.tab]}, {"esc", "map"}, {"?", "keys"}, {"q", "close"}}
+		return [][2]string{{"↑↓", "app"}, {":", "command"}, {"t", "theme"}, {"r", "restart"}, {"R", "roll back"}, {"b", "backup"}, {"o", "open"}, {"→", "its " + tabNames[t.tab]}, {"esc", "map"}, {"?", "keys"}, {"q", "close"}}
 	}
 	switch t.tab {
 	case tabHistory:
@@ -328,7 +328,7 @@ func (t *tui) keys() [][2]string {
 	case tabLogs:
 		return [][2]string{{"/", "filter"}, {"↑↓", "scroll"}, {"end", "follow"}, {"←", "apps"}, {"tab", "next tab"}}
 	}
-	return [][2]string{{"↑↓", "scroll"}, {"←", "apps"}, {"tab", "next tab"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}}
+	return [][2]string{{"↑↓", "scroll"}, {"←", "apps"}, {"tab", "next tab"}, {"r", "restart"}, {"R", "roll back"}, {"b", "backup"}, {"o", "open"}}
 }
 
 func (t *tui) lastLine(width int) string {

@@ -16,7 +16,7 @@
 | `chasen deploy <image> [<user>@<host>]` | Deploy an image that another repository releases from any directory, with nothing of the directory: `chasen deploy ghcr.io/acme/chat --domain chat.example.com`. The app is named after the image, or `-a <app>`. The server pulls `latest`, or the tag of the image. Run it again to update: the app keeps its settings. `--auto-update` makes the server deploy the newest image of the tag each night at 05:30 UTC (a public image only), `--no-auto-update` stops it. `<user>@<host>` can come after it. |
 | `chasen check` | Test the current git commit against the standard. Changes nothing live |
 | `chasen restart` | Start the app again with the env and secrets of `chasen.yml`, from the image it has |
-| `chasen rollback` | Start the version before the current one again, in seconds: the server keeps its image. The data stays as it is: `chasen restore` brings back a backup. A second rollback goes forward again |
+| `chasen rollback [version]` | Start a version that the server kept again, in seconds: no build, no pull. With no version, the one before; a second rollback goes forward again. `chasen status` lists the kept versions, and `R` on the screen picks one. The data stays as it is: `chasen restore` brings back a backup |
 | `chasen secrets edit` | Change the secrets of the app in your editor. They stay in the repository, encrypted |
 | `chasen secrets` | List the names of the secrets. `chasen secrets show` prints the values too |
 | `chasen status` | Show the version, the state, the URLs, the last backup, the replica, and the disk: the data, the backups on the server, and the image that runs |
@@ -273,4 +273,4 @@ The server has no config file: the database is all of it. An older version kept 
 - One container for each app. Each container gets 512 MB of memory unless `memory:` in `chasen.yml` says more.
 - SQLite only. Files in the storage that are not SQLite databases persist, but they have no backup.
 - A server never builds an image. `chasen deploy` builds it where it runs: your computer, or CI.
-- `chasen rollback` goes back one version, to the image that the server kept. For an older version, deploy its commit again.
+- `chasen rollback` starts an image that the server kept: one of the last 5 versions. For an older version, deploy its commit again.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -119,7 +120,7 @@ func runServer(args []string) error {
 	}
 
 	switch cmd {
-	case "deploy", "enable", "restart", "domains", "restore", "remove":
+	case "deploy", "enable", "restart", "rollback", "domains", "restore", "remove":
 		if err := lock(); err != nil {
 			return err
 		}
@@ -141,7 +142,10 @@ func runServer(args []string) error {
 	case "restart":
 		return serverRestart(name)
 	case "rollback":
-		return serverRollback(name)
+		if len(args) > 1 {
+			return errors.New("usage: chasen-server rollback <app> [version]")
+		}
+		return serverRollback(name, strings.Join(args, ""))
 	case "domains":
 		return serverDomains(name, args)
 	case "status":
@@ -949,11 +953,12 @@ func serverRestart(name string) error {
 	return nil
 }
 
-// serverRollback starts the version before the current one again, from the
-// image that the server kept: no build and no pull, so it takes seconds. The
-// data stays as it is; chasen restore brings back the data of before a
-// deploy. A second rollback goes forward again.
-func serverRollback(name string) error {
+// serverRollback starts a version that the server kept again, from its
+// image: no build and no pull, so it takes seconds. With no version, it is
+// the newest one that does not run now: the version before, and after a
+// rollback the one after. The data stays as it is; chasen restore brings back
+// the data of before a deploy.
+func serverRollback(name, want string) error {
 	app, err := loadApp(name)
 	if err != nil {
 		return err
@@ -962,17 +967,9 @@ func serverRollback(name string) error {
 		return fmt.Errorf("%s runs an image that Chasen did not build. Deploy the version you want: chasen deploy --tag <version>", name)
 	}
 	current := app.Image[strings.LastIndex(app.Image, ":")+1:]
-	// Docker lists the newest first, and the server keeps the newest five.
-	tags, _ := docker("images", imageRepo(name), "--format", "{{.Tag}}")
-	previous := ""
-	for _, tag := range strings.Fields(tags) {
-		if tag != current {
-			previous = tag
-			break
-		}
-	}
-	if previous == "" {
-		return fmt.Errorf("the server keeps no version of %s before %s. Deploy an older commit: chasen deploy --tag <its full hash>", name, current)
+	previous, err := chooseRollback(keptVersions(name, current), current, want)
+	if err != nil {
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	settings, err := loadSettings(name)
 	if err != nil {
@@ -989,12 +986,74 @@ func serverRollback(name string) error {
 	app.Image = image
 	app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes, settings.Memory
 	app.Env = appEnv(settings, strings.Split(app.Domain, ","), previous, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
-	fmt.Printf("Starting %s %s again, the version before %s\n", name, previous, current)
+	fmt.Printf("Starting %s %s again, in place of %s\n", name, previous, current)
 	if err := apply(name, app); err != nil {
 		return err
 	}
 	fmt.Printf("\nRolled back %s to %s. The data is as it was: chasen restore brings back a backup.\n", name, previous)
 	return nil
+}
+
+// keptVersion is an image of an app that the server keeps for a rollback.
+type keptVersion struct {
+	tag   string
+	built time.Time
+}
+
+// keptVersions returns the versions of an app that the server keeps, newest
+// first, without the one that runs. The server keeps the newest five images
+// of each app (pruneImages).
+func keptVersions(name, current string) []keptVersion {
+	var images []struct {
+		RepoTags []string
+		Created  int64
+	}
+	filter := url.QueryEscape(`{"reference":["` + imageRepo(name) + `"]}`)
+	if err := dockerAPI("GET", "/images/json?filters="+filter, nil, &images); err != nil {
+		return nil
+	}
+	var kept []keptVersion
+	for _, image := range images {
+		for _, tag := range image.RepoTags {
+			if version, ok := strings.CutPrefix(tag, imageRepo(name)+":"); ok && version != current {
+				kept = append(kept, keptVersion{version, time.Unix(image.Created, 0)})
+			}
+		}
+	}
+	slices.SortStableFunc(kept, func(a, b keptVersion) int { return b.built.Compare(a.built) })
+	return kept
+}
+
+// chooseRollback picks the version a rollback starts: the one asked for, by
+// its full name or its first 7 characters or more, or the newest kept one.
+func chooseRollback(kept []keptVersion, current, want string) (string, error) {
+	var names []string
+	for _, k := range kept {
+		names = append(names, k.tag)
+	}
+	switch {
+	case want == "" && len(kept) > 0:
+		return kept[0].tag, nil
+	case want == "":
+		return "", fmt.Errorf("the server keeps no version before %s. Deploy an older commit: chasen deploy --tag <its full hash>", current)
+	case want == current || (len(want) >= 7 && strings.HasPrefix(current, want)):
+		return "", fmt.Errorf("%s runs now", current)
+	}
+	var found []string
+	for _, name := range names {
+		if name == want || (len(want) >= 7 && strings.HasPrefix(name, want)) {
+			found = append(found, name)
+		}
+	}
+	switch {
+	case len(found) == 1:
+		return found[0], nil
+	case len(found) > 1:
+		return "", fmt.Errorf("%s names %d versions: %s. Give more of it", want, len(found), strings.Join(found, ", "))
+	case len(names) == 0:
+		return "", fmt.Errorf("the server keeps no version but %s. Deploy %s again from its commit: chasen deploy --tag %s", current, want, want)
+	}
+	return "", fmt.Errorf("the server keeps no version %s. It keeps: %s. For another one, deploy its commit: chasen deploy --tag <its full hash>", want, strings.Join(names, ", "))
 }
 
 // apply saves the app and deploys it, with its jobs container: one unit (see
@@ -1339,6 +1398,15 @@ func serverStatus(name string) error {
 	var image struct{ Size int64 }
 	dockerAPI("GET", "/images/"+app.Image+"/json", nil, &image)
 	fmt.Printf("Disk:     data %s · backups %s in %d · image %s\n", megabytes(data), megabytes(dirSize(backupsDir(name), nil)), len(localBackups(name)), megabytes(image.Size))
+	// The versions a rollback can start: a line even with none, so a client
+	// knows that this server takes a version.
+	kept := keptVersions(name, version)
+	if !isBuilt(name, app.Image) || len(kept) == 0 {
+		fmt.Println("Kept:     none")
+	}
+	for _, k := range kept {
+		fmt.Printf("Kept:     %s, built %s\n", k.tag, k.built.UTC().Format("Jan 2 15:04 UTC"))
+	}
 	settings, _ := loadSettings(name)
 	if settings.Jobs != "" {
 		jobs := all.of(jobsName(name)).Status

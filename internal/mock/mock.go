@@ -30,7 +30,7 @@ const stampLayout = "20060102T150405Z"
 
 type app struct {
 	name, version, state string
-	previous             string // the version before, which rollback starts again
+	kept                 []string // the versions a rollback can start, newest first
 	domains              []string
 	backups              []string // the stamps, newest first
 	history              []entry
@@ -113,7 +113,7 @@ func New(now time.Time) *Server {
 			history: []entry{{now.Add(-48 * time.Hour), "enable lognorth", "succeeded", "Pulling karloscodes/lognorth:latest\nStarting lognorth\nEnabled lognorth\n  https://lognorth.example.com\n"}},
 		},
 		{
-			name: "shop", version: "3f9a2c1", state: "Up 3 hours (healthy)", domains: []string{"shop.example.com", "shop.com"}, backups: stamps(6),
+			name: "shop", version: "3f9a2c1", state: "Up 3 hours (healthy)", domains: []string{"shop.example.com", "shop.com"}, backups: stamps(6), kept: []string{"727846a"},
 			history: []entry{
 				{now.Add(-26 * time.Hour), "deploy 727846a", "succeeded", "Pulling ghcr.io/you/shop:727846a\nDeployed shop 727846a\n"},
 				{now.Add(-25 * time.Hour), "domains add shop.com", "succeeded", "Added shop.com\n"},
@@ -364,6 +364,12 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 		}
 		fmt.Fprintf(out, "Backup:   %s\nReplica:  %s\n", backup, replica)
 		fmt.Fprintf(out, "Disk:     data 1.2 MB · backups %d KB in %d · image 87.4 MB\n", 140*len(a.backups), len(a.backups))
+		if len(a.kept) == 0 {
+			fmt.Fprintln(out, "Kept:     none")
+		}
+		for i, version := range a.kept {
+			fmt.Fprintf(out, "Kept:     %s, built %s\n", version, time.Now().UTC().Add(-time.Duration(i+1)*26*time.Hour).Format("Jan 2 15:04 UTC"))
+		}
 	case "history":
 		defer s.mu.Unlock()
 		if len(args) == 2 {
@@ -461,17 +467,27 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 		a.end(index, "succeeded")
 		s.mu.Unlock()
 	case "rollback":
-		if a.previous == "" {
-			s.mu.Unlock()
-			return fail("the server keeps no version of %s before %s. Deploy an older commit: chasen deploy --tag <its full hash>", name, a.version)
+		back := ""
+		if len(a.kept) > 0 {
+			back = a.kept[0]
 		}
-		index, kept := s.begin(a, "rollback")
-		back := a.previous
+		if len(args) > 1 {
+			back = ""
+			if slices.Contains(a.kept, args[1]) {
+				back = args[1]
+			}
+		}
+		if back == "" {
+			s.mu.Unlock()
+			return fail("%s: the server keeps no version %s. It keeps: %s", name, strings.Join(args[1:], ""), strings.Join(a.kept, ", "))
+		}
+		index, kept := s.begin(a, strings.TrimSpace("rollback "+strings.Join(args[1:], "")))
 		s.mu.Unlock()
 		out = io.MultiWriter(out, kept)
-		say(900*time.Millisecond, "Starting %s %s again, the version before %s", name, back, a.version)
+		say(900*time.Millisecond, "Starting %s %s again, in place of %s", name, back, a.version)
 		s.mu.Lock()
-		a.previous, a.version, a.state = a.version, back, "Up 1 second (healthy)"
+		a.kept = append([]string{a.version}, slices.DeleteFunc(slices.Clone(a.kept), func(v string) bool { return v == back })...)
+		a.version, a.state = back, "Up 1 second (healthy)"
 		a.end(index, "succeeded")
 		s.mu.Unlock()
 		say(0, "\nRolled back %s to %s. The data is as it was: chasen restore brings back a backup.", name, back)
@@ -599,7 +615,8 @@ func (s *Server) deploy(ctx context.Context, out io.Writer, command, name, versi
 	if hasData {
 		a.backups = append([]string{time.Now().UTC().Format(stampLayout)}, a.backups...)
 	}
-	a.previous, a.version, a.state = a.version, version, "Up 1 second (healthy)"
+	a.kept = append([]string{a.version}, a.kept[:min(len(a.kept), 3)]...)
+	a.version, a.state = version, "Up 1 second (healthy)"
 	domains := slices.Clone(a.domains)
 	s.mu.Unlock()
 	fmt.Fprintf(out, "\n%s %s %s\n", verb, name, version)

@@ -146,11 +146,20 @@ A version that does not answer `/up` never gets traffic: the old version keeps r
 
 ```bash
 chasen rollback
-# Starting shop 3f9a2c1 again, the version before 6cff7df
+# Starting shop 3f9a2c1 again, in place of 6cff7df
 # Rolled back shop to 3f9a2c1. The data is as it was: chasen restore brings back a backup.
 ```
 
 It takes seconds: the server keeps the images of the last 5 versions, like Kamal, so nothing is built or pulled. Run it again to go forward to the newer version.
+
+**Any of the last 5 versions:** `chasen status` lists the versions the server keeps, and `chasen rollback <version>` starts one. The first 7 characters of the commit are enough. On the screen, `R` lists them and starts the one you choose.
+
+```bash
+chasen status
+# Kept:     3f9a2c1d5e8b, built Oct 19 14:02 UTC
+# Kept:     727846a0c4f1, built Oct 18 09:40 UTC
+chasen rollback 727846a
+```
 
 **The data stays as it is.** When the bad version changed the database, bring back the backup that Chasen made just before its deploy:
 

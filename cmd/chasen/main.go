@@ -41,8 +41,8 @@ Run these in the directory of your app:
                          A folder with image: in chasen.yml and no Dockerfile: the newest image
   check                  Test the current git commit against the standard. Changes nothing live
   restart                Start the app again with the env and the secrets of now. Same image
-  rollback               Start the version before the current one again, in seconds: the server
-                         keeps its image. The data stays as it is. Again goes forward
+  rollback [version]     Start a version that the server kept again, in seconds: with no version,
+                         the one before. chasen status lists them. The data stays as it is
   secrets edit           Change the secrets of the app in your editor. They stay in the repository,
                          encrypted, in chasen.secrets.enc. The key is chasen.key, or CHASEN_KEY in CI
   secrets                List the names of the secrets. secrets show prints the values too

@@ -1116,6 +1116,8 @@ func (t *tui) key(key string) bool {
 		})
 	case "b":
 		t.act("backup", app)
+	case "R":
+		t.chooseRollback(app)
 	case "o":
 		t.openInBrowser()
 	case "a":
@@ -1250,6 +1252,10 @@ func (t *tui) runLine(line string) {
 	default:
 		args = append(append(args, t.app()), words[1:]...)
 	}
+	if command == "rollback" && len(words) > 1 && len(statusValues(t.pane(t.app(), tabOverview).lines, "Kept")) == 0 {
+		t.message = "This server goes back one version only, until its next update: :rollback, with no version."
+		return
+	}
 	if slices.Contains(harmless, command) || (command == "domains" && len(words) == 1) {
 		t.act(args...)
 		return
@@ -1361,6 +1367,33 @@ func (t *tui) reportFailure(o *overlay) {
 		return
 	}
 	t.message = "A new issue is open in the browser, with the command and its output. Read it, then send it."
+}
+
+// chooseRollback asks which version an app goes back to: one of the versions
+// that the server keeps, newest first, as its status lists them. A server
+// from before that list goes back one version.
+func (t *tui) chooseRollback(app string) {
+	kept := statusValues(t.pane(app, tabOverview).lines, "Kept")
+	switch {
+	case len(kept) == 0:
+		t.confirm("Roll back "+app+" to the version before? The data stays as it is.", func() { t.act("rollback", app) })
+		return
+	case kept[0] == "none":
+		t.message = "The server keeps no other version of " + app + ". Deploy an older commit from its directory: chasen deploy --tag <hash>"
+		return
+	}
+	var versions, choices []string
+	for _, line := range kept {
+		version, built, _ := strings.Cut(line, ", ")
+		versions, choices = append(versions, version), append(choices, fit(shortVersion(version), 10)+built)
+	}
+	o := &overlay{title: "roll back " + app + " to", command: commandLine("rollback", app, "<version>"), choices: choices}
+	o.pick = func(i int) {
+		t.confirm("Roll back "+app+" to "+shortVersion(versions[i])+"? The data stays as it is: a restore brings back a backup.", func() {
+			t.act("rollback", app, versions[i])
+		})
+	}
+	t.overlay = o
 }
 
 func (t *tui) openInBrowser() {
@@ -1491,6 +1524,7 @@ Move
 
 Change the app
   r    restart the app, from the same image
+  R    roll back: choose a version that the server keeps, and start it again
   b    back up the app now
   a    add a domain (on the domains tab)
   x    remove the chosen domain (on the domains tab)
@@ -1505,7 +1539,7 @@ The screen
   s    go to another server
   q    close
 
-Each action is a command of the CLI: chasen restart, chasen backup,
+Each action is a command of the CLI: chasen restart, chasen rollback, chasen backup,
 chasen restore, chasen domains. A deploy is not here: it belongs to the
 directory of the app. Run chasen deploy there, and watch it arrive here.
 
