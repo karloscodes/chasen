@@ -45,6 +45,7 @@ func readSettings(in *bufio.Reader) (settings protocol.Settings, ok bool, err er
 // of the registry is for one pull only: the server does not keep it.
 func saveSettings(name string, settings protocol.Settings) error {
 	settings.Registry = nil
+	settings.Commit = nil // it belongs to the entry of one deploy
 	data, _ := json.Marshal(settings)
 	db, err := openServerDB()
 	if err != nil {

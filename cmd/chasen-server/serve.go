@@ -187,6 +187,9 @@ func serveCommand(w http.ResponseWriter, r *http.Request, self string, db *sql.D
 	// A command that changes an app goes into the activity feed, with its output.
 	var activity int64
 	if action := recordedAction(r.PathValue("command"), args[min(1, len(args)):]); action != "" && len(args) > 0 && checkAppName(args[0]) == nil {
+		if r.PathValue("command") == "deploy" {
+			action = withSubject(action, body)
+		}
 		activity, _ = startActivity(db, args[0], action)
 		out.keep = &bytes.Buffer{}
 		// The feed has the output while the command runs, so `chasen history`

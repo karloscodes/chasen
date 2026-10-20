@@ -260,6 +260,9 @@ func TestEndToEnd(t *testing.T) {
 	})
 
 	t.Run("the first deploy builds the image of the commit, pushes it, and serves it on its default domain", func(t *testing.T) {
+		// The origin names the page of each commit in the history. Nothing is
+		// pushed to it, and chasen.yml names the image, so it is not the image.
+		must(app, "git", "remote", "add", "origin", "git@github.com:you/example.git")
 		out := must(app, bin, "deploy")
 
 		for _, step := range []string{"Building ", "Pushing ", "Pulling "} {
@@ -270,6 +273,25 @@ func TestEndToEnd(t *testing.T) {
 
 		if got := get("example.localhost"); !strings.HasPrefix(got, "hits=1 ") || !strings.HasSuffix(got, "greeting=hello") {
 			t.Errorf("GET example.localhost = %q, want hits=1 and greeting=hello", got)
+		}
+
+		// The history names the commit, and its entry links to the page of it.
+		head := strings.TrimSpace(must(app, "git", "rev-parse", "HEAD"))
+		link := "Commit: https://github.com/you/example/commit/" + head
+		if !strings.Contains(out, link) {
+			t.Errorf("deploy = %q, want %q", out, link)
+		}
+		entry := ""
+		for _, line := range strings.Split(must(app, bin, "history"), "\n") {
+			if strings.Contains(line, "deploy "+head[:7]+" change chasen.yml") {
+				entry = strings.Fields(line)[0]
+			}
+		}
+		if entry == "" {
+			t.Fatalf("history has no entry \"deploy %s change chasen.yml\"", head[:7])
+		}
+		if got := must(app, bin, "history", entry); !strings.HasPrefix(strings.TrimSpace(got), link) {
+			t.Errorf("history %s = %q, want the link to the commit first", entry, got)
 		}
 	})
 

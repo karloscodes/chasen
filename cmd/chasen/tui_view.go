@@ -313,15 +313,17 @@ func (t *tui) keys() [][2]string {
 	case !t.inPane:
 		// The line drops the keys at its end when the window is narrow: the
 		// ones that are hard to guess come first. s and ! are in the top line.
-		return [][2]string{{"↑↓", "app"}, {":", "command"}, {"t", "theme"}, {"r", "restart"}, {"R", "roll back"}, {"b", "backup"}, {"o", "open"}, {"→", "its " + tabNames[t.tab]}, {"esc", "map"}, {"?", "keys"}, {"q", "close"}}
+		return [][2]string{{"↑↓", "app"}, {":", "command"}, {"t", "theme"}, {"r", "restart"}, {"R", "roll back"}, {"b", "backup"}, {"o", "open"}, {"→", "its " + t.tabs()[min(t.tab, len(t.tabs())-1)]}, {"esc", "map"}, {"?", "keys"}, {"q", "close"}}
 	}
 	switch t.tab {
 	case tabHistory:
-		return [][2]string{{"↑↓", "entry"}, {"enter", "its output"}, {"/", "filter"}, {"←", "apps"}, {"tab", "next tab"}, {"?", "keys"}}
+		return [][2]string{{"↑↓", "entry"}, {"enter", "its output"}, {"o", "its commit"}, {"R", "roll back to it"}, {"/", "filter"}, {"←", "apps"}, {"tab", "next tab"}, {"?", "keys"}}
 	case tabBackups:
 		return [][2]string{{"↑↓", "backup"}, {"enter", "restore"}, {"b", "back up now"}, {"/", "filter"}, {"←", "apps"}, {"tab", "next tab"}}
 	case tabDomains:
 		return [][2]string{{"↑↓", "domain"}, {"a", "add"}, {"x", "remove"}, {"/", "filter"}, {"←", "apps"}, {"tab", "next tab"}}
+	case tabCommits:
+		return [][2]string{{"↑↓", "commit"}, {"d", "deploy it"}, {"R", "roll back to it"}, {"o", "its page"}, {"/", "filter"}, {"←", "apps"}, {"tab", "next tab"}}
 	case tabLogs:
 		return [][2]string{{"/", "filter"}, {"↑↓", "scroll"}, {"end", "follow"}, {"←", "apps"}, {"tab", "next tab"}}
 	}
@@ -438,7 +440,7 @@ func (t *tui) columns(width, height int) []string {
 	leftLines = append(leftLines, list[start:end]...)
 	t.hit = hits{left: left, appTop: 5, tree: refs[start:end]}
 	column := left + 4
-	for _, name := range tabNames {
+	for _, name := range t.tabs() {
 		if t.onServer {
 			break // the map has no tabs to click
 		}
@@ -544,7 +546,7 @@ func (t *tui) appLine(i, width int) string {
 
 func (t *tui) tabLine(width int) string {
 	var cells []cell
-	for i, name := range tabNames {
+	for i, name := range t.tabs() {
 		color := colorDim
 		if i == t.tab && t.inPane {
 			color = colorAccent + ";" + colorBold + ";4"
@@ -569,7 +571,15 @@ func (t *tui) tabLine(width int) string {
 		right = []cell{{"/" + t.filter, colorAccent}, {" · " + itoa(kept) + " of " + itoa(all) + " ", colorDim}}
 	default:
 		// Only when the names of the tabs leave room for it.
-		if command := "$ " + commandLine(tabCommand[t.tab], t.app()) + " "; 46+utf8.RuneCountInString(command) <= width {
+		command := "$ git log "
+		if t.tab < len(tabCommand) {
+			command = "$ " + commandLine(tabCommand[t.tab], t.app()) + " "
+		}
+		names := 0
+		for _, name := range t.tabs() {
+			names += utf8.RuneCountInString(name) + 3
+		}
+		if names+utf8.RuneCountInString(command) <= width {
 			right = []cell{{command, colorDim}}
 		}
 	}
@@ -598,6 +608,11 @@ func (t *tui) tabLines(width, height int) []string {
 		return t.overviewLines(app, p.lines, width)
 	case tabHistory:
 		return t.rowLines(width, height, func(row string) []cell { return t.historyCells(row, width) })
+	case tabCommits:
+		if len(t.rows()) == 0 {
+			return []string{paint("No commits in this directory.", colorDim)}
+		}
+		return t.rowLines(width, height, func(row string) []cell { return t.commitCells(app, row, width) })
 	case tabBackups:
 		if len(t.rows()) == 0 {
 			return []string{paint("No backups yet.", colorDim), "", "Press " + paint("b", colorAccent) + " to make one now. The server also makes one each hour, and before each deploy."}
@@ -663,7 +678,17 @@ func (t *tui) overviewLines(app string, status []string, width int) []string {
 
 // actionWidth is the room for the action of a history row: what the id, the
 // time, and the result leave.
-func actionWidth(width int) int { return max(12, min(30, width-5-28-13-7)) }
+func actionWidth(width int) int { return max(12, min(60, width-5-whenWidth(width)-2-13-7)) }
+
+// whenWidth is the room for the time of a history row: the date and how long
+// ago in a wide window, how long ago only in a narrow one, so the action keeps
+// its subject.
+func whenWidth(width int) int {
+	if width < 100 {
+		return 12
+	}
+	return 28
+}
 
 // historyCells draws one row of `chasen history`: ID, WHEN, ACTION, RESULT,
 // and TOOK from a server that says it.
@@ -686,9 +711,17 @@ func (t *tui) historyCells(row string, width int) []cell {
 	when := parts[1]
 	if at, err := time.Parse("2006-01-02 15:04:05", when); err == nil {
 		when = at.Format("Jan 2 15:04") + " · " + ago(t.now(), at)
+		if whenWidth(width) < 28 {
+			when = ago(t.now(), at)
+		}
 	}
 	result.text = fit(result.text, 13)
-	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, 28), colorDim}, {fit(clip(parts[2], actionWidth(width)-1), actionWidth(width)), ""}, result, {took, colorDim}}
+	// ↺: the server keeps the image of this deploy, so R starts it again.
+	kept := cell{"  ", ""}
+	if t.keptVersion(t.app(), deployVersion(row)) != "" {
+		kept = cell{"↺ ", colorAccent}
+	}
+	return []cell{{fit(parts[0], 5), colorDim}, {fit(when, whenWidth(width)), colorDim}, {fit(clip(parts[2], actionWidth(width)-1), actionWidth(width)), ""}, kept, result, {took, colorDim}}
 }
 
 // backupCells draws one row of `chasen backups`: the name of the backup,
@@ -708,12 +741,27 @@ func (t *tui) backupCells(row string) []cell {
 	return []cell{{fit(t.stampText(parts[0]), 34), ""}, {fit(parts[1], 18), colorDim}, {size, colorDim}}
 }
 
+// commitCells draws one commit of this directory: what it is on the server,
+// its short hash, its subject, and what d does with it.
+func (t *tui) commitCells(app, row string, width int) []cell {
+	hash, subject, _ := strings.Cut(row, " ")
+	if len(hash) < 7 {
+		return []cell{{row, ""}}
+	}
+	mark, state := t.commitState(app, hash)
+	color := colorDim
+	if mark.text != "  " {
+		color = colorAccent
+	}
+	return []cell{mark, {fit(shortVersion(hash), 9), colorDim}, {fit(subject, max(10, width-11-20)), ""}, {state, color}}
+}
+
 // rowLines draws rows that the cursor can choose. The first line of the
 // history is its header.
 func (t *tui) rowLines(width, height int, cells func(row string) []cell) []string {
 	var lines []string
 	if t.tab == tabHistory {
-		lines = append(lines, spread(width, []cell{{fit("ID", 5) + fit("WHEN (UTC)", 28) + fit("ACTION", actionWidth(width)) + fit("RESULT", 13) + "TOOK", colorDim}}, nil))
+		lines = append(lines, spread(width, []cell{{fit("ID", 5) + fit("WHEN (UTC)", whenWidth(width)) + fit("ACTION", actionWidth(width)) + "  " + fit("RESULT", 13) + "TOOK", colorDim}}, nil))
 		height--
 	}
 	rows := t.rows()
@@ -778,7 +826,7 @@ func (t *tui) overlayLines(o *overlay, width, height int) []string {
 	lines := []string{spread(width, []cell{{" " + o.title, colorAccent + ";" + colorBold}}, []cell{state})}
 	if o.command != "" {
 		prefix := " $ "
-		if !strings.HasPrefix(o.command, "chasen -a") {
+		if !strings.HasPrefix(o.command, "chasen -a") && !strings.HasPrefix(o.command, "chasen deploy") {
 			prefix = " " // a note, not a line to type
 		}
 		lines = append(lines, spread(width, []cell{{prefix + o.command, colorDim}}, nil))

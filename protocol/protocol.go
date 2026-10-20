@@ -94,6 +94,18 @@ type Settings struct {
 	// is true, `--no-auto-update` is false. Without either, nil, the app keeps
 	// what it has. Only for an image in a registry: the server pulls it.
 	AutoUpdate *bool `json:"auto_update,omitempty"`
+
+	// Commit is the git commit of a deploy, for its entry in the history: its
+	// subject, and its page on the web. The server keeps it with the entry,
+	// not with the app. An image of another repository has none.
+	Commit *Commit `json:"commit,omitempty"`
+}
+
+// Commit is what a person reads of a commit: "Fix login redirect", and the
+// address that opens it, like https://github.com/you/shop/commit/<hash>.
+type Commit struct {
+	Subject string `json:"subject"`
+	URL     string `json:"url,omitempty"`
 }
 
 // Registry is the login of an image registry, like ghcr.io or Docker Hub.

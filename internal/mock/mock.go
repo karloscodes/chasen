@@ -106,7 +106,7 @@ func New(now time.Time) *Server {
 	return &Server{Token: "dev", Wait: wait, apps: []*app{
 		{
 			name: "blog", version: "a1b2c3d", state: "Up 6 days", domains: []string{"blog.example.com"},
-			history: []entry{{now.Add(-6 * 24 * time.Hour), "deploy a1b2c3d", "succeeded", "Pulling ghcr.io/you/blog:a1b2c3d\nDeployed blog a1b2c3d\n  https://blog.example.com\n"}},
+			history: []entry{{now.Add(-6 * 24 * time.Hour), "deploy a1b2c3d Write the first post", "succeeded", "Commit: https://github.com/you/blog/commit/a1b2c3d\nPulling ghcr.io/you/blog:a1b2c3d\nDeployed blog a1b2c3d\n  https://blog.example.com\n"}},
 		},
 		{
 			name: "lognorth", version: "latest", state: "Up 2 days (healthy)", domains: []string{"lognorth.example.com"}, backups: stamps(3),
@@ -115,10 +115,10 @@ func New(now time.Time) *Server {
 		{
 			name: "shop", version: "3f9a2c1", state: "Up 3 hours (healthy)", domains: []string{"shop.example.com", "shop.com"}, backups: stamps(6), kept: []string{"727846a"},
 			history: []entry{
-				{now.Add(-26 * time.Hour), "deploy 727846a", "succeeded", "Pulling ghcr.io/you/shop:727846a\nDeployed shop 727846a\n"},
+				{now.Add(-26 * time.Hour), "deploy 727846a Upgrade Rails to 8.1", "succeeded", "Commit: https://github.com/you/shop/commit/727846a\nPulling ghcr.io/you/shop:727846a\nDeployed shop 727846a\n"},
 				{now.Add(-25 * time.Hour), "domains add shop.com", "succeeded", "Added shop.com\n"},
-				{now.Add(-5 * time.Hour), "deploy 6cff7df", "failed", "Pulling ghcr.io/you/shop:6cff7df\nStarting shop 6cff7df\nThe new version did not answer /up in 30 seconds. The previous version keeps the traffic.\nThe app must listen on port 3000 and answer 200 on /up\n"},
-				{now.Add(-3 * time.Hour), "deploy 3f9a2c1", "succeeded", "Pulling ghcr.io/you/shop:3f9a2c1\nStarting shop 3f9a2c1\nDeployed shop 3f9a2c1\n  https://shop.example.com\n  https://shop.com\n"},
+				{now.Add(-5 * time.Hour), "deploy 6cff7df Add the invoice export", "failed", "Commit: https://github.com/you/shop/commit/6cff7df\nPulling ghcr.io/you/shop:6cff7df\nStarting shop 6cff7df\nThe new version did not answer /up in 30 seconds. The previous version keeps the traffic.\nThe app must listen on port 3000 and answer 200 on /up\n"},
+				{now.Add(-3 * time.Hour), "deploy 3f9a2c1 Fix login redirect", "succeeded", "Commit: https://github.com/you/shop/commit/3f9a2c1\nPulling ghcr.io/you/shop:3f9a2c1\nStarting shop 3f9a2c1\nDeployed shop 3f9a2c1\n  https://shop.example.com\n  https://shop.com\n"},
 			},
 		},
 	}}
@@ -560,6 +560,9 @@ func (s *Server) deploy(ctx context.Context, out io.Writer, command, name, versi
 		first = "Building the image of the website"
 	}
 	action := strings.TrimSpace(command + " " + version)
+	if sent.Commit != nil && command == "deploy" {
+		action += " " + sent.Commit.Subject
+	}
 
 	s.mu.Lock()
 	a := s.app(name)
@@ -586,6 +589,9 @@ func (s *Server) deploy(ctx context.Context, out io.Writer, command, name, versi
 	}
 
 	steps := []string{first, "Port 3000 (EXPOSE in the image). Health path /up. Storage /storage."}
+	if sent.Commit != nil && sent.Commit.URL != "" {
+		steps = append([]string{"Commit: " + sent.Commit.URL}, steps...)
+	}
 	if hasData && command != "check" {
 		steps = append(steps, name+": backup "+time.Now().UTC().Format(stampLayout)+" (on the server and offsite)")
 	}

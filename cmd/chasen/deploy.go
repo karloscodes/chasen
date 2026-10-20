@@ -174,6 +174,9 @@ func deployImage(creds credentials, app appFile, settings protocol.Settings, com
 	}
 
 	settings.Image = app.Image + ":" + tag
+	if shortHash.MatchString(tag) {
+		settings.Commit = commitOf(tag)
+	}
 	registry, from, err := registryLogin(app)
 	// An image that is not built here can be public: the server pulls it with no login.
 	if err != nil && build {
@@ -280,6 +283,7 @@ func deployWebsite(creds credentials, app appFile, settings protocol.Settings, c
 	if err != nil {
 		return err
 	}
+	settings.Commit = commitOf(commit)
 	archive := exec.Command("git", "archive", "--format=tar.gz", "HEAD")
 	archive.Stderr = os.Stderr
 	files, err := archive.StdoutPipe()

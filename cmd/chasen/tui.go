@@ -39,11 +39,14 @@ const (
 	tabBackups
 	tabDomains
 	tabLogs
+	// tabCommits is the git log of the app of this directory: only that app
+	// has it (see repoApp).
+	tabCommits
 )
 
 // paneRunning is the pane with the output of the entry that runs now. It is
 // not a tab: the overview shows it.
-const paneRunning = 5
+const paneRunning = 100
 
 var tabNames = []string{"overview", "history", "backups", "domains", "logs"}
 
@@ -169,8 +172,15 @@ type tui struct {
 	onServer       bool
 	overview       []appView
 	overviewLoaded bool
-	events         chan any
-	now            func() time.Time
+	// repo is true when the screen opened in the git repository of cwdApp, on
+	// repoServer, the server that this directory deploys to. Then that app
+	// has its commits tab, and a commit deploys from there.
+	repo       bool
+	repoServer string
+	// cli runs a command of the CLI in this directory, like a deploy.
+	cli    runner
+	events chan any
+	now    func() time.Time
 }
 
 // The events of the loop.
@@ -223,11 +233,13 @@ type (
 		on  *overlay
 		err error
 	}
+	// commitEvent is the page of the commit of an entry, or "".
+	commitEvent struct{ link string }
 )
 
 func newTUI(run runner, server, cwdApp string) *tui {
 	return &tui{
-		run: run, server: server, cwdApp: cwdApp, onServer: true,
+		run: run, server: server, cwdApp: cwdApp, onServer: true, repoServer: server, cli: cliHere,
 		width: 80, height: 24,
 		panes: map[string]*pane{}, logsFollow: true, watching: map[string]string{}, finished: map[string]string{}, openURL: openURL,
 		events: make(chan any, 256), now: time.Now,
@@ -381,6 +393,24 @@ func (t *tui) rows() []string {
 		return nil
 	}
 	return t.filtered(lines)
+}
+
+// cliHere runs this program with a command of the CLI, in this directory, as
+// the user does in a terminal. Its input is empty: a question in it has no
+// one to answer, so the CLI takes the way of CI.
+func cliHere(ctx context.Context, out io.Writer, args ...string) (int, error) {
+	self, err := os.Executable()
+	if err != nil {
+		return 1, err
+	}
+	cmd := exec.CommandContext(ctx, self, args...)
+	cmd.Stdout, cmd.Stderr = out, out
+	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	err = cmd.Run()
+	if exit := (*exec.ExitError)(nil); errors.As(err, &exit) {
+		return exit.ExitCode(), nil
+	}
+	return 0, err
 }
 
 // filtered returns the lines that have the text of the filter, in any case.
@@ -697,6 +727,10 @@ func (t *tui) load(app string, tab int) {
 	if app == "" || tab == tabLogs {
 		return
 	}
+	if tab == tabCommits {
+		t.loadCommits(app)
+		return
+	}
 	run := t.run
 	go func() {
 		var out strings.Builder
@@ -712,9 +746,15 @@ func (t *tui) load(app string, tab int) {
 // history too.
 func (t *tui) show() {
 	app := t.app()
+	if t.tab >= len(t.tabs()) {
+		t.tab = tabOverview // the commits of another app are not here
+	}
 	t.load(app, t.tab)
-	if t.tab == tabOverview {
+	if t.tab == tabOverview || t.tab == tabCommits {
 		t.load(app, tabHistory)
+	}
+	if t.tab == tabCommits {
+		t.load(app, tabOverview) // the versions that run and that the server keeps
 	}
 	if t.tab == tabLogs {
 		t.followLogs(app)
@@ -786,14 +826,26 @@ func (t *tui) act(question string, args ...string) {
 // the line of the CLI that does the same. When it ends, the screen loads the
 // app again. Only a command that changes nothing starts with no question.
 func (t *tui) start(args ...string) {
-	ctx, cancel := context.WithCancel(context.Background())
-	o := &overlay{title: strings.Join(args, " "), command: commandLine(args...), running: true, follow: true, cancel: cancel}
+	command := commandLine(args...)
 	if args[0] == "restart" {
 		// The restart of the CLI also sends the chasen.yml of the directory.
-		o.command = "chasen restart, in the directory of " + args[1] + ", also applies its chasen.yml. This one keeps the settings of the last deploy."
+		command = "chasen restart, in the directory of " + args[1] + ", also applies its chasen.yml. This one keeps the settings of the last deploy."
 	}
+	t.startWith(t.run, command, args...)
+}
+
+// actHere asks, then runs a command of the CLI in this directory, as in a
+// terminal: a deploy of a commit needs the directory, its git, and its
+// Dockerfile.
+func (t *tui) actHere(question string, args ...string) {
+	t.confirm(question, func() { t.startWith(t.cli, "chasen "+strings.Join(args, " "), args...) })
+}
+
+// startWith runs a command with a runner, in the overlay of an action.
+func (t *tui) startWith(run runner, command string, args ...string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	o := &overlay{title: strings.Join(args, " "), command: command, running: true, follow: true, cancel: cancel}
 	t.overlay = o
-	run := t.run
 	go func() {
 		w := &lineWriter{emit: func(line string) { t.events <- actionLine{o, line} }}
 		code, err := run(ctx, w, args...)
@@ -1040,6 +1092,15 @@ func (t *tui) handle(event any) bool {
 			t.load(app.Name, tabOverview)
 		}
 		t.show()
+	case commitEvent:
+		switch {
+		case e.link == "":
+			t.message = "This entry names no commit: a deploy of an image, or from an older chasen."
+		case t.openURL(e.link) != nil:
+			t.message = e.link
+		default:
+			t.message = "Opened " + e.link
+		}
 	case keyEvent:
 		return t.key(string(e))
 	}
@@ -1112,8 +1173,10 @@ func (t *tui) key(key string) bool {
 		t.setTab(t.tab + 1)
 	case "shift+tab":
 		t.setTab(t.tab - 1)
-	case "1", "2", "3", "4", "5":
-		t.setTab(int(key[0] - '1'))
+	case "1", "2", "3", "4", "5", "6":
+		if tab := int(key[0] - '1'); tab < len(t.tabs()) {
+			t.setTab(tab)
+		}
 	case "up", "k":
 		t.move(-1)
 	case "down", "j":
@@ -1138,10 +1201,27 @@ func (t *tui) key(key string) bool {
 		t.act("Restart "+app+"? It starts again from the same image, with the same settings.", "restart", app)
 	case "b":
 		t.act("Back up "+app+" now? The server copies its databases, and the bucket gets the copy.", "backup", app)
+	case "d":
+		if t.inPane && t.tab == tabCommits {
+			t.deployCommit(app)
+		}
 	case "R":
-		t.chooseRollback(app)
+		switch {
+		case t.inPane && t.tab == tabCommits:
+			t.deployCommit(app) // a kept commit rolls back; d says the same
+		case t.inPane && t.tab == tabHistory:
+			t.rollbackRow(app)
+		default:
+			t.chooseRollback(app)
+		}
 	case "o":
-		t.openInBrowser()
+		if rows := t.rows(); t.inPane && t.tab == tabCommits && t.cursor < len(rows) {
+			t.openCommitPage(strings.Fields(rows[t.cursor] + " ")[0])
+		} else if rows := t.rows(); t.inPane && t.tab == tabHistory && t.cursor < len(rows) {
+			t.openCommit(app, strings.Fields(rows[t.cursor] + " ")[0])
+		} else {
+			t.openInBrowser()
+		}
 	case "a":
 		if t.tab == tabDomains {
 			t.prompt = &prompt{label: "Add a domain to " + app + ":", text: true, done: func(domain string) {
@@ -1163,11 +1243,26 @@ func (t *tui) setTab(tab int) {
 	if t.onServer {
 		return // the map has no tabs
 	}
-	t.tab = (tab + len(tabNames)) % len(tabNames)
+	t.tab = (tab + len(t.tabs())) % len(t.tabs())
 	t.cursor, t.scroll, t.filter = 0, 0, ""
 	// Who picks a tab wants to be in it.
 	t.inPane = len(t.apps) > 0
 	t.show()
+}
+
+// tabs are the names of the tabs of the chosen app: the commits tab only for
+// the app of this directory.
+func (t *tui) tabs() []string {
+	if t.repoApp() {
+		return append(slices.Clone(tabNames), "commits")
+	}
+	return tabNames
+}
+
+// repoApp reports that the chosen app is the app of this directory, on the
+// server that this directory deploys to: its commits deploy from here.
+func (t *tui) repoApp() bool {
+	return t.repo && t.app() != "" && t.app() == t.cwdApp && t.server == t.repoServer
 }
 
 // pageSize is how many lines of a tab the window shows.
@@ -1394,6 +1489,140 @@ func (t *tui) chooseRollback(app string) {
 	t.overlay = o
 }
 
+// loadCommits reads the newest commits of this directory: one line each,
+// the full hash and the subject.
+func (t *tui) loadCommits(app string) {
+	go func() {
+		out, err := exec.Command("git", "log", "--format=%H %s", "-n", "50").Output()
+		t.events <- paneEvent{app, tabCommits, string(out), err}
+	}()
+}
+
+// commitState says what a commit of this directory is on the server: the
+// version that runs, one that it keeps, one that it ran, or none of these.
+func (t *tui) commitState(app, hash string) (mark cell, state string) {
+	status := t.pane(app, tabOverview).lines
+	current := strings.Join(statusValues(status, "Version"), "")
+	switch {
+	case current != "" && (strings.HasPrefix(hash, current) || strings.HasPrefix(current, hash)):
+		return cell{"● ", colorAccent}, "runs now"
+	case t.keptVersion(app, hash[:7]) != "":
+		return cell{"↺ ", colorAccent}, "kept: R rolls back"
+	}
+	for _, row := range t.pane(app, tabHistory).lines {
+		if version := deployVersion(row); version != "" && strings.HasPrefix(hash, version) {
+			return cell{"  ", ""}, "deployed before"
+		}
+	}
+	return cell{"  ", ""}, "not deployed"
+}
+
+// deployCommit puts the chosen commit of this directory on the server: a
+// kept one with a rollback, in seconds; the newest one with a build here; an
+// older one from its image in the registry.
+func (t *tui) deployCommit(app string) {
+	rows := t.rows()
+	if t.cursor >= len(rows) {
+		return
+	}
+	hash, subject, _ := strings.Cut(rows[t.cursor], " ")
+	short := shortVersion(hash)
+	_, state := t.commitState(app, hash)
+	head := t.cursor == 0 && t.filter == ""
+	switch {
+	case state == "runs now":
+		t.message = short + " runs now."
+	case strings.HasPrefix(state, "kept"):
+		kept := t.keptVersion(app, short)
+		t.act("Roll back "+app+" to "+short+" "+subject+"? The server kept its image: it takes seconds.", "rollback", app, kept)
+	case head:
+		t.actHere("Deploy "+short+" "+subject+" to "+app+"? chasen builds its image here, pushes it, and the server starts it.", "deploy")
+	default:
+		t.actHere("Deploy "+short+" "+subject+" to "+app+" from its image in the registry? Nothing is built.", "deploy", "--tag", hash)
+	}
+}
+
+// openCommitPage opens a commit of this directory on its forge.
+func (t *tui) openCommitPage(hash string) {
+	origin, _ := exec.Command("git", "remote", "get-url", "origin").Output()
+	page := commitURL(string(origin), hash)
+	switch {
+	case page == "":
+		t.message = "This repository has no origin on a forge to open."
+	case t.openURL(page) != nil:
+		t.message = page
+	default:
+		t.message = "Opened " + page
+	}
+}
+
+// deployVersion returns the version of a row of the history that is a
+// deploy, "deploy 3f9a2c1 Fix login redirect", or "".
+func deployVersion(row string) string {
+	parts := columns.Split(strings.TrimSpace(row), 5)
+	if len(parts) < 3 {
+		return ""
+	}
+	if words := strings.Fields(parts[2]); len(words) > 1 && words[0] == "deploy" {
+		return words[1]
+	}
+	return ""
+}
+
+// keptVersion returns the version that the server keeps for a version of the
+// history, or "". One of the two names can be the short one.
+func (t *tui) keptVersion(app, version string) string {
+	for _, line := range statusValues(t.pane(app, tabOverview).lines, "Kept") {
+		kept, _, _ := strings.Cut(line, ", ")
+		if kept != "none" && version != "" && (strings.HasPrefix(kept, version) || strings.HasPrefix(version, kept)) {
+			return kept
+		}
+	}
+	return ""
+}
+
+// rollbackRow rolls back to the version of the chosen deploy of the history,
+// when the server keeps it. A server that does not list what it keeps goes
+// back one version.
+func (t *tui) rollbackRow(app string) {
+	rows := t.rows()
+	if t.cursor >= len(rows) {
+		return
+	}
+	status := t.pane(app, tabOverview).lines
+	version := deployVersion(rows[t.cursor])
+	current := strings.Join(statusValues(status, "Version"), "")
+	kept := t.keptVersion(app, version)
+	switch {
+	case version == "" || len(statusValues(status, "Kept")) == 0:
+		t.chooseRollback(app)
+	case current != "" && (strings.HasPrefix(current, version) || strings.HasPrefix(version, current)):
+		t.message = version + " runs now."
+	case kept == "":
+		t.message = version + " is not kept on the server. In the directory of " + app + ": chasen deploy --tag " + version
+	default:
+		t.act("Roll back "+app+" to "+shortVersion(kept)+"? The data stays as it is: a restore brings back a backup.", "rollback", app, kept)
+	}
+}
+
+// openCommit opens the commit of an entry of the history: the server names it
+// in the first line of the output of the deploy.
+func (t *tui) openCommit(app, id string) {
+	run := t.run
+	go func() {
+		var out strings.Builder
+		run(context.Background(), &out, "history", app, id)
+		link := ""
+		for _, line := range cleanLines(out.String()) {
+			if rest, ok := strings.CutPrefix(line, "Commit: "); ok {
+				link = strings.TrimSpace(rest)
+				break
+			}
+		}
+		t.events <- commitEvent{link}
+	}()
+}
+
 func (t *tui) openInBrowser() {
 	urls := statusValues(t.pane(t.app(), tabOverview).lines, "URL")
 	if len(urls) == 0 {
@@ -1512,7 +1741,7 @@ The map
 Move
   left, right (h, l)  go to the apps on the left, or to the tab on the right
   up, down (k, j)     move in the side you are on: the next app, the next row, or the next lines
-  tab, shift+tab      the next tab, the tab before. 1 to 5 go to a tab
+  tab, shift+tab      the next tab, the tab before. 1 to 6 go to a tab
   enter               open the row: the output of a history entry, or the restore of a backup
   /                   narrow the rows, or the logs, to what you type. esc takes it away
   :                   run a command of the CLI for the chosen app, like :restore live
@@ -1521,11 +1750,16 @@ Move
 
 Change the app
   r    restart the app, from the same image
-  R    roll back: choose a version that the server keeps, and start it again
+  R    roll back: choose a version that the server keeps, and start it again.
+       On the history tab: the version of the chosen deploy, marked ↺
+  d    on the commits tab: deploy the chosen commit. The newest builds here,
+       an older one deploys its image from the registry, a kept one rolls back.
+       The commits tab is there when chasen opens in the directory of the app
   b    back up the app now
   a    add a domain (on the domains tab)
   x    remove the chosen domain (on the domains tab)
-  o    open the app in the browser
+  o    open the app in the browser. On the history tab: the commit of the
+       chosen deploy
 
 The screen
   g    load everything again

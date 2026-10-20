@@ -1,13 +1,21 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode"
+
+	"github.com/karloscodes/chasen/protocol"
 )
 
 // The database of the server. It holds all the state of the server: its
@@ -130,6 +138,49 @@ func recordedAction(command string, args []string) string {
 		return "run " + strings.Join(args, " ")
 	}
 	return ""
+}
+
+// escapeCodes matches the escape sequences of a terminal, which a subject can
+// carry: the history shows text.
+var escapeCodes = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b.`)
+
+// withSubject adds the subject of the commit of a deploy to its entry, from
+// the settings on the first line of the body: "deploy 3f9a2c1 Fix login
+// redirect". Anything that is not text goes, so the columns of the history
+// stay columns. The body is read again from its start.
+func withSubject(action string, body io.ReadSeeker) string {
+	defer body.Seek(0, io.SeekStart)
+	line, _ := bufio.NewReader(io.LimitReader(body, 1<<20)).ReadBytes('\n')
+	var settings protocol.Settings
+	if json.Unmarshal(line, &settings) != nil || settings.Commit == nil {
+		return action
+	}
+	text := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, escapeCodes.ReplaceAllString(settings.Commit.Subject, ""))
+	subject := []rune(strings.Join(strings.Fields(text), " "))
+	if len(subject) > 60 {
+		subject = append(subject[:59], '…')
+	}
+	if len(subject) == 0 {
+		return action
+	}
+	return action + " " + string(subject)
+}
+
+// commitLink is the page of the commit of a deploy, when it is one to show:
+// https, with no login, no space, and no control character in it.
+func commitLink(c *protocol.Commit) string {
+	if c == nil || len(c.URL) > 500 || strings.ContainsFunc(c.URL, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+		return ""
+	}
+	if u, err := url.Parse(c.URL); err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+		return ""
+	}
+	return c.URL
 }
 
 func startActivity(db *sql.DB, app, action string) (int64, error) {

@@ -811,6 +811,10 @@ func serverDeploy(name, version string) error {
 	if err != nil {
 		return err
 	}
+	// The first line of the entry in the history: the screen opens it.
+	if link := commitLink(settings.Commit); link != "" {
+		fmt.Println("Commit: " + link)
+	}
 	saved, err := loadSettings(name)
 	if err != nil {
 		return err

@@ -165,7 +165,7 @@ func TestScreen(t *testing.T) {
 		sc := openScreen(t, newTestServer(t), "shop")
 
 		sc.shows("chasen  example.com", "3 apps", "▸ ● shop", "● blog", "Up 3 hours (healthy)",
-			"https://shop.example.com", "https://shop.com", "Oct 1 11:00 UTC · 3 h ago", "Last changes", "deploy 6cff7df", "✗ failed", "Oct 1 12:03 · 1 h ago")
+			"https://shop.example.com", "https://shop.com", "Oct 1 11:00 UTC · 3 h ago", "Last changes", "deploy 6cff7df", "✗ failed", "1 h ago")
 	})
 
 	t.Run("on a server from before kept versions, R goes back one version, and a version is refused", func(t *testing.T) {
@@ -696,6 +696,49 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		sc.shows("Version   727846a")
 		sc.press("R")
 		sc.shows("3f9a2c1")
+	})
+
+	t.Run("the history names each deploy by its commit, and marks the versions that the server keeps", func(t *testing.T) {
+		sc := open(t)
+
+		sc.press("2")
+
+		sc.shows("deploy 3f9a2c1 Fix login redirect", "deploy 727846a Upgrade Rails", "o its commit", "R roll back to it")
+		if line := lineWith(sc.text(), "727846a"); !strings.Contains(line, "↺") {
+			t.Errorf("the kept version has no mark: %q", line)
+		}
+		if line := lineWith(sc.text(), "6cff7df"); strings.Contains(line, "↺") {
+			t.Errorf("the failed deploy has the mark of a kept version: %q", line)
+		}
+	})
+
+	t.Run("R on a deploy of the history rolls back to it, and says why when it cannot", func(t *testing.T) {
+		sc := open(t)
+		sc.press("2")
+
+		sc.press("R")
+		sc.shows("3f9a2c1 runs now.")
+		sc.press("down", "R")
+		sc.shows("6cff7df is not kept on the server. In the directory of shop: chasen deploy --tag 6cff7df")
+		sc.press("down", "down", "R")
+		sc.shows("Roll back shop to 727846a?")
+		sc.press("y")
+
+		sc.shows("rollback shop 727846a", "Starting shop 727846a again")
+	})
+
+	t.Run("o on a deploy of the history opens its commit", func(t *testing.T) {
+		sc := open(t)
+		opened := ""
+		sc.tui.openURL = func(page string) error { opened = page; return nil }
+
+		sc.press("2", "o")
+
+		if opened != "https://github.com/you/shop/commit/3f9a2c1" {
+			t.Errorf("o opened %q, want the commit of the deploy", opened)
+		}
+		sc.press("down", "down", "o")
+		sc.shows("This entry names no commit")
 	})
 
 	t.Run("a restart changes the state, and the history has it", func(t *testing.T) {

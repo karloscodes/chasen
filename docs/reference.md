@@ -135,22 +135,32 @@ The map only shows. The keys stay on the left: choose an app there to act on it.
 
 **An app shows its tabs:** its state, its history, its backups, its domains, and its logs. `esc` on the list goes back to the map of its server.
 
-The screen does not deploy. A deploy needs the directory of an app, and the screen is about the whole server. Run `chasen deploy` in the directory, or in CI, and the new version shows up on the screen.
+**The history names each deploy by its commit:** `deploy 3f9a2c1 Fix login redirect`. `o` on a deploy opens the commit on GitHub, GitLab, or the forge of the git origin. `↺` marks the deploys whose image the server keeps, and `R` on one starts it again in seconds.
+
+**The commits tab deploys.** Open the screen in the directory of an app, and that app gets a sixth tab: the commits of the current branch, each with what it is on the server: `● runs now`, `↺ kept`, `deployed before`, or `not deployed`. `d` deploys the chosen commit, after a `y`:
+
+- The newest commit builds here, pushes, and deploys, like `chasen deploy`.
+- An older one deploys its image from the registry, like `chasen deploy --tag <hash>`. Nothing is built: an image that is not in the registry fails, and the way is to check out that commit and deploy it.
+- A kept one rolls back, in seconds.
+
+The deploy runs `chasen` in that directory, so it goes to the same server and shows the same output as in a terminal. The screen never changes your working tree. Other apps, and the same app on another server, have no commits tab: their repository is somewhere else.
 
 | Key | What it does |
 |---|---|
 | esc (on the list) | Go back to the map of the server |
 | left, right (or `h`, `l`) | Go to a side: the apps on the left, or the tab on the right |
 | up, down (or `k`, `j`) | Move in the side you are on: the next app, the next row, or the next lines |
-| tab, shift+tab | The next tab, the tab before. `1` to `5` go to a tab |
+| tab, shift+tab | The next tab, the tab before. `1` to `6` go to a tab |
 | enter | Open the row: the output of a history entry, or the restore of a backup |
 | `:` | Run a command of the CLI for the chosen app: `:restore live`, `:domains add shop.com`, `:remove`. A command that changes something asks first |
 | the mouse | A click chooses an app, a tab, or a row. A click on the chosen row opens it. The wheel scrolls. Hold shift to select text |
 | `/` | Narrow the rows, or the logs, to what you type. The logs keep coming, and only the lines with the text show. Esc takes the filter away |
+| `d` | On the commits tab: deploy the chosen commit |
 | `r` | Restart the app, from the same image |
 | `b` | Back up the app now |
 | `a`, `x` | On the domains tab: add a domain, remove the chosen domain |
-| `o` | Open the app in the browser |
+| `R` | Roll back: choose one of the versions that the server keeps. On the history or the commits tab: the chosen one |
+| `o` | Open the app in the browser. On the history or the commits tab: the page of the chosen commit |
 | `s` | List the servers that you are logged in to, and go to one |
 | `!` | Show the alerts of the server, with their fix |
 | `t` | Go to the next theme of colors |
