@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,13 +42,41 @@ func TestRecordTheScreen(t *testing.T) {
 
 	now := time.Date(2026, 10, 2, 10, 19, 0, 0, time.UTC)
 	server := mock.New(now)
+	server.UseBucket("backups-eu")
+	server.Wait = func(ctx context.Context, d time.Duration) bool { return true }
 	api := httptest.NewServer(server)
 	defer api.Close()
 	client := protocol.Client{URL: api.URL, Token: server.Token}
+
+	// The screen opens in the repository of shop: four commits, and the
+	// server ran the second and the third, each with its subject and its page.
+	t.Chdir(t.TempDir())
+	git := func(args ...string) string {
+		out, err := exec.Command("git", args...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %s", args, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-q")
+	git("remote", "add", "origin", "git@github.com:you/shop.git")
+	var commits []string
+	for _, subject := range []string{"Start the shop", "Add the cart", "Send the receipts by email", "Add gift cards"} {
+		git("-c", "user.name=you", "-c", "user.email=you@example.com", "commit", "-q", "--allow-empty", "-m", subject)
+		commits = append(commits, git("rev-parse", "HEAD"))
+	}
+	for _, hash := range commits[1:3] {
+		settings := protocol.Settings{Image: "ghcr.io/you/shop:" + hash, Commit: commitOf(hash)}
+		if code, err := client.Run(context.Background(), "deploy", []string{"shop", hash[:7]}, settings.Body(nil), io.Discard); code != 0 || err != nil {
+			t.Fatalf("deploy %s: %d, %v", hash[:7], code, err)
+		}
+	}
+
 	ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 		return client.Run(ctx, args[0], args[1:], nil, out)
 	}, "example.com", "shop")
-	ui.onServer = false // the script of keys starts on an app
+	ui.repo = true
+	ui.cli = func(ctx context.Context, out io.Writer, args ...string) (int, error) { return 0, nil }
 	ui.width, ui.height = 112, 30
 	ui.now = func() time.Time { return now }
 	ui.servers = []string{"example.com", "example.org"}
@@ -57,6 +86,14 @@ func TestRecordTheScreen(t *testing.T) {
 	staging := func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 		if args[0] == "list" {
 			io.WriteString(out, "NAME   VERSION       DOMAINS\nshop   9d8c7b6a1f2e  shop.example.org\n")
+			return 0, nil
+		}
+		if args[0] == "overview" {
+			io.WriteString(out, `[{"app":"shop","state":"Up 2 days","up":true,"version":"9d8c7b6a1f2e","domains":["shop.example.org"],"databases":2,"backup":"20261002T100000Z","replica":"off"}]`+"\n")
+			return 0, nil
+		}
+		if args[0] == "load" {
+			io.WriteString(out, "Load:     0.08 0.05 0.01 (2 cores, arm64)\nMemory:   0.9 GB of 3.8 GB (24%)\nDisk:     6 GB of 38 GB (16%)\nBucket:   none: the backups stay on this server\nAPI:      SSH only: not on the web\n")
 			return 0, nil
 		}
 		return run(ctx, out, args...)
@@ -88,18 +125,17 @@ func TestRecordTheScreen(t *testing.T) {
 		shot(key, says)
 	}
 
-	shot("", "chasen: the screen of your server")
-	press("↑", "choose an app", "up")
-	press("↓", "and back to shop", "down")
-	press("tab", "the history of shop", "tab")
-	press("enter", "the output of a deploy", "enter")
-	press("esc", "back", "esc")
-	press("tab", "the backups: enter restores one", "tab")
-	press("tab", "the domains: a adds one", "tab")
+	shot("", "chasen: your servers on the left, the map of this one on the right")
+	press("↓", "an app: its state, and its last changes", "down", "down", "down")
+	press("2", "the history: each deploy names its commit, ↺ the server keeps its image", "2")
+	press("R", "roll back to a kept version, in seconds: it asks first", "down", "R")
+	press("6", "the commits of this directory, and what each one is on the server", "n", "6")
+	press("d", "d deploys the chosen commit: the newest builds here", "d")
+	press("3", "the backups: enter restores one", "n", "3")
 	press(":", "run any command: the help narrows as you type", "1", ":", "r", "e")
 	press("!", "the alerts of the server, refreshed every minute", "esc", "!")
-	press("↓", "every server is in the list: down goes on to the next one", "esc", "left", "down")
-	press("↑", "and back", "up")
+	press("esc", "back to the map", "esc", "esc", "esc")
+	press("↓", "every server is in the list: the map of the next one", "down", "down", "down", "down")
 	press("t", "theme: monochrome", "t")
 	press("t", "theme: the colors of your terminal, which follow Omarchy", "t")
 	press("t", "theme: chasen", "t")
