@@ -10,6 +10,7 @@ package mock
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -82,6 +83,14 @@ type Server struct {
 	mu     sync.Mutex
 	apps   []*app
 	bucket string // the name of the bucket of the server, or ""
+}
+
+// UseBucket gives the server a bucket for its backups, as `chasen bucket`
+// does. A new server has none.
+func (s *Server) UseBucket(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.bucket = name
 }
 
 // New returns a server with three apps: a blog with no backups, the addon
@@ -262,22 +271,41 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 		beat := float64(time.Now().Unix()%20) / 20
 		fmt.Fprintf(out, "Load:     %.2f %.2f %.2f (4 cores, amd64)\nMemory:   %.1f GB of 7.6 GB (%d%%)\nDisk:     31 GB of 75 GB (41%%)\n",
 			0.2+beat, 0.4+beat/2, 0.5, 2.1+beat, int((2.1+beat)*100/7.6))
+		s.mu.Lock()
+		bucket := cmp.Or(s.bucket, "none: the backups stay on this server")
+		s.mu.Unlock()
+		fmt.Fprintf(out, "Bucket:   %s\nAPI:      SSH only: not on the web\n", bucket)
 		return 0
 	case "overview":
 		// Each app with its state, its version, and the change that runs now.
 		type row struct {
-			App     string `json:"app"`
-			State   string `json:"state"`
-			Up      bool   `json:"up"`
-			Version string `json:"version"`
-			Running string `json:"running,omitempty"`
-			Since   string `json:"since,omitempty"`
-			ID      int    `json:"id,omitempty"`
+			App       string   `json:"app"`
+			State     string   `json:"state"`
+			Up        bool     `json:"up"`
+			Version   string   `json:"version"`
+			Running   string   `json:"running,omitempty"`
+			Since     string   `json:"since,omitempty"`
+			ID        int      `json:"id,omitempty"`
+			Domains   []string `json:"domains"`
+			Jobs      string   `json:"jobs,omitempty"`
+			Databases int      `json:"databases"`
+			Backup    string   `json:"backup"`
+			Replica   string   `json:"replica"`
 		}
 		s.mu.Lock()
 		var rows []row
 		for _, a := range s.apps {
-			r := row{App: a.name, State: a.state, Up: strings.HasPrefix(a.state, "Up"), Version: a.version}
+			r := row{App: a.name, State: a.state, Up: strings.HasPrefix(a.state, "Up"), Version: a.version, Domains: a.domains, Replica: "off"}
+			if a.name == "shop" {
+				r.Jobs = "Up 3 hours"
+			}
+			if len(a.backups) > 0 {
+				// The shop has its data and its queue, the others one database.
+				r.Backup, r.Databases = a.backups[0], 1+strings.Count(r.Jobs, "Up")
+				if s.bucket != "" {
+					r.Replica = "live"
+				}
+			}
 			for i, e := range a.history {
 				if e.result == "running" {
 					r.Running, r.Since, r.ID = e.action, e.at.UTC().Format(time.RFC3339), i+1

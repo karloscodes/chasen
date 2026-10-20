@@ -107,12 +107,32 @@ If a nightly job on the server updates the app with matcha (a cron line with `ma
 
 ## The screen
 
-Run `chasen` with no command, in a terminal, to open the screen of your apps. It is for watching and running a server: it shows the apps of the current server on the left, and under them how busy the server is. On the right it shows one app: its state, its history, its backups, its domains, and its logs.
+Run `chasen` with no command, in a terminal, to open the screen of your apps. It is for watching and running your servers.
+
+**The first page is the map.** Each server you are logged in to is one block:
+
+```
+ shop-server   amd64 · 4 cores · 7.6 GB              load 0.42  mem 31%  disk 41%  ! 1 warning
+ internet ━•━━▶ proxy ━┳━•━━▶ ▸ ● blog      a1b2c3d           1 db  ───▶ backup 12 min ago  ───▶ backups-eu
+                       ┃          blog.example.com                  ·•·▶ live replica       ···▶ backups-eu
+                       ┗━━•━▶   ● shop      3f9a2c1           2 db  ───▶ backup 12 min ago  ───▶ backups-eu
+                                  shop.example.com shop.com         ··•▶ live replica       ·•·▶ backups-eu
+                                  └ jobs  ● Up 3 hours
+ you ──── ssh ────▶ API   SSH only: not on the web
+```
+
+The first line is the machine and how busy it is. Under it, the traffic comes from the internet to the proxy, and from the proxy to each app, with its version and its domains. On the right, the data of the app goes to the hourly backup on the server, and from there to the bucket. The live replica sends each change to the bucket, about a second behind. A server with no bucket says "this server only". The last line says where the API answers: through SSH only, or on the internet as a branch of the proxy.
+
+A line moves while its path is open: the traffic to an app that answers, a live replica, a backup that runs. It does not count requests: the server does not know them. An app that is down has a red cross on its line. A replica that is behind is red. The map asks each server every 10 seconds, with the same three commands however many apps it has: `chasen overview`, `chasen load`, and, once a minute, `chasen alerts`.
+
+`enter` on an app opens it. On the left are the apps of its server, and under them how busy the server is. On the right is the app: its state, its history, its backups, its domains, and its logs. `esc` on the list of the apps goes back to the map.
 
 The screen does not deploy. A deploy needs the directory of an app, and the screen is about the whole server. Run `chasen deploy` in the directory, or in CI, and the new version shows up on the screen.
 
 | Key | What it does |
 |---|---|
+| enter (on the map) | Open the chosen app |
+| esc (on the list of the apps) | Go back to the map |
 | left, right (or `h`, `l`) | Go to a side: the apps on the left, or the tab on the right |
 | up, down (or `k`, `j`) | Move in the side you are on: the next app, the next row, or the next lines |
 | tab, shift+tab | The next tab, the tab before. `1` to `5` go to a tab |
@@ -203,7 +223,7 @@ chasen use 2                         # change it: the number, or a part of the a
 chasen use                           # or choose from the list
 ```
 
-In the screen (`chasen` with no command), the list on the left has every server with its apps under it. The arrow keys go from the last app of one server to the first app of the next.
+In the screen (`chasen` with no command), the map shows every server with its apps, and the list on the left of an app has every server with its apps under it. The arrow keys go from the last app of one server to the first app of the next.
 
 An app can name its server in `chasen.yml`, so `chasen deploy` always goes to the right one:
 

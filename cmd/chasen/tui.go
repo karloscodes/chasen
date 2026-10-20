@@ -111,6 +111,8 @@ type hits struct {
 	rowTop   int       // the line of the first row of the tab
 	rowFirst int       // which row that is
 	tree     []treeRef // with several servers: what each line of the list is, from appTop
+	mapTop   int       // on the map: the line of the first line of the body
+	mapRefs  []treeRef // on the map: the app of each line of the body, from mapTop
 }
 
 // treeRef is a line of the list of servers and apps: a server, or an app of it.
@@ -163,8 +165,14 @@ type tui struct {
 	alertsChecked string // the last line: when the server looked
 	noAlerts      bool   // the server has no alerts command: do not ask again
 	frame         int    // for the spinner
-	events        chan any
-	now           func() time.Time
+	// The map: the first page. home is true while it shows; esc in an app
+	// comes back to it.
+	home        bool
+	maps        map[string]*serverMap
+	mapChosen   treeRef
+	mapAlertsAt time.Time // when the map last asked for the alerts
+	events      chan any
+	now         func() time.Time
 }
 
 // The events of the loop.
@@ -221,7 +229,7 @@ type (
 
 func newTUI(run runner, server, cwdApp string) *tui {
 	return &tui{
-		run: run, server: server, cwdApp: cwdApp,
+		run: run, server: server, cwdApp: cwdApp, home: true,
 		width: 80, height: 24,
 		panes: map[string]*pane{}, logsFollow: true, watching: map[string]string{}, finished: map[string]string{}, openURL: openURL,
 		events: make(chan any, 256), now: time.Now,
@@ -572,22 +580,27 @@ var checkedAt = regexp.MustCompile(`Checked at (\d\d:\d\d UTC)\.(?: Quiet: ([^.]
 // alertView draws the alerts: when the server looked, then each alert with a
 // dot of its color, what is wrong, and the fix under it, wrapped to the window.
 func (t *tui) alertView(width int) []string {
+	return t.alertLines(t.alerts, t.alertsChecked, width)
+}
+
+// alertLines draws the alerts of a server, and when it looked.
+func (t *tui) alertLines(alerts []alertRow, checked string, width int) []string {
 	note := "Refreshes every minute. The same: chasen alerts"
-	if m := checkedAt.FindStringSubmatch(t.alertsChecked); m != nil {
+	if m := checkedAt.FindStringSubmatch(checked); m != nil {
 		note = "Checked at " + m[1] + ", refreshes every minute. The same: chasen alerts"
 		if m[2] != "" {
 			note += ". Turned off: " + m[2]
 		}
 	}
 	lines := []string{" " + paint(note, colorDim), ""}
-	if t.alertsChecked == "" {
+	if checked == "" {
 		return append(lines, " "+paint(spinner[t.frame%len(spinner)], colorAccent)+paint(" Asking the server", colorDim))
 	}
-	if len(t.alerts) == 0 {
+	if len(alerts) == 0 {
 		return append(lines, " "+paint("✓", colorAccent)+" No alerts. Nothing is wrong, and nothing puts the server at risk.")
 	}
 	const indent = "             "
-	for _, a := range t.alerts {
+	for _, a := range alerts {
 		level, color := "warning", colorAccent
 		if a.error {
 			level, color = "error  ", colorBad
@@ -833,6 +846,17 @@ func (t *tui) handle(event any) bool {
 		t.width, t.height = e.width, e.height
 	case tickEvent:
 		t.frame++
+		if t.home {
+			// The map asks every 10 seconds, and every 5 while a change runs.
+			every := 80
+			if t.mapRunning() {
+				every = 40
+			}
+			if t.frame%every == 0 && t.overlay == nil && t.prompt == nil {
+				t.loadMaps()
+			}
+			break
+		}
 		// Every 10 seconds, ask again for what the screen shows, and for
 		// what runs: a deploy from somewhere else shows up in the overview. A
 		// server from before it shows it in the history of each app. Every
@@ -931,6 +955,8 @@ func (t *tui) handle(event any) bool {
 				t.watch(app)
 			}
 		}
+	case mapEvent:
+		t.gotMap(e)
 	case alertsEvent:
 		// A server from before the alerts command answers with an error.
 		t.noAlerts = e.failed
@@ -1008,6 +1034,9 @@ func (t *tui) key(key string) bool {
 		t.overlayKey(o, key)
 		return true
 	}
+	if t.home {
+		return t.mapKey(key)
+	}
 
 	switch key {
 	case "q":
@@ -1034,12 +1063,20 @@ func (t *tui) key(key string) bool {
 	// in it. The tabs have their own keys.
 	case "esc":
 		// Esc takes one thing away at a time: the filter, then the side.
-		if t.filter != "" {
+		switch {
+		case t.filter != "":
 			t.filter, t.cursor, t.scroll = "", 0, 0
-		} else {
+		case t.inPane:
 			t.inPane = false
+		default:
+			t.goHome()
+			return true
 		}
 	case "left", "h":
+		if !t.inPane {
+			t.goHome()
+			return true
+		}
 		t.inPane = false
 	case "/":
 		t.startFilter()
@@ -1240,6 +1277,24 @@ func (t *tui) mouse(button, x, y int) {
 		}
 		return
 	}
+	if t.home {
+		switch button {
+		case wheelUp:
+			t.mapMove(-1)
+		case wheelDown:
+			t.mapMove(1)
+		case left:
+			if row := y - t.hit.mapTop; row >= 0 && row < len(t.hit.mapRefs) && t.hit.mapRefs[row].app != "" {
+				r := t.hit.mapRefs[row]
+				if r == t.mapChoice() {
+					t.openFromMap()
+				} else {
+					t.mapChosen = r
+				}
+			}
+		}
+		return
+	}
 	onApps := x <= t.hit.left
 	switch button {
 	case wheelUp, wheelDown:
@@ -1415,6 +1470,15 @@ func (t *tui) overlayKey(o *overlay, key string) {
 }
 
 var helpLines = strings.Split(strings.TrimSpace(`
+The map
+  up, down (k, j)     choose an app, on any server
+  enter, right (l)    open the app: its overview, history, backups, domains, and logs
+  esc, left (h)       from the list of apps, back to the map
+  o                   open the chosen app in the browser
+  !                   the alerts of the server of the chosen app
+  A line moves when its path is open: the traffic to an app that answers, a
+  live replica, a backup that runs. It does not count requests.
+
 Move
   left, right (h, l)  go to the apps on the left, or to the tab on the right
   up, down (k, j)     move in the side you are on: the next app, the next row, or the next lines
@@ -1593,7 +1657,11 @@ func runScreen(t *tui) error {
 		}
 	}()
 
-	t.loadApps()
+	if t.home {
+		t.loadMaps()
+	} else {
+		t.loadApps()
+	}
 	drawn := ""
 	for {
 		// The clock ticks eight times a second for the spinner. Most ticks

@@ -205,6 +205,9 @@ func (t *tui) commandHelp(width int, typed string, room int) []string {
 }
 
 func (t *tui) firstLine(width int) string {
+	if t.home {
+		return t.mapFirstLine(width)
+	}
 	count := ""
 	switch {
 	case t.appsLoaded && len(t.apps) == 1:
@@ -229,15 +232,17 @@ func (t *tui) firstLine(width int) string {
 
 // alertCells counts the alerts of the server: "! 1 error  2 warnings", the
 // errors in red. No alert, no cells.
-func (t *tui) alertCells() []cell {
+func (t *tui) alertCells() []cell { return alertCellsOf(t.alerts) }
+
+func alertCellsOf(alerts []alertRow) []cell {
 	errors := 0
-	for _, a := range t.alerts {
+	for _, a := range alerts {
 		if a.error {
 			errors++
 		}
 	}
-	warnings := len(t.alerts) - errors
-	if len(t.alerts) == 0 {
+	warnings := len(alerts) - errors
+	if len(alerts) == 0 {
 		return nil
 	}
 	cells := []cell{{"! ", colorAccent}}
@@ -258,9 +263,11 @@ var (
 // statCells shows the load, the memory, and the disk of the server in a few
 // characters: "load 0.42  mem 31%  disk 41%". A number that needs attention
 // is red: a load above the count of the cores, or 90% and more in use.
-func (t *tui) statCells() []cell {
+func (t *tui) statCells() []cell { return statCellsOf(t.stats) }
+
+func statCellsOf(stats []string) []cell {
 	var cells []cell
-	if parts := loadLine.FindStringSubmatch(strings.Join(statusValues(t.stats, "Load"), "")); parts != nil {
+	if parts := loadLine.FindStringSubmatch(strings.Join(statusValues(stats, "Load"), "")); parts != nil {
 		color := colorDim
 		load, _ := strconv.ParseFloat(parts[1], 64)
 		if cores, _ := strconv.Atoi(parts[2]); cores > 0 && load > float64(cores) {
@@ -269,7 +276,7 @@ func (t *tui) statCells() []cell {
 		cells = append(cells, cell{"load ", colorDim}, cell{parts[1] + "  ", color})
 	}
 	for _, name := range []string{"Memory", "Disk"} {
-		parts := percent.FindStringSubmatch(strings.Join(statusValues(t.stats, name), ""))
+		parts := percent.FindStringSubmatch(strings.Join(statusValues(stats, name), ""))
 		if parts == nil {
 			continue
 		}
@@ -302,12 +309,14 @@ func (t *tui) keys() [][2]string {
 		return [][2]string{{"!", "report this, with its output"}, {"↑↓", "scroll"}, {"esc", "close"}}
 	case t.overlay != nil:
 		return [][2]string{{"↑↓", "scroll"}, {"esc", "close"}}
+	case t.home:
+		return [][2]string{{"↑↓", "app"}, {"enter", "open it"}, {"o", "open the site"}, {"!", "alerts"}, {"t", "theme"}, {"g", "load again"}, {"?", "keys"}, {"q", "close"}}
 	case len(t.apps) == 0:
-		return [][2]string{{"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
+		return [][2]string{{"esc", "map"}, {"g", "load again"}, {"s", "servers"}, {"?", "keys"}, {"q", "close"}}
 	case !t.inPane:
 		// The line drops the keys at its end when the window is narrow: the
 		// ones that are hard to guess come first. s and ! are in the top line.
-		return [][2]string{{"↑↓", "app"}, {":", "command"}, {"t", "theme"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"→", "its " + tabNames[t.tab]}, {"?", "keys"}, {"q", "close"}}
+		return [][2]string{{"↑↓", "app"}, {":", "command"}, {"t", "theme"}, {"r", "restart"}, {"b", "backup"}, {"o", "open"}, {"→", "its " + tabNames[t.tab]}, {"esc", "map"}, {"?", "keys"}, {"q", "close"}}
 	}
 	switch t.tab {
 	case tabHistory:
@@ -381,6 +390,8 @@ func (t *tui) body(width, height int) []string {
 	switch {
 	case t.overlay != nil:
 		lines = t.overlayLines(t.overlay, width, height)
+	case t.home:
+		lines = t.mapLines(width, height)
 	case !t.appsLoaded && t.appsErr == "":
 		lines = t.splash(width, height)
 	case t.appsErr != "":

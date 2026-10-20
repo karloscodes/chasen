@@ -54,7 +54,7 @@ It runs in a container, with the Docker socket, and changes nothing else on the 
 
 ## The screen
 
-`chasen` with no command opens the screen of your server: your apps and their state, the history, the backups, the domains, and the logs, live. The top line shows the load of the server and its alerts.
+`chasen` with no command opens the screen of your servers. Its first page is a map of each server: the traffic from the internet through the proxy to each app, the jobs beside an app, and where the data goes, to the hourly backups, the bucket, and the live replica. A line moves while its path is open. `enter` on an app opens it: its state, the history, the backups, the domains, and the logs, live. `esc` goes back to the map.
 
 The keys do what the CLI does: `r` restarts, `b` backs up, `enter` on a backup restores it, `:` runs any command for the chosen app and lists them as you type, `!` shows the alerts, and `s` goes to another server. Each action shows the command line that does the same, so the screen also teaches the CLI. It has no deploy key: a deploy belongs to the directory of the app.
 

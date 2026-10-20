@@ -22,6 +22,7 @@ func main() {
 	}
 	server := mock.New(time.Now())
 	server.Log = log.New(os.Stdout, "", log.Ltime)
+	server.UseBucket("backups-eu") // so the map of the screen has all its lines
 	log.Printf("The mock server listens on http://%s. Its token is %q.", address, server.Token)
 	log.Fatal(http.ListenAndServe(address, server))
 }

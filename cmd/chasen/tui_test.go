@@ -103,6 +103,8 @@ func openScreen(t *testing.T, s *testServer, cwdApp string) *screen {
 	ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 		return client.Run(ctx, args[0], args[1:], nil, out)
 	}, "example.com", cwdApp)
+	// These tests are about an app and its tabs: the map has its own.
+	ui.home = false
 	ui.width, ui.height = 100, 30
 	ui.now = func() time.Time { return time.Date(2026, 10, 1, 14, 0, 0, 0, time.UTC) }
 	colorsOn = true
@@ -535,6 +537,7 @@ func TestScreen(t *testing.T) {
 		ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 			return client.Run(ctx, args[0], args[1:], nil, out)
 		}, "example.com", "")
+		ui.home = false // the map has its own tests: tui_map_test.go
 		sc := &screen{t, ui}
 
 		ui.loadApps()
@@ -607,6 +610,7 @@ func TestScreenOnTheMockServer(t *testing.T) {
 		ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 			return client.Run(ctx, args[0], args[1:], nil, out)
 		}, "mock", "shop")
+		ui.home = false // the map has its own tests: tui_map_test.go
 		ui.width, ui.height = 100, 30
 		sc := &screen{t, ui}
 		t.Cleanup(ui.stopLogs)
@@ -664,6 +668,7 @@ func TestScreenOnTheMockServer(t *testing.T) {
 			return client.Run(ctx, args[0], args[1:], nil, out)
 		}
 		ui := newTUI(run, "mock", "")
+		ui.home = false // the map has its own tests: tui_map_test.go
 		ui.width, ui.height = 110, 34
 		sc := &screen{t, ui}
 		ui.loadApps()
@@ -763,6 +768,7 @@ func TestServerTextIsCleanedOnTheScreen(t *testing.T) {
 		ui := newTUI(func(ctx context.Context, out io.Writer, args ...string) (int, error) {
 			return client.Run(ctx, args[0], args[1:], nil, out)
 		}, "example.com", "shop")
+		ui.home = false // the map has its own tests: tui_map_test.go
 		sc := &screen{t, ui}
 
 		ui.loadApps()

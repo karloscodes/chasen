@@ -46,6 +46,12 @@ type appView struct {
 	Running string `json:"running,omitempty"`
 	Since   string `json:"since,omitempty"`
 	ID      int64  `json:"id,omitempty"`
+	// For the map of the screen. A server from before them leaves them out.
+	Domains   []string `json:"domains,omitempty"`
+	Jobs      string   `json:"jobs,omitempty"`
+	Databases int      `json:"databases,omitempty"`
+	Backup    string   `json:"backup,omitempty"`
+	Replica   string   `json:"replica,omitempty"`
 }
 
 type alertView struct {
