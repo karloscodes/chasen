@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -398,6 +399,78 @@ func TestEndToEnd(t *testing.T) {
 		// The map of the screen: the domains of the app, and where its data goes.
 		if !strings.Contains(data, `"domains":["example.localhost"`) || !strings.Contains(data, `"replica":"`) || !regexp.MustCompile(`"backup":"\d{8}T\d{6}Z"`).MatchString(data) {
 			t.Errorf("overview --json = %q, want the domains, the newest backup, and the replica of the app", data)
+		}
+	})
+
+	t.Run("proxy update starts the proxy of this release, keeps the routes, and no new visitor gets an error", func(t *testing.T) {
+		// A swap makes a new container: the cleanup removes the one that runs at the end.
+		defer func() { proxyID, _ = docker("ps", "-q", "--filter", "name=^matcha-proxy$") }()
+		// The proxy of an older release, with the routes of the apps.
+		const older = "basecamp/kamal-proxy:v0.10.1"
+		if err := replaceProxy(proxyImage, older); err != nil {
+			t.Fatal(err)
+		}
+		if out := must(app, bin, "alerts"); !strings.Contains(out, "the proxy runs "+older) {
+			t.Errorf("alerts = %q, want the proxy of another version", out)
+		}
+
+		// New visitors, one connection each, all through the swap.
+		stop := make(chan struct{})
+		failed := make(chan error, 1000)
+		var asked atomic.Int64
+		go func() {
+			defer close(failed)
+			client := http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				req, _ := http.NewRequest("GET", "http://127.0.0.1/up", nil)
+				req.Host = "example.localhost"
+				resp, err := client.Do(req)
+				if err == nil {
+					resp.Body.Close()
+					if resp.StatusCode != http.StatusOK {
+						err = fmt.Errorf("status %d", resp.StatusCode)
+					}
+				}
+				if err != nil {
+					failed <- err
+				}
+				asked.Add(1)
+				time.Sleep(50 * time.Millisecond)
+			}
+		}()
+		time.Sleep(300 * time.Millisecond)
+		out := must(".", server, "proxy", "update")
+		time.Sleep(300 * time.Millisecond)
+		close(stop)
+		var errs []error
+		for err := range failed {
+			errs = append(errs, err)
+		}
+
+		if len(errs) > 0 {
+			t.Errorf("%d of %d requests failed during the swap, the first: %v\n%s", len(errs), asked.Load(), errs[0], out)
+		}
+		if image, _ := docker("inspect", "-f", "{{.Config.Image}}", "matcha-proxy"); image != proxyImage {
+			t.Errorf("the proxy runs %s, want %s", image, proxyImage)
+		}
+		// /up, not /: the later steps count the hits of the app.
+		req, _ := http.NewRequest("GET", "http://127.0.0.1/up", nil)
+		req.Host = "example.localhost"
+		if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != http.StatusOK {
+			t.Errorf("GET example.localhost/up after the swap = %v, %v, want 200: the route stays", resp, err)
+		} else {
+			resp.Body.Close()
+		}
+		if out, _ := exec.Command("iptables", "-t", "raw", "-S").CombinedOutput(); strings.Contains(string(out), "chasen proxy swap") {
+			t.Errorf("the hold rules stay after the swap:\n%s", out)
+		}
+		if out := must(".", server, "proxy", "update"); !strings.Contains(out, "the version of this release") {
+			t.Errorf("a second proxy update = %q, want nothing to do", out)
 		}
 	})
 

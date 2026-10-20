@@ -174,15 +174,19 @@ If the firewall of the server lets in only the addresses of Cloudflare, every na
 
 ## Updates
 
-**Chasen updates itself on your server.** Each night, at a random minute between 03:00 and 05:00, a timer runs `chasen-server update`. It updates Chasen only, not the operating system:
+**Chasen updates itself on your server.** Each night, in the quiet hour of the server (03:00 until one is known), at a random minute of it, a timer runs `chasen-server update`. It updates Chasen and its proxy, not the operating system:
 
-- It compares the checksum of the newest release with the binary that runs. When they are the same, nothing happens.
+- It compares the checksum of the newest release with the binary that runs. When they are the same, the binary stays.
 - It keeps the old binary as `chasen-server.previous`, installs the new one, and starts the API again. Your apps do not restart.
 - When the new API does not answer in 30 seconds, it puts the old binary back.
+- Each release of Chasen names the version of the proxy (kamal-proxy) that it runs. When the proxy of the server is another one, the update swaps it. During the swap, a few seconds, a new visitor gets no answer at first, and their browser sends the connection again a second later, to the new proxy: a pause, not an error. A request that runs during the swap, like an upload, is cut. The routes and the certificates stay. When the new proxy does not answer with every route, the old one starts again.
 - It never interrupts a deploy: it waits for the next night.
+- Then it moves the timer to the quiet hour of the server: the hour with the fewest requests in the last week, from the log of the proxy.
 
 ```bash
 chasen-server update                      # update now
+chasen-server proxy                       # the version of the proxy, and the one of this release
+chasen-server proxy update                # swap the proxy now
 systemctl list-timers chasen-update.timer # when the next run is
 ```
 

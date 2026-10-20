@@ -46,7 +46,9 @@ On the server, as root:
 |---|---|
 | `chasen-server setup --domain <domain>` | Start the proxy and the API, and the timer of the nightly update |
 | `chasen-server bucket ...` | Set the S3 bucket for offsite backups. From your computer it is `chasen bucket ...` |
-| `chasen-server update` | Install the newest release now. The timer does this each night |
+| `chasen-server update` | Install the newest release now, and the proxy it names. The timer does this each night, in the quiet hour of the server |
+| `chasen-server proxy` | Show the version of the proxy, and the one of this release of Chasen |
+| `chasen-server proxy update` | Start the proxy of this release. New visitors wait a few seconds, with no error; the routes and the certificates stay |
 | `chasen-server check` | The same as `chasen alerts`, on the server |
 | `chasen-server settings quiet_alerts <name,name>` | Turn alerts off by their name: `firewall` when the firewall of your provider does that job. An empty value turns them all on again |
 | `chasen-server settings domain none` | Remove the base domain. The API no longer answers at `https://api.<domain>`, and the apps keep their domains. `chasen-server setup --domain <domain>` gives it back |
@@ -183,6 +185,8 @@ A restart, a restore, and the removal of a domain ask first. Each action is a co
 | SSH accepts passwords | warning | `ssh` |
 | No firewall runs on the server (ufw, or nftables that drops what it does not allow) | warning | `firewall` |
 | The API answers on the internet: the server has a base domain | warning | `api` |
+| The proxy does not run, and apps need it | error | `proxy` |
+| The proxy is another version than the one of this release | warning | `proxy` |
 | The server does not install its security updates by itself (Debian and Ubuntu) | warning | `updates` |
 | An update waits for a reboot for more than a day | warning | `reboot` |
 | The nightly update of `chasen-server` is off | warning | `auto_update` |

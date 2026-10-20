@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -76,6 +77,21 @@ func TestAutoUpdateDue(t *testing.T) {
 	t.Run("not when the loop looked at no minute", func(t *testing.T) {
 		if autoUpdateDue(at("2026-10-08 05:30"), time.Time{}) {
 			t.Error("an empty window is due")
+		}
+	})
+}
+
+func TestTimerHour(t *testing.T) {
+	t.Run("the timer runs at the hour it moved to, or at 03:00", func(t *testing.T) {
+		for timer, want := range map[string]int{
+			fmt.Sprintf(updateTimer, 4):                                   4,
+			fmt.Sprintf(updateTimer, 23):                                  23,
+			"[Timer]\nOnCalendar=*-*-* 03:00:00\nRandomizedDelaySec=2h\n": 3,
+			"": 3,
+		} {
+			if got := timerHourOf(timer); got != want {
+				t.Errorf("timerHourOf(%q) = %d, want %d", timer, got, want)
+			}
 		}
 	})
 }

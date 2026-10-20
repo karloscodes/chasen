@@ -101,6 +101,8 @@ func runServer(args []string) error {
 		return serverLoad()
 	case "quiet-hour":
 		return serverQuietHour()
+	case "proxy":
+		return serverProxy(args)
 	case "adopt":
 		return serverAdopt(args)
 	case "backup":
@@ -493,7 +495,8 @@ func engine(name string) *matcha.Matcha {
 	return matcha.New(matcha.Config{
 		Name:        name,
 		DataDirBase: root() + "/var/matcha",
-		SkipPull:    true, // chasen pulls the image itself, with the login of the deploy
+		ProxyImage:  proxyImage, // when a deploy finds no proxy, it starts this one
+		SkipPull:    true,       // chasen pulls the image itself, with the login of the deploy
 	})
 }
 
@@ -548,6 +551,11 @@ func serverSetup(args []string) error {
 		}
 		fmt.Fprintln(os.Stderr, "Starting the proxy.")
 		if err := matcha.Setup(); err != nil {
+			return err
+		}
+		// matcha starts the proxy from its own default image: the version of
+		// this release takes its place, before any app has a route.
+		if err := updateProxy(); err != nil {
 			return err
 		}
 	}

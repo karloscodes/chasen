@@ -60,6 +60,7 @@ func checkAlerts(cfg serverConfig, now time.Time) []alert {
 		sshAlerts,
 		firewallAlerts,
 		func() []alert { return apiAlerts(cfg) },
+		proxyAlerts,
 		updateAlerts,
 		func() []alert { return rebootAlerts(now) },
 		func() []alert { return selfUpdateAlerts(cfg) },

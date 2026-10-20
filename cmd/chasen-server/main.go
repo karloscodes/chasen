@@ -22,7 +22,11 @@ Run these on the server, as root:
   settings heartbeat_url <url>   Call this URL after each hourly backup that worked. "" turns it off
   settings domain none           Remove the base domain: the API leaves the web, the apps keep theirs
   token                          Print the login token
-  update                         Install the newest release now. A timer does this each night
+  update                         Install the newest release now, and the proxy it names. A timer does
+                                 this each night, at the quiet hour of the server
+  proxy                          Show the version of the proxy, and the one of this release
+  proxy update                   Start the proxy of this release. New visitors wait a few seconds,
+                                 with no error
   check                          Check the security of the server (with no arguments)
   list                           List all apps
   load                           Show the load, the memory, and the disk of the server

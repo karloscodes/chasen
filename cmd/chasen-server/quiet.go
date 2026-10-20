@@ -16,24 +16,35 @@ import (
 // The numbers come from the log of the proxy, which has one line for each
 // request.
 func serverQuietHour() error {
-	logs := exec.Command("docker", "logs", "--since", "168h", "matcha-proxy")
-	out, err := logs.StdoutPipe()
+	hour, ok, err := measureQuietHour()
 	if err != nil {
 		return err
-	}
-	logs.Stderr = logs.Stdout // the proxy writes its own messages to the other stream
-	if err := logs.Start(); err != nil {
-		return err
-	}
-	hour, ok := quietHour(out, time.Now())
-	if err := logs.Wait(); err != nil {
-		return errors.New("cannot read the log of the proxy. Does the proxy run? chasen-server setup starts it")
 	}
 	if !ok {
 		return errors.New("the log of the proxy has less than one day of requests: no hour is known yet")
 	}
 	fmt.Printf("%02d:00\n", hour)
 	return nil
+}
+
+// measureQuietHour reads the last 7 days of the log of the proxy. A new
+// proxy container starts a new log, so after its swap no hour is known for a
+// day.
+func measureQuietHour() (hour int, ok bool, err error) {
+	logs := exec.Command("docker", "logs", "--since", "168h", proxyContainer)
+	out, err := logs.StdoutPipe()
+	if err != nil {
+		return 0, false, err
+	}
+	logs.Stderr = logs.Stdout // the proxy writes its own messages to the other stream
+	if err := logs.Start(); err != nil {
+		return 0, false, err
+	}
+	hour, ok = quietHour(out, time.Now())
+	if err := logs.Wait(); err != nil {
+		return 0, false, errors.New("cannot read the log of the proxy. Does the proxy run? chasen-server setup starts it")
+	}
+	return hour, ok, nil
 }
 
 // quietHour reads the log of the proxy and returns the hour of the day with
