@@ -1,6 +1,8 @@
 package main
 
 import (
+	"cmp"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,13 +11,16 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/karloscodes/chasen/protocol"
 	"github.com/karloscodes/matcha"
 )
 
 // The overview is what a glance needs, for each app of the server, in one
 // call: its state, its version, and the change that runs now. The bar of a
 // desktop asks for it every few seconds while a deploy runs, so it reads
-// Docker once and the database once.
+// Docker once and the database once. The map of the screen draws the rest:
+// the domains that bring traffic, the jobs beside the app, and where its data
+// goes. Those come from the same reads, and from the directory of backups.
 
 type overviewApp struct {
 	App     string `json:"app"`
@@ -25,6 +30,12 @@ type overviewApp struct {
 	Running string `json:"running,omitempty"` // the change that runs now: "deploy 3f9a2c1"
 	Since   string `json:"since,omitempty"`   // when that change started, in RFC 3339
 	ID      int64  `json:"id,omitempty"`      // its id in the history, to follow its output
+
+	Domains   []string `json:"domains"`
+	Jobs      string   `json:"jobs,omitempty"` // the state of the jobs container, when the app has one
+	Databases int      `json:"databases"`      // the SQLite databases in the newest backup
+	Backup    string   `json:"backup"`         // the stamp of the newest backup, "" before the first, "off" with backup: false
+	Replica   string   `json:"replica"`        // the live replica: "live", "behind", or "off"
 }
 
 // serverOverview prints the overview as a table, or as JSON with --json.
@@ -59,6 +70,8 @@ func overview() ([]overviewApp, error) {
 		action, started string
 	}
 	running := map[string]change{}
+	settings := map[string]protocol.Settings{}
+	behind := map[string]bool{}
 	if db, err := openServerDB(); err == nil {
 		defer db.Close()
 		if rows, err := db.Query("SELECT id, app, action, started_at FROM activity WHERE status = 'running' ORDER BY id"); err == nil {
@@ -74,7 +87,9 @@ func overview() ([]overviewApp, error) {
 				}
 			}
 		}
+		settings, behind = allSettings(db), behindReplicas(db, time.Now())
 	}
+	live := replicaPID() != 0
 	var rows []overviewApp
 	for _, name := range matcha.ListAppsSorted(apps) {
 		c := all.of(name)
@@ -86,10 +101,75 @@ func overview() ([]overviewApp, error) {
 		if now, ok := running[name]; ok {
 			r.Running, r.Since, r.ID = now.action, now.started, now.id
 		}
+		r.Domains = strings.FieldsFunc(apps[name].Domain, func(c rune) bool { return c == ',' })
+		if settings[name].Jobs != "" {
+			r.Jobs = cmp.Or(all.of(jobsName(name)).Status, "not running")
+		}
+		r.Backup, r.Databases = newestBackup(name)
+		r.Replica = "off"
+		switch {
+		case settings[name].NoBackup:
+			r.Backup = "off"
+		case live && behind[name]:
+			r.Replica = "behind"
+		case live && r.Databases > 0:
+			r.Replica = "live"
+		}
 		rows = append(rows, r)
 	}
 	slices.SortFunc(rows, func(a, b overviewApp) int { return strings.Compare(a.App, b.App) })
 	return rows, nil
+}
+
+// allSettings reads the settings of every app in one query.
+func allSettings(db *sql.DB) map[string]protocol.Settings {
+	all := map[string]protocol.Settings{}
+	rows, err := db.Query("SELECT app, settings FROM app_settings")
+	if err != nil {
+		return all
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var app string
+		var data []byte
+		var s protocol.Settings
+		if rows.Scan(&app, &data) == nil && json.Unmarshal(data, &s) == nil {
+			all[app] = s
+		}
+	}
+	return all
+}
+
+// behindReplicas gives the apps with a database that the live replica has
+// not copied for longer than it may: the same rule as chasen verify.
+func behindReplicas(db *sql.DB, now time.Time) map[string]bool {
+	behind := map[string]bool{}
+	rows, err := db.Query("SELECT app, behind_since FROM replica_state WHERE behind_since IS NOT NULL")
+	if err != nil {
+		return behind
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var app, since string
+		if rows.Scan(&app, &since) != nil {
+			continue
+		}
+		if from, err := time.Parse(time.RFC3339, since); err == nil && now.Sub(from) > replicaMayBeBehind {
+			behind[app] = true
+		}
+	}
+	return behind
+}
+
+// newestBackup returns the stamp of the newest backup of an app, and how
+// many databases it holds: one file for each.
+func newestBackup(name string) (stamp string, databases int) {
+	stamps := localBackups(name)
+	if len(stamps) == 0 {
+		return "", 0
+	}
+	files, _ := backupFiles(backupsDir(name) + "/" + stamps[0])
+	return stamps[0], len(files)
 }
 
 // container is what Docker says of one container: "Up 3 hours (healthy)",

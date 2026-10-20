@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -377,6 +378,10 @@ func TestEndToEnd(t *testing.T) {
 		data := must(app, bin, "overview", "--json")
 		if !strings.Contains(data, `"app":"example"`) || !strings.Contains(data, `"up":true`) {
 			t.Errorf("overview --json = %q, want the app as JSON, up", data)
+		}
+		// The map of the screen: the domains of the app, and where its data goes.
+		if !strings.Contains(data, `"domains":["example.localhost"`) || !strings.Contains(data, `"replica":"`) || !regexp.MustCompile(`"backup":"\d{8}T\d{6}Z"`).MatchString(data) {
+			t.Errorf("overview --json = %q, want the domains, the newest backup, and the replica of the app", data)
 		}
 	})
 

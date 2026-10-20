@@ -13,7 +13,9 @@ import (
 // serverLoad prints how busy the server is: the load, the memory in use, and
 // the disk that holds the apps. The API runs in a container, but these are
 // the numbers of the whole machine: /proc is the one of the kernel, and
-// /var/matcha is the disk of the host.
+// /var/matcha is the disk of the host. Then the two ways out of the server
+// that the map of the screen draws: the bucket of the backups, and where the
+// API answers.
 func serverLoad() error {
 	load, err := os.ReadFile("/proc/loadavg")
 	if err != nil {
@@ -43,7 +45,32 @@ func serverLoad() error {
 	}
 	block := uint64(disk.Bsize)
 	fmt.Printf("Disk:     %s\n", inUse((disk.Blocks-disk.Bfree)*block, disk.Blocks*block))
+
+	cfg, err := loadServerConfig()
+	if err != nil {
+		return nil // the numbers are what the load is for
+	}
+	fmt.Printf("Bucket:   %s\n", bucketLine(cfg))
+	fmt.Printf("API:      %s\n", apiLine(cfg))
 	return nil
+}
+
+func bucketLine(cfg serverConfig) string {
+	if cfg.Backup.S3 == nil {
+		return "none: the backups stay on this server"
+	}
+	return cfg.Backup.S3.Bucket
+}
+
+// apiLine says where the API answers, by the rule of the api alert.
+func apiLine(cfg serverConfig) string {
+	switch {
+	case cfg.Domain == "":
+		return "SSH only: not on the web"
+	case isLocal(cfg.Domain):
+		return "https://api." + cfg.Domain + ", on this machine"
+	}
+	return "https://api." + cfg.Domain + ", on the internet"
 }
 
 // memoryKB returns one value of /proc/meminfo, in kB: "MemTotal:  16303428 kB".

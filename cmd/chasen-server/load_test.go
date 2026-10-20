@@ -40,3 +40,28 @@ func TestLoad(t *testing.T) {
 		}
 	})
 }
+
+func TestWaysOut(t *testing.T) {
+	t.Run("the bucket is its name, or none", func(t *testing.T) {
+		var cfg serverConfig
+		if got := bucketLine(cfg); got != "none: the backups stay on this server" {
+			t.Errorf("bucketLine with no bucket = %q", got)
+		}
+		cfg.Backup.S3 = &s3Config{Bucket: "shop-backups", SecretAccessKey: "secret"}
+		if got := bucketLine(cfg); got != "shop-backups" {
+			t.Errorf("bucketLine = %q, want the name, and nothing of the key", got)
+		}
+	})
+
+	t.Run("the API is on the internet with a base domain, and SSH only without one", func(t *testing.T) {
+		for domain, want := range map[string]string{
+			"":            "SSH only: not on the web",
+			"localhost":   "https://api.localhost, on this machine",
+			"example.com": "https://api.example.com, on the internet",
+		} {
+			if got := apiLine(serverConfig{Domain: domain}); got != want {
+				t.Errorf("apiLine(%q) = %q, want %q", domain, got, want)
+			}
+		}
+	})
+}
