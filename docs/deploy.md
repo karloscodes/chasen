@@ -106,7 +106,7 @@ chasen deploy --tag 2.7.6     # one version
 - **The settings of your server stay in your folder,** not in the repository of the product.
 
 
-A directory with an `index.html` and no `Dockerfile` deploys as a static website. Chasen serves the files of the commit with Caddy. A site that needs a build step (Astro, Hugo) is an image like any app: it has a `Dockerfile` like any app.
+A directory with an `index.html` and no `Dockerfile` deploys as a static website. Chasen serves the files of the commit with Caddy, the version this release names. A site that needs a build step (Astro, Hugo) is an image like any app: it has a `Dockerfile` like any app.
 
 ## Addons
 

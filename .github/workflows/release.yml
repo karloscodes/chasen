@@ -40,7 +40,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # The whole history, so the build stamps the tag and not a
+          # pseudo-version from a shallow clone.
+          fetch-depth: 0
           persist-credentials: false
+      - name: The checkout is the tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: test "$(git rev-list -n 1 "$GITHUB_REF_NAME")" = "$(git rev-parse HEAD)"
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -49,15 +55,43 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           flags="-s -w -X main.version=$GITHUB_REF_NAME"
-          mkdir dist
+          # Outside the checkout. v0.12.6 wrote the binaries into dist/ here,
+          # so the first one was clean and every later one was stamped
+          # vcs.modified, with the module version v0.12.6+dirty.
+          out="${RUNNER_TEMP}/dist"
+          mkdir -p "$out"
+          test -z "$(git status --porcelain)"
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
-            GOOS=${target%/*} GOARCH=${target#*/} go build -ldflags "$flags" -o dist/chasen-${target%/*}-${target#*/} ./cmd/chasen
+            GOOS=${target%/*} GOARCH=${target#*/} go build -ldflags "$flags" -o "$out/chasen-${target%/*}-${target#*/}" ./cmd/chasen
           done
           for arch in amd64 arm64; do
-            GOOS=linux GOARCH=$arch go build -ldflags "$flags" -o dist/chasen-server-linux-$arch ./cmd/chasen-server
+            GOOS=linux GOARCH=$arch go build -ldflags "$flags" -o "$out/chasen-server-linux-$arch" ./cmd/chasen-server
           done
-          cd dist && sha256sum chasen-* > checksums.txt
+          (
+            cd "$out"
+            sha256sum chasen-* > checksums.txt
+            want="go$(awk '/^go / { print $2; exit }' "$GITHUB_WORKSPACE/go.mod")"
+            tab="$(printf '\t')"
+            for bin in chasen-*; do
+              info="$(go version -m "$bin")"
+              case "$info" in
+                "$bin: $want"$'\n'*) ;;
+                *) echo "$bin was built with another Go than $want"; printf '%s\n' "$info"; exit 1 ;;
+              esac
+              case "$info" in
+                *"${tab}build${tab}vcs.modified=false"*) ;;
+                *) echo "$bin was built from a modified checkout"; printf '%s\n' "$info"; exit 1 ;;
+              esac
+              if [ "$GITHUB_REF" != "${GITHUB_REF#refs/tags/}" ]; then
+                case "$info" in
+                  *"${tab}mod${tab}github.com/karloscodes/chasen${tab}${GITHUB_REF_NAME}${tab}"*) ;;
+                  *) echo "$bin is not the module version $GITHUB_REF_NAME"; printf '%s\n' "$info"; exit 1 ;;
+                esac
+              fi
+            done
+          )
+          test -z "$(git status --porcelain)"
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/dist/* --title "$GITHUB_REF_NAME" --generate-notes
