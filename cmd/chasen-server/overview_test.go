@@ -7,21 +7,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 )
 
 func TestOverviewMap(t *testing.T) {
 	t.Run("gives each app its domains, its jobs, and where its data goes", func(t *testing.T) {
 		t.Setenv("CHASEN_ROOT", t.TempDir())
-		saveApp("shop", matcha.AppConfig{Image: "chasen.invalid/shop:abc1234", Domain: "shop.com,www.shop.com"})
+		saveApp("shop", engine.AppConfig{Image: "chasen.invalid/shop:abc1234", Domain: "shop.com,www.shop.com"})
 		saveSettings("shop", protocol.Settings{Jobs: "bin/jobs"})
 		newest := filepath.Join(backupsDir("shop"), "20261020T120000Z", "data")
 		os.MkdirAll(newest, 0755)
 		os.WriteFile(filepath.Join(newest, "db.sqlite3.gz"), []byte("x"), 0644)
 		os.WriteFile(filepath.Join(newest, "queue.sqlite3.gz"), []byte("x"), 0644)
 		os.MkdirAll(filepath.Join(backupsDir("shop"), "20261020T110000Z"), 0755)
-		saveApp("blog", matcha.AppConfig{Image: "chasen.invalid/blog:1", Domain: "blog.example.com"})
+		saveApp("blog", engine.AppConfig{Image: "chasen.invalid/blog:1", Domain: "blog.example.com"})
 		saveSettings("blog", protocol.Settings{NoBackup: true})
 
 		rows, err := overview()

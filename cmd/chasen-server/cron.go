@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 )
 
 // The cron jobs of the apps: `cron:` in chasen.yml, which travels in the
@@ -102,7 +102,7 @@ func dueCron(now time.Time) (due []cronJob, from, to time.Time) {
 		log.Print("cron: ", err)
 		return nil, from, now
 	}
-	for _, name := range matcha.ListAppsSorted(apps) {
+	for _, name := range engine.ListAppsSorted(apps) {
 		settings, err := loadSettings(name)
 		if err != nil {
 			continue

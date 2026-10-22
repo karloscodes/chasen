@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/karloscodes/matcha"
+	"github.com/karloscodes/chasen/internal/engine"
 )
 
 // serverAdopt moves an app that matcha runs on this server to Chasen, or back.
@@ -24,7 +24,7 @@ import (
 // record, with the health check and the swap that matcha did.
 func serverAdopt(args []string) error {
 	flags := flag.NewFlagSet("adopt", flag.ContinueOnError)
-	from := flags.String("from", matcha.ConfigPath(), "the config file of matcha")
+	from := flags.String("from", engine.ConfigPath(), "the config file of matcha")
 	undo := flags.Bool("undo", false, "give the app back to matcha")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -44,20 +44,20 @@ func serverAdopt(args []string) error {
 	}
 
 	// The record moves from the file of matcha to the database of Chasen, or back.
-	var app matcha.AppConfig
+	var app engine.AppConfig
 	var err error
 	if *undo {
 		if app, err = loadApp(name); err != nil {
 			return fmt.Errorf("Chasen has no app %q", name)
 		}
-		if _, err := matcha.LoadAppFrom(*from, name); err == nil {
+		if _, err := engine.LoadAppFrom(*from, name); err == nil {
 			return fmt.Errorf("matcha has the app %q already: %s. Nothing changed", name, *from)
 		}
 		if isBuilt(name, app.Image) {
 			return fmt.Errorf("%s runs an image that Chasen made for it (%s). matcha cannot get that image again, so the app stays", name, app.Image)
 		}
 	} else {
-		if app, err = matcha.LoadAppFrom(*from, name); err != nil {
+		if app, err = engine.LoadAppFrom(*from, name); err != nil {
 			return fmt.Errorf("matcha has no app %q in %s", name, *from)
 		}
 		if _, err := loadApp(name); err == nil {
@@ -76,19 +76,19 @@ func serverAdopt(args []string) error {
 		}
 	}
 	if *undo {
-		if err := matcha.SaveAppTo(*from, name, app); err != nil {
+		if err := engine.SaveAppTo(*from, name, app); err != nil {
 			return err
 		}
 		if err := forgetApp(name); err != nil {
 			// The app is in both places now. Take it out of the new one: one owner.
-			matcha.RemoveAppFrom(*from, name)
+			engine.RemoveAppFrom(*from, name)
 			return fmt.Errorf("cannot take %s out of Chasen, so nothing changed: %w", name, err)
 		}
 	} else {
 		if err := saveApp(name, app); err != nil {
 			return err
 		}
-		if err := matcha.RemoveAppFrom(*from, name); err != nil {
+		if err := engine.RemoveAppFrom(*from, name); err != nil {
 			forgetApp(name)
 			return fmt.Errorf("cannot take %s out of %s, so nothing changed: %w", name, *from, err)
 		}

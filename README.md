@@ -2,7 +2,7 @@
 
 Enter your app. Run `chasen deploy`. It is live.
 
-A chasen is the bamboo whisk that prepares matcha. Chasen is the tool you hold; [matcha](https://github.com/karloscodes/matcha) is the engine underneath.
+A chasen is the bamboo whisk that prepares matcha.
 
 Chasen deploys the Docker image of an app with a SQLite database to one server. You get HTTPS, deploys without downtime, custom domains, and backups you can trust. `chasen deploy` builds the image on your computer or in CI and sends it to the server through SSH: no registry, no token, nothing builds on the server. There is no YAML pipeline of ours, and the server needs no name in DNS.
 

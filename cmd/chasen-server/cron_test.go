@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 )
 
 func TestDueCron(t *testing.T) {
@@ -18,7 +18,7 @@ func TestDueCron(t *testing.T) {
 	}
 	server := func(t *testing.T) {
 		t.Setenv("CHASEN_ROOT", t.TempDir())
-		if err := saveApp("shop", matcha.AppConfig{Image: "chasen.invalid/shop:1"}); err != nil {
+		if err := saveApp("shop", engine.AppConfig{Image: "chasen.invalid/shop:1"}); err != nil {
 			t.Fatal(err)
 		}
 		if err := saveSettings("shop", protocol.Settings{Cron: []protocol.CronJob{

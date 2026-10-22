@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/karloscodes/matcha"
+	"github.com/karloscodes/chasen/internal/engine"
 )
 
 func TestReplicaBehind(t *testing.T) {
@@ -86,7 +86,7 @@ func TestVerify(t *testing.T) {
 		if err := saveServerConfig(serverConfig{Domain: "example.com", Token: "token"}); err != nil {
 			t.Fatal(err)
 		}
-		saveApp("shop", matcha.AppConfig{Image: "chasen.invalid/shop:1", Domain: "shop.example.com"})
+		saveApp("shop", engine.AppConfig{Image: "chasen.invalid/shop:1", Domain: "shop.example.com"})
 		db = filepath.Join(dataDir("shop"), "db.sqlite3")
 		os.MkdirAll(dataDir("shop"), 0755)
 		query(t, db, "CREATE TABLE orders (name); INSERT INTO orders VALUES ('one')")

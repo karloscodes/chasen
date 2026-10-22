@@ -20,8 +20,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
@@ -168,7 +168,7 @@ func runServer(args []string) error {
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stdout
 			return cmd.Run()
 		}
-		return engine(name).Logs()
+		return engineFor(name).Logs()
 	case "backup":
 		cfg, err := loadServerConfig()
 		if err != nil {
@@ -491,8 +491,8 @@ func serverBucket(args []string) error {
 // engine returns the matcha deployer for an app. Chasen keeps its apps in its
 // own database, so the nightly `matcha update-all` does not touch them. The
 // proxy and the network are the same as matcha uses.
-func engine(name string) *matcha.Matcha {
-	return matcha.New(matcha.Config{
+func engineFor(name string) *engine.Engine {
+	return engine.New(engine.Config{
 		Name:        name,
 		DataDirBase: root() + "/var/matcha",
 		ProxyImage:  proxyImage, // when a deploy finds no proxy, it starts this one
@@ -538,7 +538,7 @@ func serverSetup(args []string) error {
 		return fmt.Errorf("invalid base domain %q: use a name like example.com", cfg.Domain)
 	}
 
-	// matcha.Setup restarts the proxy, so run it only when the proxy is down.
+	// engine.Setup restarts the proxy, so run it only when the proxy is down.
 	// With CHASEN_ROOT, the first deploy starts the proxy under that root instead.
 	// Each step says so when it starts, on stderr: the CLI shows these lines
 	// while it sets up a server through SSH.
@@ -550,7 +550,7 @@ func serverSetup(args []string) error {
 			fmt.Fprintln(os.Stderr, "Installing Docker. This takes a minute or two.")
 		}
 		fmt.Fprintln(os.Stderr, "Starting the proxy.")
-		if err := matcha.Setup(); err != nil {
+		if err := engine.Setup(); err != nil {
 			return err
 		}
 		// matcha starts the proxy from its own default image: the version of
@@ -562,7 +562,7 @@ func serverSetup(args []string) error {
 
 	if cfg.Token == "" {
 		var err error
-		if cfg.Token, err = matcha.GeneratePrivateKey(); err != nil {
+		if cfg.Token, err = engine.GeneratePrivateKey(); err != nil {
 			return err
 		}
 	}
@@ -862,7 +862,7 @@ func serverDeploy(name, version string) error {
 	// The key that the deploy brings, then the key the app has, then a new one.
 	privateKey := cmp.Or(settings.SecretKey(), old.Env["PRIVATE_KEY"])
 	if privateKey == "" {
-		if privateKey, err = matcha.GeneratePrivateKey(); err != nil {
+		if privateKey, err = engine.GeneratePrivateKey(); err != nil {
 			return err
 		}
 	}
@@ -877,7 +877,7 @@ func serverDeploy(name, version string) error {
 		return err
 	}
 
-	app := matcha.AppConfig{
+	app := engine.AppConfig{
 		Image:         image,
 		Domain:        strings.Join(domains, ","),
 		Port:          sh.Port,
@@ -1074,18 +1074,18 @@ func chooseRollback(kept []keptVersion, current, want string) (string, error) {
 // apply saves the app and deploys it, with its jobs container: one unit (see
 // jobs.go). When the deploy fails, the previous version keeps the traffic and
 // its jobs, and apply puts the previous record back.
-func apply(name string, app matcha.AppConfig) error {
+func apply(name string, app engine.AppConfig) error {
 	old, oldErr := loadApp(name)
 	if err := saveApp(name, app); err != nil {
 		return err
 	}
-	if err := engine(name).DeployApp(app); err != nil {
+	if err := engineFor(name).DeployApp(app); err != nil {
 		if oldErr == nil {
 			saveApp(name, old)
 		} else {
 			forgetApp(name)
 		}
-		var failed *matcha.UnhealthyError
+		var failed *engine.UnhealthyError
 		if errors.As(err, &failed) {
 			return errors.New(unhealthyReport(app, failed))
 		}
@@ -1094,7 +1094,7 @@ func apply(name string, app matcha.AppConfig) error {
 	settings, _ := loadSettings(name)
 	if err := swapJobs(name, settings.Jobs); err != nil {
 		// The web and the jobs are one unit: the web goes back too.
-		m := engine(name)
+		m := engineFor(name)
 		if oldErr != nil {
 			m.RemoveFromProxy()
 			m.StopApp()
@@ -1113,7 +1113,7 @@ func apply(name string, app matcha.AppConfig) error {
 // unhealthyReport says why a new version did not get the traffic, from what
 // its container left before the engine removed it: how it ended, the ports it
 // listened on, and its last lines.
-func unhealthyReport(app matcha.AppConfig, failed *matcha.UnhealthyError) string {
+func unhealthyReport(app engine.AppConfig, failed *engine.UnhealthyError) string {
 	var report strings.Builder
 	timeout := cmp.Or(app.HealthTimeout, protocol.DefaultHealthTimeout)
 	fmt.Fprintf(&report, "The new version did not answer 200 on %s at port %d within %d seconds. The old version keeps the traffic.\n", app.HealthPath, app.Port, timeout)
@@ -1281,7 +1281,7 @@ func serverEnable(name string, args []string) error {
 		return fmt.Errorf("this server has no base domain, so it cannot name the addon. Give it its domain: chasen enable %s %s.example.com", name, name)
 	}
 	if privateKey == "" {
-		if privateKey, err = matcha.GeneratePrivateKey(); err != nil {
+		if privateKey, err = engine.GeneratePrivateKey(); err != nil {
 			return err
 		}
 	}
@@ -1294,7 +1294,7 @@ func serverEnable(name string, args []string) error {
 		return err
 	}
 
-	app := matcha.AppConfig{
+	app := engine.AppConfig{
 		Image:      product.Image,
 		Domain:     domain,
 		Port:       protocol.DefaultPort,
@@ -1459,7 +1459,7 @@ func serverList() error {
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "NAME\tVERSION\tDOMAINS")
-	for _, name := range matcha.ListAppsSorted(apps) {
+	for _, name := range engine.ListAppsSorted(apps) {
 		_, version, _ := strings.Cut(apps[name].Image, ":")
 		fmt.Fprintf(w, "%s\t%s\t%s\n", name, version, strings.ReplaceAll(apps[name].Domain, ",", " "))
 	}
@@ -1470,7 +1470,7 @@ func serverRemove(name string) error {
 	if _, err := loadApp(name); err != nil {
 		return err
 	}
-	m := engine(name)
+	m := engineFor(name)
 	if err := m.RemoveFromProxy(); err != nil {
 		fmt.Printf("Warning: %v\n", err)
 	}

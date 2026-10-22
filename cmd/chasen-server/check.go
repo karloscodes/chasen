@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/karloscodes/matcha"
+	"github.com/karloscodes/chasen/internal/engine"
 )
 
 // engineEnv is the env that the engine adds to every container at a deploy,
@@ -85,7 +85,7 @@ func serverCheck(name, version string) error {
 	defer os.RemoveAll(appDir(scratch))
 	defer docker("rm", "-f", container)
 
-	privateKey, err := matcha.GeneratePrivateKey()
+	privateKey, err := engine.GeneratePrivateKey()
 	if err != nil {
 		return err
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/karloscodes/matcha"
+	"github.com/karloscodes/chasen/internal/engine"
 )
 
 // host makes a fake host for the alerts: the files of /etc and /run that
@@ -109,7 +109,7 @@ func TestAlertsOfTheAPI(t *testing.T) {
 
 func TestAlertsOfTheBackups(t *testing.T) {
 	t.Setenv("CHASEN_ROOT", t.TempDir())
-	saveApp("shop", matcha.AppConfig{Image: "chasen.invalid/shop:1", Domain: "shop.localhost"})
+	saveApp("shop", engine.AppConfig{Image: "chasen.invalid/shop:1", Domain: "shop.localhost"})
 	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 	os.MkdirAll(filepath.Join(backupsDir("shop"), now.Add(-5*time.Hour).Format(stampLayout)), 0755)
 

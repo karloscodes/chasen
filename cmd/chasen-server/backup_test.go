@@ -2,8 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 	"os"
 	"path/filepath"
 	"slices"
@@ -192,7 +192,7 @@ func TestAppWithNoBackup(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, name := range []string{"shop", "demo"} {
-			saveApp(name, matcha.AppConfig{Image: "chasen.invalid/" + name + ":1", Domain: name + ".example.com"})
+			saveApp(name, engine.AppConfig{Image: "chasen.invalid/" + name + ":1", Domain: name + ".example.com"})
 			os.MkdirAll(dataDir(name), 0755)
 			query(t, filepath.Join(dataDir(name), "db.sqlite3"), "CREATE TABLE rows (name); INSERT INTO rows VALUES ('one')")
 		}

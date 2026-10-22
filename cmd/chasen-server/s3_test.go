@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 	"os"
 	"path/filepath"
 	"testing"
@@ -83,7 +83,7 @@ func TestOffsiteBackup(t *testing.T) {
 		if err := saveServerConfig(cfg); err != nil {
 			t.Fatal(err)
 		}
-		saveApp("demo", matcha.AppConfig{Image: "chasen.invalid/demo:1", Domain: "demo.example.com"})
+		saveApp("demo", engine.AppConfig{Image: "chasen.invalid/demo:1", Domain: "demo.example.com"})
 		saveSettings("demo", protocol.Settings{NoBackup: true})
 		file := filepath.Join(t.TempDir(), "file")
 		os.WriteFile(file, []byte("x"), 0600)

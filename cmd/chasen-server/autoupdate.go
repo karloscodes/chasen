@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 )
 
 // Auto-update: an app deployed with --auto-update gets the newest image of
@@ -80,7 +80,7 @@ func serverAutoUpdate(args []string) error {
 	if err != nil {
 		return err
 	}
-	names := matcha.ListAppsSorted(apps)
+	names := engine.ListAppsSorted(apps)
 	if len(args) == 1 {
 		if err := checkAppName(args[0]); err != nil {
 			return err

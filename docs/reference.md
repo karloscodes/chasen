@@ -91,7 +91,7 @@ You get a shell in the container that has the traffic, with the env, the secrets
 
 ## Coming from matcha
 
-A server that runs its apps with matcha can move to Chasen one app at a time, with no downtime and no copy of data. Chasen is built on matcha: it uses the same proxy, the same names for containers, and the same directories for the data. So the app does not move. Only its record does.
+A server that runs its apps with matcha can move to Chasen one app at a time, with no downtime and no copy of data. Chasen began as matcha: it uses the same proxy, the same names for containers, and the same directories for the data. So the app does not move. Only its record does.
 
 ```bash
 curl -fsSL https://chasenhq.com/server | sudo sh

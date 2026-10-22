@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/karloscodes/matcha"
+	"github.com/karloscodes/chasen/internal/engine"
 	_ "modernc.org/sqlite"
 )
 
@@ -370,7 +370,7 @@ func backupAll() error {
 	}
 
 	var failed []string
-	for _, name := range matcha.ListAppsSorted(apps) {
+	for _, name := range engine.ListAppsSorted(apps) {
 		if !backedUp(name) {
 			// No new backups. What it has from before must not stay forever.
 			if err := forgetBackups(name, cfg); err != nil {
@@ -591,7 +591,7 @@ func serverRestore(name, source string) error {
 		return err
 	}
 
-	m := engine(name)
+	m := engineFor(name)
 	if err := pauseReplica(); err != nil {
 		return err
 	}

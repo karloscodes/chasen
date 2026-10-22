@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/oauth"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 )
 
 // The API (see the protocol package). A request needs the token of the server, or
@@ -132,7 +132,7 @@ func serverServe() error {
 			return "owner", isOwner(cfg, key)
 		},
 		Issue: func(string) (string, error) {
-			token, err := matcha.GeneratePrivateKey()
+			token, err := engine.GeneratePrivateKey()
 			if err != nil {
 				return "", err
 			}

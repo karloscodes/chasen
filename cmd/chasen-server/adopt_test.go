@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/karloscodes/matcha"
+	"github.com/karloscodes/chasen/internal/engine"
 )
 
 // An app that matcha runs, in a real container. It needs Docker, so it runs
@@ -34,12 +34,12 @@ func TestAdopt(t *testing.T) {
 			t.Fatal(err)
 		}
 		matchaConfig = filepath.Join(t.TempDir(), "config.yml")
-		app := matcha.AppConfig{Image: "busybox:latest", Domain: "shop.example.org", Port: 8080, HealthPath: "/_health",
+		app := engine.AppConfig{Image: "busybox:latest", Domain: "shop.example.org", Port: 8080, HealthPath: "/_health",
 			Volumes: []string{"/app/storage"}, Env: map[string]string{"PRIVATE_KEY": "the-key-of-the-app"}}
-		if err := matcha.SaveAppTo(matchaConfig, name, app); err != nil {
+		if err := engine.SaveAppTo(matchaConfig, name, app); err != nil {
 			t.Fatal(err)
 		}
-		if err := matcha.SaveAppTo(matchaConfig, "other", matcha.AppConfig{Image: "busybox:latest", Domain: "other.example.org"}); err != nil {
+		if err := engine.SaveAppTo(matchaConfig, "other", engine.AppConfig{Image: "busybox:latest", Domain: "other.example.org"}); err != nil {
 			t.Fatal(err)
 		}
 		return matchaConfig
@@ -58,10 +58,10 @@ func TestAdopt(t *testing.T) {
 		if err != nil || app.Domain != "shop.example.org" || app.Env["PRIVATE_KEY"] != "the-key-of-the-app" || app.HealthPath != "/_health" || app.Image != "busybox:latest" {
 			t.Errorf("Chasen has %+v (%v), want the record of matcha as it was", app, err)
 		}
-		if _, err := matcha.LoadAppFrom(config, name); err == nil {
+		if _, err := engine.LoadAppFrom(config, name); err == nil {
 			t.Error("matcha still has the app: two tools would run it")
 		}
-		if _, err := matcha.LoadAppFrom(config, "other"); err != nil {
+		if _, err := engine.LoadAppFrom(config, "other"); err != nil {
 			t.Error("the other app of matcha is gone")
 		}
 		if started() != before {
@@ -83,7 +83,7 @@ func TestAdopt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if app, err := matcha.LoadAppFrom(config, name); err != nil || app.Env["PRIVATE_KEY"] != "the-key-of-the-app" {
+		if app, err := engine.LoadAppFrom(config, name); err != nil || app.Env["PRIVATE_KEY"] != "the-key-of-the-app" {
 			t.Errorf("matcha has %+v (%v), want the record back", app, err)
 		}
 		if _, err := loadApp(name); err == nil {
@@ -109,7 +109,7 @@ func TestAdopt(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "does not run") {
 			t.Fatalf("got %v", err)
 		}
-		if _, err := matcha.LoadAppFrom(config, "other"); err != nil {
+		if _, err := engine.LoadAppFrom(config, "other"); err != nil {
 			t.Error("matcha lost the app")
 		}
 	})

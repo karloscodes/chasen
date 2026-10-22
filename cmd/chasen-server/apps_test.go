@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/karloscodes/matcha"
+	"github.com/karloscodes/chasen/internal/engine"
 )
 
 func TestApps(t *testing.T) {
-	shop := matcha.AppConfig{
+	shop := engine.AppConfig{
 		Image: "chasen.invalid/shop:abc1234", Domain: "shop.example.com,www.example.com", Port: 3000,
 		HealthPath: "/up", HealthTimeout: 60, Volumes: []string{"/app/storage", "/app/logs"},
 		Env: map[string]string{"PRIVATE_KEY": "the-key-of-the-shop", "PORT": "3000"},
@@ -37,7 +37,7 @@ func TestApps(t *testing.T) {
 	t.Run("an app that is forgotten is not deployed", func(t *testing.T) {
 		t.Setenv("CHASEN_ROOT", t.TempDir())
 		saveApp("shop", shop)
-		saveApp("blog", matcha.AppConfig{Image: "chasen.invalid/blog:1"})
+		saveApp("blog", engine.AppConfig{Image: "chasen.invalid/blog:1"})
 
 		err := forgetApp("shop")
 
@@ -55,13 +55,13 @@ func TestApps(t *testing.T) {
 
 // A server from before kept its apps in apps.yml.
 func TestAppsFromBefore(t *testing.T) {
-	shop := matcha.AppConfig{Image: "chasen.invalid/shop:1", Domain: "shop.example.com", Port: 8080, HealthPath: "/up",
+	shop := engine.AppConfig{Image: "chasen.invalid/shop:1", Domain: "shop.example.com", Port: 8080, HealthPath: "/up",
 		Volumes: []string{"/app/storage"}, Env: map[string]string{"PRIVATE_KEY": "the-key-of-the-shop"}}
 	serverFromBefore := func(t *testing.T) {
 		t.Helper()
 		t.Setenv("CHASEN_ROOT", t.TempDir())
 		os.MkdirAll(filepath.Dir(appsPath()), 0755)
-		if err := matcha.SaveAppTo(appsPath(), "shop", shop); err != nil {
+		if err := engine.SaveAppTo(appsPath(), "shop", shop); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -86,7 +86,7 @@ func TestAppsFromBefore(t *testing.T) {
 		newer := shop
 		newer.Image = "chasen.invalid/shop:2"
 		saveApp("shop", newer)
-		saveApp("blog", matcha.AppConfig{Image: "chasen.invalid/blog:1"})
+		saveApp("blog", engine.AppConfig{Image: "chasen.invalid/blog:1"})
 
 		err := forgetApp("blog")
 
@@ -104,7 +104,7 @@ func TestAppsFromBefore(t *testing.T) {
 		// An update failed and the previous version came back. It deploys.
 		deployed := shop
 		deployed.Image = "chasen.invalid/shop:2"
-		matcha.SaveAppTo(appsPath(), "shop", deployed)
+		engine.SaveAppTo(appsPath(), "shop", deployed)
 		later := time.Now().Add(time.Minute)
 		os.Chtimes(appsPath(), later, later)
 

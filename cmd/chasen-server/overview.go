@@ -11,8 +11,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/karloscodes/chasen/internal/engine"
 	"github.com/karloscodes/chasen/protocol"
-	"github.com/karloscodes/matcha"
 )
 
 // The overview is what a glance needs, for each app of the server, in one
@@ -91,7 +91,7 @@ func overview() ([]overviewApp, error) {
 	}
 	live := replicaPID() != 0
 	var rows []overviewApp
-	for _, name := range matcha.ListAppsSorted(apps) {
+	for _, name := range engine.ListAppsSorted(apps) {
 		c := all.of(name)
 		_, version, _ := strings.Cut(apps[name].Image, ":")
 		r := overviewApp{App: name, State: c.Status, Version: version, Up: c.State == "running" && !strings.Contains(c.Status, "unhealthy")}

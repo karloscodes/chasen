@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/karloscodes/matcha"
+	"github.com/karloscodes/chasen/internal/engine"
 )
 
 // serverConnect joins the input and the output of this command to the API of
@@ -45,7 +45,7 @@ func serverLogin() error {
 	if _, err := loadServerConfig(); err != nil {
 		return err
 	}
-	token, err := matcha.GeneratePrivateKey()
+	token, err := engine.GeneratePrivateKey()
 	if err != nil {
 		return err
 	}
