@@ -41,17 +41,19 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # Nothing restored. The job that publishes keeps no module cache
+      # and no build cache.
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          cache: false
       - name: Build
         env:
           CGO_ENABLED: "0"
         run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           flags="-s -w -X main.version=$GITHUB_REF_NAME"
-          # Outside the checkout. v0.12.6 wrote the binaries into dist/ here,
-          # so the first one was clean and every later one was stamped
-          # vcs.modified, with the module version v0.12.6+dirty.
+          # Outside the checkout. An untracked file in it makes the build +dirty.
           out="${RUNNER_TEMP}/dist"
           mkdir -p "$out"
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
@@ -88,4 +90,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/dist/* --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --generate-notes "$RUNNER_TEMP"/dist/*
