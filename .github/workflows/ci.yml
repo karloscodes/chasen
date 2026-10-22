@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      # gosec v2.29.0 pins a golang.org/x/tools too old to read Go 1.27.3
+      # gosec v2.29.0 pins a golang.org/x/tools too old to read Go 1.27
       # packages, so it is built with x/tools v0.52.0.
       - name: Build gosec
         run: |

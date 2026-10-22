@@ -19,7 +19,7 @@ An app that follows the standard, in a repository on GitHub, deploys with no con
 | 9 | It logs to stdout and stderr | | none |
 | 10 | It stops within 10 seconds of `SIGTERM` | | none |
 
-A directory with an `index.html` and no `Dockerfile` is a static website. It needs no image and no registry: Chasen copies its files into a Caddy image that follows all ten rules. The image is the one this release names. This is the only image that a server makes.
+A directory with an `index.html` and no `Dockerfile` is a static website. It needs no image and no registry: Chasen copies its files into a Caddy image that follows all ten rules. This is the only image that a server makes.
 
 ## The Dockerfile is the contract
 
