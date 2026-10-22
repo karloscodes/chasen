@@ -62,6 +62,9 @@ jobs:
           for arch in amd64 arm64; do
             GOOS=linux GOARCH=$arch go build -ldflags "$flags" -o "$out/chasen-server-linux-$arch" ./cmd/chasen-server
           done
+          # The module path comes from the checkout. The stamp check runs
+          # beside the binaries, which are outside it.
+          mod="$(go list -m)"
           (
             cd "$out"
             sha256sum chasen-* > checksums.txt
@@ -77,12 +80,15 @@ jobs:
                 *"${tab}build${tab}vcs.modified=false"*) ;;
                 *) echo "$bin was built from a modified checkout"; printf '%s\n' "$info"; exit 1 ;;
               esac
-              if [ "$GITHUB_REF" != "${GITHUB_REF#refs/tags/}" ]; then
-                case "$info" in
-                  *"${tab}mod${tab}github.com/karloscodes/chasen${tab}${GITHUB_REF_NAME}${tab}"*) ;;
-                  *) echo "$bin is not the module version $GITHUB_REF_NAME"; printf '%s\n' "$info"; exit 1 ;;
-                esac
-              fi
+              # A release tag is v*. Another tag is not a module version.
+              case "$GITHUB_REF" in
+                refs/tags/v*)
+                  case "$info" in
+                    *"${tab}mod${tab}${mod}${tab}${GITHUB_REF_NAME}${tab}"*) ;;
+                    *) echo "$bin is not the module version $GITHUB_REF_NAME"; printf '%s\n' "$info"; exit 1 ;;
+                  esac
+                  ;;
+              esac
             done
           )
       # workflow_dispatch can be started from a branch. A release is a tag.
