@@ -675,8 +675,11 @@ var versionRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$`)
 // A static website follows the standard like an app: Caddy listens on $PORT
 // and answers /up. This is the only image that a server makes, and the server
 // owns its Dockerfile: the client sends the files and nothing else.
+//
+// The base image pins the Caddy release. caddy:2-alpine follows every
+// Caddy 2 release, so a later website build could get an untested Caddy.
 const (
-	websiteDockerfile = "FROM caddy:2-alpine\nCOPY Caddyfile /etc/caddy/Caddyfile\nADD site.tar.gz /srv\n"
+	websiteDockerfile = "FROM caddy:2.11.7-alpine\nCOPY Caddyfile /etc/caddy/Caddyfile\nADD site.tar.gz /srv\n"
 	websiteCaddyfile  = `{
 	admin off
 	auto_https off

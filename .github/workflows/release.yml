@@ -41,23 +41,61 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # Nothing restored. The job that publishes keeps no module cache
+      # and no build cache.
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          cache: false
       - name: Build
         env:
           CGO_ENABLED: "0"
         run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           flags="-s -w -X main.version=$GITHUB_REF_NAME"
-          mkdir dist
+          # Outside the checkout. An untracked file in it makes the build +dirty.
+          out="${RUNNER_TEMP}/dist"
+          mkdir -p "$out"
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
-            GOOS=${target%/*} GOARCH=${target#*/} go build -ldflags "$flags" -o dist/chasen-${target%/*}-${target#*/} ./cmd/chasen
+            GOOS=${target%/*} GOARCH=${target#*/} go build -ldflags "$flags" -o "$out/chasen-${target%/*}-${target#*/}" ./cmd/chasen
           done
           for arch in amd64 arm64; do
-            GOOS=linux GOARCH=$arch go build -ldflags "$flags" -o dist/chasen-server-linux-$arch ./cmd/chasen-server
+            GOOS=linux GOARCH=$arch go build -ldflags "$flags" -o "$out/chasen-server-linux-$arch" ./cmd/chasen-server
           done
-          cd dist && sha256sum chasen-* > checksums.txt
+          # The module path comes from the checkout. The stamp check runs
+          # beside the binaries, which are outside it.
+          mod="$(go list -m)"
+          (
+            cd "$out"
+            sha256sum chasen-* > checksums.txt
+            want="go$(awk '/^go / { print $2; exit }' "$GITHUB_WORKSPACE/go.mod")"
+            tab="$(printf '\t')"
+            for bin in chasen-*; do
+              info="$(go version -m "$bin")"
+              case "$info" in
+                "$bin: $want"$'\n'*) ;;
+                *) echo "$bin was built with another Go than $want"; printf '%s\n' "$info"; exit 1 ;;
+              esac
+              case "$info" in
+                *"${tab}build${tab}vcs.modified=false"*) ;;
+                *) echo "$bin was built from a modified checkout"; printf '%s\n' "$info"; exit 1 ;;
+              esac
+              # A release tag is v*. Another tag is not a module version.
+              case "$GITHUB_REF" in
+                refs/tags/v*)
+                  case "$info" in
+                    *"${tab}mod${tab}${mod}${tab}${GITHUB_REF_NAME}${tab}"*) ;;
+                    *) echo "$bin is not the module version $GITHUB_REF_NAME"; printf '%s\n' "$info"; exit 1 ;;
+                  esac
+                  ;;
+              esac
+            done
+          )
+      # workflow_dispatch can be started from a branch or from a tag that
+      # is not v*. The module-version check runs only for refs/tags/v*,
+      # so publish does too: a non-v tag cannot become a release.
       - name: Publish
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --generate-notes "$RUNNER_TEMP"/dist/*
