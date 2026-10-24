@@ -1119,8 +1119,11 @@ func TestEndToEnd(t *testing.T) {
 		if out, _ := docker("ps", "-aq", "--filter", "name=^lognorth(-next)?$"); out != "" {
 			t.Skip("a lognorth container exists on this machine. The test does not touch it")
 		}
-		must(app, bin, "enable", "lognorth")
+		out := must(app, bin, "enable", "lognorth")
 
+		if !strings.Contains(out, "How to use it: https://lognorth.com/docs/") {
+			t.Errorf("enable = %q, want the link to the docs of lognorth", out)
+		}
 		req, _ := http.NewRequest("GET", "http://127.0.0.1/_health", nil)
 		req.Host = "lognorth.localhost"
 		resp, err := http.DefaultClient.Do(req)

@@ -1297,12 +1297,13 @@ type addon struct {
 	Health  string
 	Volumes []string
 	About   string
+	Docs    string // the docs of the product: how to use it once it runs
 }
 
 var addons = map[string]addon{
-	"fusionaly":  {"karloscodes/fusionaly:latest", "/_health", []string{"/app/storage", "/app/logs"}, "privacy-first web analytics"},
-	"formlander": {"karloscodes/formlander:latest", "/_health", []string{"/app/storage", "/app/logs"}, "form backend for static sites"},
-	"lognorth":   {"karloscodes/lognorth:latest", "/_health", []string{"/app/storage"}, "logs, errors, alerts, and uptime"},
+	"fusionaly":  {"karloscodes/fusionaly:latest", "/_health", []string{"/app/storage", "/app/logs"}, "privacy-first web analytics", "https://fusionaly.com/docs/"},
+	"formlander": {"karloscodes/formlander:latest", "/_health", []string{"/app/storage", "/app/logs"}, "form backend for static sites", "https://formlander.com/docs/"},
+	"lognorth":   {"karloscodes/lognorth:latest", "/_health", []string{"/app/storage"}, "logs, errors, alerts, and uptime", "https://lognorth.com/docs/"},
 }
 
 // isBuilt reports an app that Chasen built from source on this server.
@@ -1369,6 +1370,9 @@ func serverEnable(name string, args []string) error {
 		return err
 	}
 	fmt.Printf("\nEnabled %s\n  %s\n", name, link(domain))
+	// Not indented like the address above: the CLI checks the lines with
+	// two spaces and an address, and the docs are not the app.
+	fmt.Printf("How to use it: %s\n", product.Docs)
 	return nil
 }
 

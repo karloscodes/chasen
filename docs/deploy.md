@@ -148,13 +148,13 @@ chasen -a lognorth status                 # -a names the app: an addon has no di
 chasen -a lognorth logs
 ```
 
-| Addon | What it is |
-|---|---|
-| `fusionaly` | Privacy-first web analytics |
-| `formlander` | Form backend for static sites |
-| `lognorth` | Logs, errors, alerts, and uptime |
+| Addon | What it is | Its docs |
+|---|---|---|
+| `fusionaly` | Privacy-first web analytics | [fusionaly.com/docs](https://fusionaly.com/docs/) |
+| `formlander` | Form backend for static sites | [formlander.com/docs](https://formlander.com/docs/) |
+| `lognorth` | Logs, errors, alerts, and uptime | [lognorth.com/docs](https://lognorth.com/docs/) |
 
-Run `chasen enable <addon>` again to update it to the newest image. An addon has one domain. Any other product that ships as an image deploys with one line: see [An image that another repository releases](#an-image-that-another-repository-releases).
+`chasen enable` ends with the link to the docs of the addon. Run `chasen enable <addon>` again to update it to the newest image. An addon has one domain. Any other product that ships as an image deploys with one line: see [An image that another repository releases](#an-image-that-another-repository-releases).
 
 ## History
 
