@@ -1,5 +1,7 @@
 # Chasen
 
+[![CI](https://github.com/karloscodes/chasen/actions/workflows/ci.yml/badge.svg)](https://github.com/karloscodes/chasen/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/karloscodes/chasen)](https://github.com/karloscodes/chasen/releases/latest) [![License](https://img.shields.io/github/license/karloscodes/chasen)](LICENSE)
+
 Enter your app. Run `chasen deploy`. It is live.
 
 A chasen is the bamboo whisk that prepares matcha.
@@ -115,4 +117,4 @@ Report a problem with `chasen report`. Pull requests are small, pass all the tes
 
 ## License
 
-[Apache 2.0](LICENSE)
+Apache 2.0. See [LICENSE](LICENSE).
