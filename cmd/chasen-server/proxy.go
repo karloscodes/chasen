@@ -231,7 +231,14 @@ func proxyAlerts() []alert {
 		State  struct{ Running bool }
 	}
 	if err := dockerAPI("GET", "/containers/"+proxyContainer+"/json", nil, &proxy); err != nil || !proxy.State.Running {
-		if apps, _ := listApps(); len(apps) == 0 {
+		public := 0 // a private app does not need the proxy
+		apps, _ := listApps()
+		for _, app := range apps {
+			if app.Listen == "" {
+				public++
+			}
+		}
+		if public == 0 {
 			return nil
 		}
 		return []alert{{"proxy", true, "the proxy does not run: no app answers on the web",

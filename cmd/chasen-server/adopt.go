@@ -56,6 +56,9 @@ func serverAdopt(args []string) error {
 		if isBuilt(name, app.Image) {
 			return fmt.Errorf("%s runs an image that Chasen made for it (%s). matcha cannot get that image again, so the app stays", name, app.Image)
 		}
+		if app.Listen != "" {
+			return fmt.Errorf("%s is private, and matcha has no private apps, so the app stays", name)
+		}
 	} else {
 		if app, err = engine.LoadAppFrom(*from, name); err != nil {
 			return fmt.Errorf("matcha has no app %q in %s", name, *from)

@@ -660,6 +660,36 @@ var ssProgram = regexp.MustCompile(`users:\(\("([^"]+)"`)
 func checkAppName(name string) error { return protocol.CheckAppName(name) }
 
 // primaryDomain is the first custom domain, or the default domain.
+// appDomains is the domains of a record: none for a private app.
+func appDomains(app engine.AppConfig) []string {
+	if app.Domain == "" {
+		return nil
+	}
+	return strings.Split(app.Domain, ",")
+}
+
+// baseURL is the address of an app for BASE_URL: https:// and its main
+// domain, or the address of a private app on the server.
+func baseURL(domains []string, listen string) string {
+	if listen != "" {
+		return "http://" + listen
+	}
+	return "https://" + primaryDomain(domains)
+}
+
+// privatePorts is the ports of the private apps of the server, but the one
+// of except: two apps cannot have one port.
+func privatePorts(except string) []int {
+	apps, _ := listApps()
+	var ports []int
+	for name, app := range apps {
+		if _, port, err := protocol.ParsePrivate(app.Listen); name != except && app.Listen != "" && err == nil {
+			ports = append(ports, port)
+		}
+	}
+	return ports
+}
+
 func primaryDomain(domains []string) string {
 	switch len(domains) {
 	case 0:
@@ -818,11 +848,15 @@ func serverDeploy(name, version string) error {
 	if link := commitLink(settings.Commit); link != "" {
 		fmt.Println("Commit: " + link)
 	}
+	// The address of a private app is a request of this deploy, not a
+	// setting that the app keeps: the record keeps where the app listens.
+	private := settings.Private
 	saved, err := loadSettings(name)
 	if err != nil {
 		return err
 	}
 	settings = mergeSettings(saved, settings)
+	settings.Private = ""
 	if err := saveSettings(name, settings); err != nil {
 		return err
 	}
@@ -847,18 +881,7 @@ func serverDeploy(name, version string) error {
 		}
 	}
 
-	old, oldErr := loadApp(name)
-	var has []string
-	if oldErr == nil {
-		has = strings.Split(old.Domain, ",")
-	}
-	domains, note, err := protocol.AppDomains(name, cfg.Domain, settings.Domain, has)
-	if err != nil {
-		return err
-	}
-	if note != "" {
-		fmt.Println(note)
-	}
+	old, _ := loadApp(name)
 	// The key that the deploy brings, then the key the app has, then a new one.
 	privateKey := cmp.Or(settings.SecretKey(), old.Env["PRIVATE_KEY"])
 	if privateKey == "" {
@@ -873,6 +896,23 @@ func serverDeploy(name, version string) error {
 	}
 	fmt.Printf("Port %d (%s). Health path %s. Storage %s.\n", sh.Port, sh.PortFrom, sh.Health, sh.Volumes[0])
 
+	listen, err := protocol.AppListen(private, settings.Domain, old.Listen, sh.Port, privatePorts(name))
+	if err != nil {
+		return err
+	}
+	var domains []string
+	if listen == "" {
+		var note string
+		if domains, note, err = protocol.AppDomains(name, cfg.Domain, settings.Domain, appDomains(old)); err != nil {
+			return err
+		}
+		if note != "" {
+			fmt.Println(note)
+		}
+	} else if private == "" {
+		fmt.Printf("%s stays private, at %s. A deploy with --domain puts it on the internet.\n", name, listen)
+	}
+
 	if err := prepareData(name, image, sh.Volumes, cfg); err != nil {
 		return err
 	}
@@ -880,11 +920,12 @@ func serverDeploy(name, version string) error {
 	app := engine.AppConfig{
 		Image:         image,
 		Domain:        strings.Join(domains, ","),
+		Listen:        listen,
 		Port:          sh.Port,
 		HealthPath:    sh.Health,
 		HealthTimeout: sh.HealthTimeout,
 		Volumes:       sh.Volumes,
-		Env:           appEnv(settings, domains, version, privateKey, sh),
+		Env:           appEnv(settings, baseURL(domains, listen), version, privateKey, sh),
 		Memory:        settings.Memory,
 	}
 	fmt.Printf("Starting %s %s\n", name, version)
@@ -897,6 +938,9 @@ func serverDeploy(name, version string) error {
 	fmt.Printf("\nDeployed %s %s\n", name, version)
 	for _, d := range domains {
 		fmt.Println("  " + link(d))
+	}
+	if listen != "" {
+		fmt.Printf("  http://%s on the server, not on the internet\n", listen)
 	}
 	return nil
 }
@@ -935,7 +979,9 @@ func serverRestart(name string) error {
 		if err != nil {
 			return err
 		}
+		private := settings.Private
 		if sent {
+			settings.Private = ""
 			// A restart sends no image, and says nothing about auto-update: both stay.
 			if saved, err := loadSettings(name); err == nil {
 				settings.Image = cmp.Or(settings.Image, saved.Image)
@@ -956,9 +1002,17 @@ func serverRestart(name string) error {
 		if err := prepareVolumes(name, app.Image, sh.Volumes); err != nil {
 			return err
 		}
+		// A new address in chasen.yml moves a private app, or makes an app
+		// private. A restart never puts an app on the internet.
+		if private != "" {
+			if app.Listen, err = protocol.AppListen(private, "", app.Listen, sh.Port, privatePorts(name)); err != nil {
+				return err
+			}
+			app.Domain = ""
+		}
 		version := app.Image[strings.LastIndex(app.Image, ":")+1:]
 		app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes, settings.Memory
-		app.Env = appEnv(settings, strings.Split(app.Domain, ","), version, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
+		app.Env = appEnv(settings, baseURL(appDomains(app), app.Listen), version, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
 	}
 	fmt.Println("Restarting", name)
 	if err := apply(name, app); err != nil {
@@ -1000,7 +1054,7 @@ func serverRollback(name, want string) error {
 	}
 	app.Image = image
 	app.Port, app.HealthPath, app.HealthTimeout, app.Volumes, app.Memory = sh.Port, sh.Health, sh.HealthTimeout, sh.Volumes, settings.Memory
-	app.Env = appEnv(settings, strings.Split(app.Domain, ","), previous, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
+	app.Env = appEnv(settings, baseURL(appDomains(app), app.Listen), previous, cmp.Or(settings.SecretKey(), app.Env["PRIVATE_KEY"]), sh)
 	fmt.Printf("Starting %s %s again, in place of %s\n", name, previous, current)
 	if err := apply(name, app); err != nil {
 		return err
@@ -1107,6 +1161,10 @@ func apply(name string, app engine.AppConfig) error {
 		}
 		return fmt.Errorf("%w\nThe version before runs again, with its jobs", err)
 	}
+	// An app that becomes private leaves the proxy.
+	if oldErr == nil && old.Listen == "" && app.Listen != "" {
+		engineFor(name).RemoveFromProxy()
+	}
 	return nil
 }
 
@@ -1116,7 +1174,11 @@ func apply(name string, app engine.AppConfig) error {
 func unhealthyReport(app engine.AppConfig, failed *engine.UnhealthyError) string {
 	var report strings.Builder
 	timeout := cmp.Or(app.HealthTimeout, protocol.DefaultHealthTimeout)
-	fmt.Fprintf(&report, "The new version did not answer 200 on %s at port %d within %d seconds. The old version keeps the traffic.\n", app.HealthPath, app.Port, timeout)
+	kept := "The old version keeps the traffic."
+	if app.Listen != "" {
+		kept = "The old version runs again."
+	}
+	fmt.Fprintf(&report, "The new version did not answer 200 on %s at port %d within %d seconds. %s\n", app.HealthPath, app.Port, timeout, kept)
 	others := slices.DeleteFunc(slices.Clone(failed.Listening), func(port int) bool { return port == app.Port })
 	switch {
 	case failed.OOMKilled:
@@ -1300,7 +1362,7 @@ func serverEnable(name string, args []string) error {
 		Port:       protocol.DefaultPort,
 		HealthPath: product.Health,
 		Volumes:    product.Volumes,
-		Env:        addonEnv(old.Env, standardEnv([]string{domain}, "latest", privateKey, shape{Port: protocol.DefaultPort, Volumes: product.Volumes})),
+		Env:        addonEnv(old.Env, standardEnv("https://"+domain, "latest", privateKey, shape{Port: protocol.DefaultPort, Volumes: product.Volumes})),
 	}
 	fmt.Println("Starting", name)
 	if err := apply(name, app); err != nil {
@@ -1331,7 +1393,10 @@ func serverDomains(name string, args []string) error {
 	if err != nil {
 		return err
 	}
-	domains := strings.Split(app.Domain, ",")
+	domains := appDomains(app)
+	if len(args) > 0 && app.Listen != "" {
+		return fmt.Errorf("%s is private: it has no domains. To put it on the internet: chasen deploy --domain <domain>", name)
+	}
 	if len(args) > 0 && !isBuilt(name, app.Image) {
 		return fmt.Errorf("an addon has one domain. Change it with: chasen enable %s <domain>", name)
 	}
@@ -1373,7 +1438,7 @@ func serverDomains(name string, args []string) error {
 	}
 
 	app.Domain = strings.Join(domains, ",")
-	app.Env["BASE_URL"] = "https://" + primaryDomain(domains)
+	app.Env["BASE_URL"] = baseURL(domains, "")
 	if err := apply(name, app); err != nil {
 		return err
 	}
@@ -1427,8 +1492,11 @@ func serverStatus(name string) error {
 		jobs := all.of(jobsName(name)).Status
 		fmt.Printf("Jobs:     %s (%s)\n", cmp.Or(jobs, "not running"), settings.Jobs)
 	}
-	for _, d := range strings.Split(app.Domain, ",") {
+	for _, d := range appDomains(app) {
 		fmt.Printf("URL:      %s\n", link(d))
+	}
+	if app.Listen != "" {
+		fmt.Printf("Private:  %s, not on the internet\n", app.Listen)
 	}
 	last := "none"
 	if stamps := localBackups(name); len(stamps) > 0 {
@@ -1461,18 +1529,25 @@ func serverList() error {
 	fmt.Fprintln(w, "NAME\tVERSION\tDOMAINS")
 	for _, name := range engine.ListAppsSorted(apps) {
 		_, version, _ := strings.Cut(apps[name].Image, ":")
-		fmt.Fprintf(w, "%s\t%s\t%s\n", name, version, strings.ReplaceAll(apps[name].Domain, ",", " "))
+		domains := strings.ReplaceAll(apps[name].Domain, ",", " ")
+		if apps[name].Listen != "" {
+			domains = "private " + apps[name].Listen
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\n", name, version, domains)
 	}
 	return w.Flush()
 }
 
 func serverRemove(name string) error {
-	if _, err := loadApp(name); err != nil {
+	app, err := loadApp(name)
+	if err != nil {
 		return err
 	}
 	m := engineFor(name)
-	if err := m.RemoveFromProxy(); err != nil {
-		fmt.Printf("Warning: %v\n", err)
+	if app.Listen == "" {
+		if err := m.RemoveFromProxy(); err != nil {
+			fmt.Printf("Warning: %v\n", err)
+		}
 	}
 	m.StopApp()
 	if jobs := runningJobs(name); jobs != "" {

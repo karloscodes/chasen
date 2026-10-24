@@ -95,7 +95,7 @@ func serverCheck(name, version string) error {
 	// `-e NAME` takes the value from the environment of the docker command, so
 	// a secret is not in its arguments, where every user of the server sees it.
 	var env []string
-	checked := appEnv(settings, []string{name + ".check"}, version, privateKey, sh)
+	checked := appEnv(settings, "https://"+name+".check", version, privateKey, sh)
 	for k, v := range engineEnv(name, name+".check", sh.Port, privateKey) {
 		checked[k] = v
 	}

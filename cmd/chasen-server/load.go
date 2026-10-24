@@ -25,6 +25,9 @@ func serverLoad() error {
 	if len(averages) < 3 {
 		return fmt.Errorf("/proc/loadavg has an unknown format: %q", load)
 	}
+	// The version first: a client asks before it uses something new, like a
+	// private app, that a server from before ignores.
+	fmt.Printf("Version:  %s\n", version)
 	// The CPU type too: the CLI builds the image of an app for it.
 	fmt.Printf("Load:     %s (%d cores, %s)\n", strings.Join(averages[:3], " "), runtime.NumCPU(), runtime.GOARCH)
 

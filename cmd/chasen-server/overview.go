@@ -32,10 +32,11 @@ type overviewApp struct {
 	ID      int64  `json:"id,omitempty"`      // its id in the history, to follow its output
 
 	Domains   []string `json:"domains"`
-	Jobs      string   `json:"jobs,omitempty"` // the state of the jobs container, when the app has one
-	Databases int      `json:"databases"`      // the SQLite databases in the newest backup
-	Backup    string   `json:"backup"`         // the stamp of the newest backup, "" before the first, "off" with backup: false
-	Replica   string   `json:"replica"`        // the live replica: "live", "behind", or "off"
+	Private   string   `json:"private,omitempty"` // where a private app listens on the server, like 127.0.0.1:8080
+	Jobs      string   `json:"jobs,omitempty"`    // the state of the jobs container, when the app has one
+	Databases int      `json:"databases"`         // the SQLite databases in the newest backup
+	Backup    string   `json:"backup"`            // the stamp of the newest backup, "" before the first, "off" with backup: false
+	Replica   string   `json:"replica"`           // the live replica: "live", "behind", or "off"
 }
 
 // serverOverview prints the overview as a table, or as JSON with --json.
@@ -102,6 +103,7 @@ func overview() ([]overviewApp, error) {
 			r.Running, r.Since, r.ID = now.action, now.started, now.id
 		}
 		r.Domains = strings.FieldsFunc(apps[name].Domain, func(c rune) bool { return c == ',' })
+		r.Private = apps[name].Listen
 		if settings[name].Jobs != "" {
 			r.Jobs = cmp.Or(all.of(jobsName(name)).Status, "not running")
 		}

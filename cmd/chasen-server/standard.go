@@ -128,10 +128,10 @@ func appShape(image string, settings protocol.Settings) (shape, error) {
 
 // standardEnv is the env that Chasen sets in every container. An app cannot
 // override these names: they are protocol.StandardEnv.
-func standardEnv(domains []string, version, privateKey string, s shape) map[string]string {
+func standardEnv(base, version, privateKey string, s shape) map[string]string {
 	return map[string]string{
 		"PORT":            strconv.Itoa(s.Port),
-		"BASE_URL":        "https://" + primaryDomain(domains),
+		"BASE_URL":        base,
 		"SECRET_KEY_BASE": privateKey,
 		"PRIVATE_KEY":     privateKey,
 		"STORAGE_DIR":     s.Volumes[0],
@@ -143,12 +143,12 @@ func standardEnv(domains []string, version, privateKey string, s shape) map[stri
 
 // appEnv is the environment of a container: what the client sent, then what
 // Chasen sets.
-func appEnv(settings protocol.Settings, domains []string, version, privateKey string, s shape) map[string]string {
+func appEnv(settings protocol.Settings, base, version, privateKey string, s shape) map[string]string {
 	env := map[string]string{}
 	for k, v := range settings.Env {
 		env[k] = v
 	}
-	for k, v := range standardEnv(domains, version, privateKey, s) {
+	for k, v := range standardEnv(base, version, privateKey, s) {
 		env[k] = v
 	}
 	return env

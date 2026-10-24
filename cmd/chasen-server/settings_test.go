@@ -162,7 +162,7 @@ func TestAppSettings(t *testing.T) {
 
 func TestAddonKeepsItsEnvAtAnUpdate(t *testing.T) {
 	had := map[string]string{"FORMLANDER_SESSION_SECRET": "the-secret", "PRIVATE_KEY": "old", "PORT": "9999"}
-	standard := standardEnv([]string{"forms.example.com"}, "latest", "old", shape{Port: 8080, Volumes: []string{"/app/storage"}})
+	standard := standardEnv("https://forms.example.com", "latest", "old", shape{Port: 8080, Volumes: []string{"/app/storage"}})
 
 	env := addonEnv(had, standard)
 
@@ -204,7 +204,7 @@ func TestVersionOfTheNewestImage(t *testing.T) {
 // The CLI refuses these names in chasen.yml before a deploy, from the list in
 // the protocol. The list must be the names that the server sets.
 func TestStandardEnvNamesMatchTheProtocol(t *testing.T) {
-	set := slices.Sorted(maps.Keys(standardEnv([]string{"shop.example.com"}, "1", "key", shape{Port: 8080, Volumes: []string{"/storage"}})))
+	set := slices.Sorted(maps.Keys(standardEnv("https://shop.example.com", "1", "key", shape{Port: 8080, Volumes: []string{"/storage"}})))
 
 	listed := slices.Sorted(slices.Values(protocol.StandardEnv))
 

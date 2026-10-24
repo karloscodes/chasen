@@ -36,7 +36,7 @@ func loadApps(where string, args ...any) (map[string]engine.AppConfig, error) {
 		return nil, err
 	}
 	defer db.Close()
-	rows, err := db.Query("SELECT name, image, domain, port, health_path, health_timeout, volumes, env, memory FROM apps "+where, args...)
+	rows, err := db.Query("SELECT name, image, domain, port, health_path, health_timeout, volumes, env, memory, listen FROM apps "+where, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func loadApps(where string, args ...any) (map[string]engine.AppConfig, error) {
 	for rows.Next() {
 		var name, volumes, env string
 		var app engine.AppConfig
-		if err := rows.Scan(&name, &app.Image, &app.Domain, &app.Port, &app.HealthPath, &app.HealthTimeout, &volumes, &env, &app.Memory); err != nil {
+		if err := rows.Scan(&name, &app.Image, &app.Domain, &app.Port, &app.HealthPath, &app.HealthTimeout, &volumes, &env, &app.Memory, &app.Listen); err != nil {
 			return nil, err
 		}
 		if err := errors.Join(json.Unmarshal([]byte(volumes), &app.Volumes), json.Unmarshal([]byte(env), &app.Env)); err != nil {
@@ -73,8 +73,8 @@ type execer interface {
 func insertApp(db execer, name string, app engine.AppConfig) error {
 	volumes, _ := json.Marshal(app.Volumes)
 	env, _ := json.Marshal(app.Env)
-	_, err := db.Exec(`INSERT OR REPLACE INTO apps (name, image, domain, port, health_path, health_timeout, volumes, env, memory)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, name, app.Image, app.Domain, app.Port, app.HealthPath, app.HealthTimeout, string(volumes), string(env), app.Memory)
+	_, err := db.Exec(`INSERT OR REPLACE INTO apps (name, image, domain, port, health_path, health_timeout, volumes, env, memory, listen)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, name, app.Image, app.Domain, app.Port, app.HealthPath, app.HealthTimeout, string(volumes), string(env), app.Memory, app.Listen)
 	return err
 }
 

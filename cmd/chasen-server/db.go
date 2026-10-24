@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS apps (
 	health_timeout INTEGER NOT NULL,
 	volumes        TEXT NOT NULL,
 	env            TEXT NOT NULL,
-	memory         TEXT NOT NULL DEFAULT ''
+	memory         TEXT NOT NULL DEFAULT '',
+	listen         TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS replica_state (
 	db           TEXT PRIMARY KEY,
@@ -94,6 +95,11 @@ func openServerDB() (*sql.DB, error) {
 	}
 	// A database from a version before the memory setting gets its column.
 	if err := addColumn(db, "apps", "memory", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		db.Close()
+		return nil, err
+	}
+	// And one from before private apps, its column of where an app listens.
+	if err := addColumn(db, "apps", "listen", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		db.Close()
 		return nil, err
 	}
