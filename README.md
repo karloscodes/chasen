@@ -88,6 +88,7 @@ The docs are on [chasenhq.com/docs](https://chasenhq.com/docs/). Their source is
 | [The app standard](STANDARD.md) | The rules an app follows: the port, `/up`, the storage, migrations |
 | [Backups and restore](docs/backups.md) | Snapshots, the live replica, a restore, and a new server |
 | [Domains](docs/domains.md) | Custom domains, and Cloudflare in front |
+| [Private apps](docs/private.md) | An app that you reach only through a VPN, like Tailscale |
 | [Deploy from GitHub Actions](docs/github-actions.md) | `git push` as the deploy |
 | [Commands, files, and limits](docs/reference.md) | Every command, the files on the server, and what Chasen does not do |
 | [Chasen on Omarchy](docs/omarchy.md) | The launcher, the module of the top bar, and the theme |
