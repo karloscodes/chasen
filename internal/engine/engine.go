@@ -41,6 +41,8 @@ type Engine struct {
 	config Config
 	// Temporary state during installation
 	domain string
+	// listen is the address and the port of a private app on the server.
+	listen string
 	// The record a caller gave to DeployApp. With it, no config file is read.
 	app *AppConfig
 }

@@ -16,8 +16,12 @@ type MatchaConfig struct {
 
 // AppConfig holds the configuration for a single deployed application.
 type AppConfig struct {
-	Image         string            `yaml:"image"`
-	Domain        string            `yaml:"domain"`
+	Image  string `yaml:"image"`
+	Domain string `yaml:"domain"`
+	// Listen is the address and the port on the server of a private app,
+	// like 127.0.0.1:8080: it has no domain and no route on the proxy.
+	// Empty for an app on the internet.
+	Listen        string            `yaml:"listen,omitempty"`
 	Port          int               `yaml:"port,omitempty"`
 	HealthPath    string            `yaml:"health_path,omitempty"`
 	Volumes       []string          `yaml:"volumes,omitempty"`

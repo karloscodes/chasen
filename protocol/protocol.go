@@ -95,6 +95,14 @@ type Settings struct {
 	// what it has. Only for an image in a registry: the server pulls it.
 	AutoUpdate *bool `json:"auto_update,omitempty"`
 
+	// Private puts the app on an address of the server, not on the internet:
+	// `--private` or `private: true` is 127.0.0.1, `--private=10.8.0.1` is the
+	// address of the server in a VPN, and a port can follow, like
+	// 10.8.0.1:3001. The app gets no domain and no route on the proxy. Empty
+	// keeps what the app has: only a Domain puts a private app on the
+	// internet. The server does not keep it with the settings.
+	Private string `json:"private,omitempty"`
+
 	// Commit is the git commit of a deploy, for its entry in the history: its
 	// subject, and its page on the web. The server keeps it with the entry,
 	// not with the app. An image of another repository has none.

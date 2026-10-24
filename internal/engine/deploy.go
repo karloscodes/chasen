@@ -1,7 +1,9 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
+	"time"
 )
 
 func (m *Engine) deploy() error {
@@ -9,7 +11,8 @@ func (m *Engine) deploy() error {
 		return fmt.Errorf("failed to create network: %w", err)
 	}
 
-	if !m.isRunning(m.ProxyContainerName()) {
+	// A private app does not need the proxy.
+	if m.listen == "" && !m.isRunning(m.ProxyContainerName()) {
 		if err := m.deployProxy(); err != nil {
 			return fmt.Errorf("failed to deploy proxy: %w", err)
 		}
@@ -22,6 +25,10 @@ func (m *Engine) deploy() error {
 		if err := m.pullImage(m.config.AppImage); err != nil {
 			printWarn("Could not pull %s, deploying the local copy: %v", m.config.AppImage, err)
 		}
+	}
+
+	if m.listen != "" {
+		return m.deployPrivate()
 	}
 
 	// Zero-downtime deploy:
@@ -49,5 +56,41 @@ func (m *Engine) deploy() error {
 		m.stopAndRemove(oldContainer)
 	}
 
+	return nil
+}
+
+// deployPrivate swaps the container of a private app. It has no proxy to
+// move the traffic: its port is on an address of the server, and two
+// containers cannot have one port. So the old container stops first, and the
+// app does not answer for the seconds the new one needs to start. When the new
+// one does not start or does not answer 200 on the health path, the old one
+// starts again.
+func (m *Engine) deployPrivate() error {
+	oldContainer := m.findActiveContainer()
+	newContainer := m.nextContainerName(oldContainer)
+	wasRunning := m.isRunning(oldContainer)
+	if wasRunning {
+		m.runDocker("stop", oldContainer)
+	}
+	back := func() {
+		m.stopAndRemove(newContainer)
+		if wasRunning {
+			m.runDocker("start", oldContainer)
+		}
+	}
+
+	if err := m.deployApp(newContainer); err != nil {
+		back()
+		return fmt.Errorf("cannot start %s on %s: %w", m.config.Name, m.listen, err)
+	}
+	if _, problem := WaitHealthy(newContainer, m.config.AppPort, m.config.HealthPath, time.Duration(m.config.HealthTimeout)*time.Second); problem != "" {
+		failed := m.unhealthy(newContainer, errors.New(problem))
+		back()
+		return failed
+	}
+
+	if oldContainer != newContainer {
+		m.stopAndRemove(oldContainer)
+	}
 	return nil
 }

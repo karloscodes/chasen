@@ -9,7 +9,9 @@ import (
 
 // fakeDocker puts a `docker` script first on PATH. It records every call and
 // answers just enough for a deploy: the proxy is running and every command succeeds,
-// except `pull` when failPull is set.
+// except `pull` when failPull is set. For a private app: the old container aja runs
+// with OLD_RUNNING=1, the new one does not start with FAIL_RUN=1, and every
+// container is at 127.0.0.1 for the health check.
 func fakeDocker(t *testing.T, failPull bool) (logPath string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -19,6 +21,9 @@ echo "$*" >> "` + logPath + `"
 case "$*" in
   pull*) [ "$FAIL_PULL" = 1 ] && exit 1 ;;
   "ps -q --filter name=^matcha-proxy$") echo proxy-id ;;
+  "ps -q --filter name=^aja$") [ "$OLD_RUNNING" = 1 ] && echo old-id ;;
+  "run -d --name aja-next"*) [ "$FAIL_RUN" = 1 ] && exit 1 ;;
+  "inspect -f {{.State.Running}}"*) echo "true 127.0.0.1" ;;
 esac
 exit 0
 `

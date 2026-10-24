@@ -22,6 +22,7 @@ func (m *Engine) useRecord(app AppConfig) {
 	if app.Domain != "" {
 		m.domain = app.Domain
 	}
+	m.listen = app.Listen
 	if app.Port != 0 {
 		m.config.AppPort = app.Port
 	}

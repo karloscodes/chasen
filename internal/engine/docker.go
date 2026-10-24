@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -132,6 +133,11 @@ func (m *Engine) deployApp(name string) error {
 		"run", "-d",
 		"--name", name,
 		"--network", m.NetworkName(),
+	}
+
+	// A private app listens on an address of the server, not on the proxy.
+	if m.listen != "" {
+		args = append(args, "-p", m.listen+":"+strconv.Itoa(m.config.AppPort))
 	}
 
 	// Mount volumes from config (resolved from container paths)

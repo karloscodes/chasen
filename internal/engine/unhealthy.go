@@ -11,7 +11,7 @@ import (
 // engine removes the container; these are the facts that it left, so the
 // caller can say why it failed.
 type UnhealthyError struct {
-	Err       error  // what the proxy said
+	Err       error  // what the health check said
 	Logs      string // the last lines of the output of the container
 	Status    string // the state of Docker: "running", "restarting", "exited"
 	ExitCode  int    // the exit code of its last run, when it stopped
@@ -20,7 +20,7 @@ type UnhealthyError struct {
 	Listening []int  // the TCP ports it listened on, when it was running
 }
 
-func (e *UnhealthyError) Error() string { return "failed to register with proxy: " + e.Err.Error() }
+func (e *UnhealthyError) Error() string { return "the health check failed: " + e.Err.Error() }
 func (e *UnhealthyError) Unwrap() error { return e.Err }
 
 // unhealthy collects the facts of a container that failed its health check.

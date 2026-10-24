@@ -157,6 +157,14 @@ func (s Settings) Check() error {
 	if s.Domain != "" && !ValidDomain(s.Domain) {
 		problems = append(problems, fmt.Errorf("invalid domain %q: use a name like shop.example.com, in lowercase, with no https://", s.Domain))
 	}
+	if s.Private != "" {
+		if _, _, err := ParsePrivate(s.Private); err != nil {
+			problems = append(problems, err)
+		}
+		if s.Domain != "" {
+			problems = append(problems, errPrivateDomain)
+		}
+	}
 	if s.Port < 0 || s.Port > 65535 {
 		problems = append(problems, fmt.Errorf("invalid port %d: use 1 to 65535", s.Port))
 	}
