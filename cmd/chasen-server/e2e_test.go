@@ -974,6 +974,87 @@ func TestEndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("--private deploys an app that only the server reaches, and --domain puts it on the internet", func(t *testing.T) {
+		open := os.Getenv("CHASEN_TEST_OPEN_REGISTRY")
+		if open == "" {
+			t.Skip("set CHASEN_TEST_OPEN_REGISTRY to a registry with no login")
+		}
+		commit := strings.TrimSpace(must(app, "git", "rev-parse", "HEAD"))
+		build := exec.Command("docker", "build", "-q", "-t", open+"/logs:latest", "-")
+		build.Stdin = strings.NewReader(fmt.Sprintf("FROM %s/example:%s\n", registry, commit))
+		if out, err := build.CombinedOutput(); err != nil {
+			t.Fatalf("docker build: %s", out)
+		}
+		must(".", "docker", "push", "-q", open+"/logs:latest")
+		t.Cleanup(func() {
+			run(".", server, "remove", "logs")
+			docker("rmi", open+"/logs:latest")
+		})
+		// The test runs on the server: 127.0.0.1 here is the one of the app.
+		private := func(path string) string {
+			t.Helper()
+			resp, err := http.Get("http://127.0.0.1:8080" + path)
+			if err != nil {
+				return err.Error()
+			}
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(resp.Body)
+			return string(body)
+		}
+
+		out := must(t.TempDir(), bin, "deploy", open+"/logs", "--private")
+
+		if !strings.Contains(out, "http://127.0.0.1:8080 on the server, not on the internet") {
+			t.Errorf("deploy = %q, want the address on the server", out)
+		}
+		if status := must(".", server, "status", "logs"); !strings.Contains(status, "Private:  127.0.0.1:8080") || strings.Contains(status, "URL:") {
+			t.Errorf("status = %q, want the address and no URL", status)
+		}
+		if got := private("/"); !strings.HasPrefix(got, "hits=1 ") {
+			t.Errorf("GET 127.0.0.1:8080 = %q, want the app", got)
+		}
+		// No Host reaches it through the proxy: it has no route.
+		if routes, _ := proxyRoutes(); slices.Contains(routes, "logs") {
+			t.Errorf("the proxy has a route for the private app: %v", routes)
+		}
+		if got := get("logs.localhost"); strings.HasPrefix(got, "hits=") {
+			t.Errorf("GET logs.localhost through the proxy = %q, want no app", got)
+		}
+
+		out = must(t.TempDir(), bin, "deploy", open+"/logs")
+
+		if !strings.Contains(out, "logs stays private, at 127.0.0.1:8080") {
+			t.Errorf("deploy again = %q, want the app to stay private, at its port", out)
+		}
+		if got := private("/"); !strings.HasPrefix(got, "hits=2 ") {
+			t.Errorf("GET after the deploy again = %q, want the app with its data: hits=2", got)
+		}
+		if out, err := run(t.TempDir(), bin, "-a", "logs", "domains", "add", "logs.localhost"); err == nil || !strings.Contains(out, "logs is private") {
+			t.Errorf("domains add = %q, %v, want a refusal", out, err)
+		}
+
+		must(t.TempDir(), bin, "deploy", open+"/logs", "--domain", "logs.localhost")
+
+		if got := get("logs.localhost"); !strings.HasPrefix(got, "hits=3 ") {
+			t.Errorf("GET logs.localhost after --domain = %q, want the app with its data on the internet", got)
+		}
+		if status := must(".", server, "status", "logs"); strings.Contains(status, "Private:") || !strings.Contains(status, "URL:      http://logs.localhost") {
+			t.Errorf("status after --domain = %q, want the URL and no address", status)
+		}
+		if got := private("/up"); got == "ok" {
+			t.Error("127.0.0.1:8080 still answers after the app went on the internet")
+		}
+
+		must(t.TempDir(), bin, "deploy", open+"/logs", "--private")
+
+		if got := private("/"); !strings.HasPrefix(got, "hits=4 ") {
+			t.Errorf("GET 127.0.0.1:8080 after --private again = %q, want the app", got)
+		}
+		if routes, _ := proxyRoutes(); slices.Contains(routes, "logs") {
+			t.Errorf("an app that became private kept its route: %v", routes)
+		}
+	})
+
 	t.Run("a deploy that does not get healthy keeps the previous version live", func(t *testing.T) {
 		commit("app.py", "raise SystemExit('broken')\n")
 
