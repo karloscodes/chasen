@@ -1,0 +1,71 @@
+name: Security release
+
+# The fast lane of the Go CLIs: a security update does not wait for a person
+# to cut a release. When merge-security-updates.yml merges one, this tags the
+# next patch release (v1.5.0 -> v1.5.1) and starts Release, which runs its own
+# tests before it publishes. A CLI is released from main, so the patch is main
+# as it is: other changes since the last release ship with it.
+#
+# By hand, for a merge it missed: gh workflow run "Security release"
+# This file is the same in chasen, lognorth-cli, and suppyhq-cli.
+on:
+  # A merge by GITHUB_TOKEN starts no push workflow, so it listens for the
+  # workflow that merged.
+  workflow_run:
+    workflows: ["Merge security updates"]
+    types: [completed]
+  workflow_dispatch:
+
+# One release at a time.
+concurrency:
+  group: release-train
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    # A merge workflow that skipped or failed merged nothing.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GIT_COMMITTER_NAME: github-actions[bot]
+      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Release the security updates on main now
+        run: |
+          set -euo pipefail
+          last="$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -v -- - | head -1)"
+          [ -n "$last" ] || { echo "No release tag yet."; exit 0; }
+
+          # Dependabot's security commits on main after $last. The merge keeps
+          # Dependabot's metadata in the message.
+          security=(--no-merges --author='^dependabot\[bot\]' --grep='^  dependency-group: security$')
+          fixes="$(git log --format=%h "${security[@]}" "$last..HEAD")"
+          [ -n "$fixes" ] || { echo "No security update after $last."; exit 0; }
+
+          # Never tag a commit marked ci skip: take the newest commit without
+          # the mark. It holds every fix, because a Dependabot commit has none.
+          target="$(git log -1 --format=%H -i --invert-grep --grep='\[ci skip\]' --grep='\[skip ci\]' HEAD)"
+          if tag="$(git describe --exact-match --tags "$target" 2>/dev/null)"; then
+            echo "$target is $tag already."
+            exit 0
+          fi
+
+          IFS=. read -r major minor patch <<<"${last#v}"
+          next="v$major.$minor.$((patch + 1))"
+          echo "Releasing $next: main after $last, with $(wc -l <<<"$fixes") security updates"
+          git log --format='  %s' "${security[@]}" "$last..$target"
+
+          git tag -a "$next" "$target" -m "Security release $next: main with the security updates after $last"
+          git push origin "$next"
+          # A tag that a workflow pushes starts no other workflow: start the release here.
+          gh workflow run release.yml --ref "$next"
