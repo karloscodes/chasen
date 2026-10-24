@@ -1,5 +1,8 @@
 # A tag v* makes a release: the CLI for macOS and Linux, the server for
-# Linux, and checksums.txt. The install scripts download the newest release.
+# Linux, and checksums.txt. The install scripts download the newest release,
+# and a release reaches every server the same night.
+# The test job is the same in chasen, lognorth-cli, and suppyhq-cli. Each
+# builds and publishes its own binaries.
 name: Release
 on:
   push:
@@ -12,9 +15,9 @@ permissions:
   contents: read
 
 jobs:
-  # A release reaches every server the same night. It is made only from a
-  # commit of main that passes the end-to-end test.
-  e2e:
+  # The same gate as CI, so a tag on a red commit releases nothing. A release
+  # is made only from a commit of main.
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -27,13 +30,14 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - run: go vet ./... && go test ./...
+      - run: go vet ./...
+      - run: go test -race ./...
       # The end-to-end test starts a real SSH server, for the SSH way to a server.
       - run: test -x /usr/sbin/sshd || (sudo apt-get update -q && sudo apt-get install -y -q openssh-server)
       - run: bin/e2e -test.v
 
   release:
-    needs: e2e
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write
