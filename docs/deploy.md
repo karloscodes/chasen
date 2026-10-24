@@ -37,6 +37,35 @@ Point a DNS record for that name to the server. The certificate comes on the fir
 
 A server with a base domain (`chasen-server setup --domain example.com`, with a wildcard DNS record) needs no flag: a new app gets `<app>.example.com`.
 
+## A private app
+
+A private app is not on the internet. It is for a server that you reach through a VPN, like Tailscale or WireGuard: an admin tool, the logs of your servers, a dashboard of your team. It has no domain and no route on the proxy. Its port listens on an address of the server that only the server and the machines of your VPN reach.
+
+```bash
+chasen deploy --private
+```
+
+The app listens on `127.0.0.1` of the server, at the port of the app (8080, or the next free one). The deploy and `chasen status` say the address. To reach it:
+
+- **Tailscale.** On the server: `tailscale serve --bg 8080`. The machines of your tailnet open `https://<server>.<tailnet>.ts.net`, with a certificate from Tailscale.
+- **WireGuard, NetBird, ZeroTier, or another VPN.** Deploy with the address of the server in the VPN: `chasen deploy --private=10.8.0.1`. The machines of the VPN open `http://10.8.0.1:8080`. A port can follow the address: `--private=10.8.0.1:3001`.
+- **No VPN.** An SSH tunnel from your computer: `ssh -L 8080:127.0.0.1:8080 root@203.0.113.5`, then open `http://localhost:8080`.
+
+In `chasen.yml` it is one line, with the same values:
+
+```yaml
+private: true           # 127.0.0.1
+private: 10.8.0.1       # the address of the server in the VPN, with a port or without
+```
+
+- **The app stays private.** A deploy that says nothing keeps it private, also after you remove `private:` from `chasen.yml`, and so does the nightly update. Only `chasen deploy --domain <domain>` puts it on the internet. `--private` with `--domain`, or two addresses in `chasen.yml` and in the command, stop the deploy before the build.
+- **Only an address that the internet does not reach.** `127.0.0.1`, the private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`), and `100.64.0.0/10`, the range of Tailscale and NetBird. A public address and `0.0.0.0` are refused.
+- **A deploy stops the app for a few seconds.** Two containers cannot have one port, so the old one stops, then the new one starts. When the new one does not answer on `/up`, the old one starts again. An app on the internet has no such gap: the proxy moves the traffic.
+- **Private is not a login.** Every machine of the VPN reaches the app. Keep the login of the app on.
+- **`BASE_URL`** is the address on the server, like `http://127.0.0.1:8080`.
+- **On a VPN address, start Docker after the VPN.** When the address is not there yet at boot, the app can stay down until `chasen restart`. For WireGuard: `systemctl edit docker`, and under `[Unit]` add `After=wg-quick@wg0.service`. `127.0.0.1` is always there.
+- **It needs chasen-server v0.13.0 or newer.** The CLI asks the server first: a server from before would put the app on the internet.
+
 ## The image
 
 `chasen deploy` builds the image of the current git commit with your Docker, for the CPU of the server, and the server pulls it. The tag is the full hash of the commit. Where the image goes between the two depends on how the CLI reaches the server:
@@ -276,6 +305,7 @@ Each finding says what is wrong, what to write, and which page explains it.
 | An app name that is not lowercase letters, digits, and hyphens | error |
 | An app name that the server keeps for itself: `api`, `proxy`, `chasen-server`, a name that ends in `-next`, or one that starts with `chasen-check-` | error |
 | A port, a health path, a health timeout, a volume, or a memory value that is not valid | error |
+| `private:` has an address that the internet reaches, or is `false` | error |
 | `env:` or `secrets:` has a name that Chasen sets itself (`PORT`, `BASE_URL`, and the others of [the standard](../STANDARD.md#4-environment)). `SECRET_KEY_BASE` in `secrets:` is right: then the key is yours | error |
 | `registry.password` holds a token, not the name of a secret | error |
 | The image declares several ports, none is 80, and `chasen.yml` has no `port:` | error |
@@ -313,6 +343,9 @@ memory: 1g              # the most memory the app may use. The default is 512m
 
 # For an app whose data needs no backup, like a demo that makes its data again at each start.
 backup: false
+
+# Not on the internet: 127.0.0.1 of the server, or its address in your VPN. See A private app.
+private: true
 
 # The command of the jobs container. See Background jobs.
 jobs: bin/jobs

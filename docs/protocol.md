@@ -92,6 +92,7 @@ The shell is a WebSocket because a WebSocket passes every proxy that can be in f
 - A website has no `image`. Its files follow the line of the settings, as a `tar.gz` archive. The server puts them in a Caddy image; it is the only image a server makes.
 - `restart` with an empty body keeps the settings that the server has.
 - `"auto_update": true` or `false` turns the nightly deploy of the newest image of the tag on or off. Without the field the app keeps what it has.
+- `"private": "127.0.0.1"` puts the app on an address of the server, with a port or without (`"10.8.0.1:3001"`): no domain, and no route on the proxy. Without the field the app keeps what it has; a `domain` puts a private app on the internet. It does not come with a `domain`.
 - `"keep_settings": true` on a `deploy` changes the image and keeps the other settings that the app has. `image`, `registry`, and `domain` come from the body. `chasen deploy <image>` sends it.
 
 ```bash
@@ -124,5 +125,6 @@ In CI there is no login: the token of the server, or a login of it, is the beare
 - The path says `/v1`. A change that breaks a client gets a new number.
 - A new command is a new word in the list. An old server answers it with an error line and exit code 1.
 - A new field in the settings is ignored by an old server. So a new client with an old server can lose a setting without an error: keep the server as new as the client.
+- `load` says the version of the server first: `Version:  v0.13.0`. A client asks it before it sends a setting that an old server must not lose. `private` is one: an old server would put the app on the internet. A server from before v0.13.0 has no such line.
 - Version 0.2 moved the settings into the body of `deploy`, `check`, and `restart`, and removed the `env` command. A 0.1 client does not work with a 0.2 server.
 - `GET /up` answers `200` when the API runs. It needs no token.

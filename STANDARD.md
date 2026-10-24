@@ -94,7 +94,7 @@ In both ways, Chasen makes a checked backup of every database before the migrati
 | Variable | Value | Same as |
 |---|---|---|
 | `PORT` | the port of rule 2: from `port:`, from `EXPOSE`, or 8080 | Heroku |
-| `BASE_URL` | `https://` + the main domain of the app | |
+| `BASE_URL` | `https://` + the main domain of the app. For a private app, its address on the server: `http://127.0.0.1:8080` | |
 | `SECRET_KEY_BASE` | a random secret, made once for each app and kept across deploys | Rails |
 | `PRIVATE_KEY` | the same secret | matcha |
 | `STORAGE_DIR` | the first storage path of rule 5 | |

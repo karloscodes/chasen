@@ -9,6 +9,8 @@ chasen domains rm www.myapp.com
 
 Point an A record for the domain to the server. The certificate comes on the first HTTPS request after DNS resolves. The change needs no build and has no downtime.
 
+A [private app](deploy.md#a-private-app) has no domains. `chasen deploy --domain <domain>` puts it on the internet.
+
 ## Cloudflare in front (recommended, optional)
 
 Put Cloudflare in front of your domains: turn the proxy on and set the SSL mode to **Full (strict)**. Chasen needs no setting for it.
