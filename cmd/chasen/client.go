@@ -52,6 +52,10 @@ type appFile struct {
 	// like the job role of Kamal: bin/jobs.
 	Jobs string `yaml:"jobs"`
 
+	// Private puts the app on an address of the server, not on the
+	// internet: true is 127.0.0.1, or the address of the server in a VPN.
+	Private privateValue `yaml:"private"`
+
 	Port          int      `yaml:"port"`
 	Memory        string   `yaml:"memory"`
 	Health        string   `yaml:"health"`
@@ -81,6 +85,11 @@ var serverFlag string
 // the server deploys the newest image of the tag each night. nil keeps what
 // the app has.
 var autoUpdateFlag *bool
+
+// privateFlag is the address of `--private` (127.0.0.1) or
+// `--private=10.8.0.1`: the app is not on the internet. Empty says nothing,
+// and the app keeps what it has.
+var privateFlag string
 
 // jsonFlag is `overview --json`: every server with its apps, as JSON.
 var jsonFlag bool
@@ -124,6 +133,13 @@ options:
 		case args[i] == "--auto-update" || args[i] == "--no-auto-update":
 			on := args[i] == "--auto-update"
 			autoUpdateFlag = &on
+			args = slices.Delete(args, i, i+1)
+			i--
+			continue
+		case args[i] == "--private" || strings.HasPrefix(args[i], "--private="):
+			// No value after a space: the word after --private is the image
+			// or the server, never the address.
+			privateFlag = cmp.Or(strings.TrimPrefix(strings.TrimPrefix(args[i], "--private"), "="), protocol.DefaultPrivate)
 			args = slices.Delete(args, i, i+1)
 			i--
 			continue
@@ -373,7 +389,7 @@ var unknownKey = regexp.MustCompile(`line (\d+): field (\S+) not found in type \
 func appFileError(err error) error {
 	message := unknownKey.ReplaceAllString(err.Error(), "line $1: unknown key `$2`")
 	message = strings.TrimPrefix(strings.ReplaceAll(message, "yaml: unmarshal errors:\n  ", ""), "yaml: ")
-	return fmt.Errorf("chasen.yml: %s\n  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes, memory, backup, cron, jobs.\n  %s%s", message, docsURL, docsAppFile)
+	return fmt.Errorf("chasen.yml: %s\n  The keys of chasen.yml: name, server, image, registry, env, secrets, secrets_command, port, health, health_timeout, volumes, memory, backup, cron, jobs, private.\n  %s%s", message, docsURL, docsAppFile)
 }
 
 // bucket shows where the backups of the server go, or sets the bucket: the

@@ -167,6 +167,17 @@ func TestMap(t *testing.T) {
 		}
 	})
 
+	t.Run("a private app shows where it listens on the server, not a domain", func(t *testing.T) {
+		sc := openMap(t, "backups-eu")
+
+		sc.tui.handle(overviewEvent{server: "shop-server", output: `[{"app":"logs","state":"Up 1 hour","up":true,"version":"1.0.0","private":"127.0.0.1:8080","databases":1,"backup":"20261020T120000Z","replica":"off"}]`})
+
+		sc.shows("● logs", "private 127.0.0.1:8080")
+		if strings.Contains(sc.text(), "no domain") {
+			t.Errorf("the map says no domain for a private app:\n%s", sc.text())
+		}
+	})
+
 	t.Run("a server from before the map fields has its apps, and says when its data shows", func(t *testing.T) {
 		sc := openMap(t, "backups-eu")
 

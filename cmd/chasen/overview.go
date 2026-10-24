@@ -48,6 +48,7 @@ type appView struct {
 	ID      int64  `json:"id,omitempty"`
 	// For the map of the screen. A server from before them leaves them out.
 	Domains   []string `json:"domains,omitempty"`
+	Private   string   `json:"private,omitempty"` // where a private app listens on the server
 	Jobs      string   `json:"jobs,omitempty"`
 	Databases int      `json:"databases,omitempty"`
 	Backup    string   `json:"backup,omitempty"`

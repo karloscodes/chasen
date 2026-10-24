@@ -42,6 +42,14 @@ func deploy(creds credentials, app appFile, command string) error {
 	}
 	settings.Domain = domainFlag
 	settings.AutoUpdate = autoUpdateFlag
+	if settings.Private, err = privateAddress(string(app.Private)); err != nil {
+		return err
+	}
+	if settings.Private != "" && command == "deploy" {
+		if err := requirePrivate(creds); err != nil {
+			return err
+		}
+	}
 	// A directory with a Dockerfile and no tag builds its image: there is
 	// nothing for the server to pull at night.
 	if _, tag := splitImage(app.Image); autoUpdates(settings) && noDockerfile == nil && cmp.Or(tagFlag, tag) == "" {
@@ -97,7 +105,7 @@ func appSettings(app appFile) (protocol.Settings, error) {
 		return protocol.Settings{}, err
 	}
 	return protocol.Settings{Env: env, Port: app.Port, Health: app.Health, HealthTimeout: app.HealthTimeout, Volumes: app.Volumes, Memory: app.Memory,
-		NoBackup: app.Backup != nil && !*app.Backup, Cron: app.Cron, Jobs: app.Jobs}, nil
+		NoBackup: app.Backup != nil && !*app.Backup, Cron: app.Cron, Jobs: app.Jobs, Private: string(app.Private)}, nil
 }
 
 // railsMasterKey gives a Rails app the key of its credentials. The key on
@@ -258,7 +266,15 @@ func deployRelease(creds credentials, ref string) error {
 	if err := printReview(os.Stderr, reviewAppFile(app, false, "")); err != nil {
 		return err
 	}
-	settings := protocol.Settings{Env: map[string]string{}, Domain: domainFlag, KeepSettings: true, AutoUpdate: autoUpdateFlag}
+	settings := protocol.Settings{Env: map[string]string{}, Domain: domainFlag, KeepSettings: true, AutoUpdate: autoUpdateFlag, Private: privateFlag}
+	if err := settings.Check(); err != nil {
+		return err
+	}
+	if settings.Private != "" {
+		if err := requirePrivate(creds); err != nil {
+			return err
+		}
+	}
 	return deployImage(creds, app, settings, "deploy")
 }
 

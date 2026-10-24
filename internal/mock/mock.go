@@ -79,6 +79,9 @@ type Server struct {
 	Wait func(ctx context.Context, d time.Duration) bool
 	// Log gets one line for each request, or nil.
 	Log *log.Logger
+	// Version is the version of chasen-server that load says. Empty is a
+	// server from before v0.13.0, which says none.
+	Version string
 
 	mu     sync.Mutex
 	apps   []*app
@@ -103,7 +106,7 @@ func New(now time.Time) *Server {
 		}
 		return list
 	}
-	return &Server{Token: "dev", Wait: wait, apps: []*app{
+	return &Server{Token: "dev", Version: "dev", Wait: wait, apps: []*app{
 		{
 			name: "blog", version: "a1b2c3d", state: "Up 6 days", domains: []string{"blog.example.com"},
 			history: []entry{{now.Add(-6 * 24 * time.Hour), "deploy a1b2c3d Write the first post", "succeeded", "Commit: https://github.com/you/blog/commit/a1b2c3d\nPulling ghcr.io/you/blog:a1b2c3d\nDeployed blog a1b2c3d\n  https://blog.example.com\n"}},
@@ -269,6 +272,9 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 	case "load":
 		// Numbers that move, so the screen has something to show.
 		beat := float64(time.Now().Unix()%20) / 20
+		if s.Version != "" {
+			fmt.Fprintf(out, "Version:  %s\n", s.Version)
+		}
 		fmt.Fprintf(out, "Load:     %.2f %.2f %.2f (4 cores, amd64)\nMemory:   %.1f GB of 7.6 GB (%d%%)\nDisk:     31 GB of 75 GB (41%%)\n",
 			0.2+beat, 0.4+beat/2, 0.5, 2.1+beat, int((2.1+beat)*100/7.6))
 		s.mu.Lock()

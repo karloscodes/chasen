@@ -38,6 +38,8 @@ Run these in the directory of your app:
                          --tag <tag> deploys an image that is already in the registry. No build
                          --domain <domain> gives a new app its domain. A server with no base
                          domain needs it at the first deploy of each app
+                         --private: not on the internet, only at 127.0.0.1 of the server, or
+                         --private=<address> of the server in your VPN. --domain undoes it
                          A folder with image: in chasen.yml and no Dockerfile: the newest image
   check                  Test the current git commit against the standard. Changes nothing live
   restart                Start the app again with the env and the secrets of now. Same image
@@ -83,6 +85,7 @@ Apps that others release run from their image, in any directory:
                          image, or -a <app>. Run it again to update: the settings of the app stay
                          --auto-update: the server deploys the newest image of the tag each night,
                          at 05:30 UTC. --no-auto-update stops it. A public image only
+                         --private[=<address>]: not on the internet, as for deploy
 
 Addons run from a ready image, with the same backups:
   enable <addon> [domain]   Run fusionaly, formlander, or lognorth. Run it again to update

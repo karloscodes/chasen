@@ -643,6 +643,7 @@ func (t *tui) overviewLines(app string, status []string, width int) []string {
 	}
 	field("Version", statusValues(status, "Version")...)
 	field("URL", statusValues(status, "URL")...)
+	field("Private", statusValues(status, "Private")...)
 	for _, stamp := range statusValues(status, "Backup") {
 		if stamp == "none" {
 			field("Backup", "none yet")

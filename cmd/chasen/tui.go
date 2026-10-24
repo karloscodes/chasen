@@ -1624,7 +1624,14 @@ func (t *tui) openCommit(app, id string) {
 }
 
 func (t *tui) openInBrowser() {
-	urls := statusValues(t.pane(t.app(), tabOverview).lines, "URL")
+	status := t.pane(t.app(), tabOverview).lines
+	urls := statusValues(status, "URL")
+	if private := statusValues(status, "Private"); len(urls) == 0 && len(private) > 0 {
+		// Its address is on the server: in the browser of this computer it
+		// would be another machine, or nothing.
+		t.message = "A private app: it answers at " + private[0] + ", through your VPN."
+		return
+	}
 	if len(urls) == 0 {
 		t.message = "This app has no URL yet."
 		return

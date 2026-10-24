@@ -124,7 +124,10 @@ func (t *tui) serverBlock(width int) []string {
 			under[1].text = " "
 		}
 		domains := strings.Join(a.Domains, " ")
-		if domains == "" {
+		switch {
+		case a.Private != "":
+			domains = "private " + a.Private
+		case domains == "":
 			domains = "no domain"
 		}
 		second := append(slices.Clone(under), cell{"   ", ""}, cell{fit(domains, l.name+2+l.what), colorDim}, cell{"  ", ""})
