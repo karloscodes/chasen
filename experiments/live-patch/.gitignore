@@ -1,0 +1,5 @@
+results/raw/
+apps/go/app
+apps/node/node_modules/
+apps/rails/tmp/
+apps/rails/log/
