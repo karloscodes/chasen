@@ -18,7 +18,8 @@ import (
 // The alerts of a server: what is wrong now (an error), and what puts the
 // server at risk or will go wrong soon (a warning). `chasen alerts` prints
 // them, and the screen asks for them every minute. The server looks on each
-// call: nothing runs in the background, and nothing is kept.
+// call, and this call does not start a scan. The image scan, when it is on,
+// runs at night and leaves its report, which scanAlerts reads.
 //
 // The open source version does not harden a server: the operating system is
 // the owner's. These alerts say what is missing and how to fix it by hand.
@@ -64,6 +65,7 @@ func checkAlerts(cfg serverConfig, now time.Time) []alert {
 		updateAlerts,
 		func() []alert { return rebootAlerts(now) },
 		func() []alert { return selfUpdateAlerts(cfg) },
+		func() []alert { return scanAlerts(cfg, now) },
 	} {
 		for _, a := range check() {
 			if !slices.Contains(cfg.QuietAlerts, a.ID) {
