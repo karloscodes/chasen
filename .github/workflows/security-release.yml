@@ -22,4 +22,4 @@ jobs:
     permissions:
       contents: write
       actions: write
-    uses: karloscodes/workflows/.github/workflows/security-release.yml@v1.1.0
+    uses: karloscodes/workflows/.github/workflows/security-release.yml@main

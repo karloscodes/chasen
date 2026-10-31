@@ -43,12 +43,12 @@ jobs:
   # design, so gosec's taint rules (G702 command, G703 path, G704 SSRF) are off;
   # every other high-severity, high-confidence rule fails the build.
   security:
-    uses: karloscodes/workflows/.github/workflows/go-security.yml@v1.1.0
+    uses: karloscodes/workflows/.github/workflows/go-security.yml@main
     with:
       gosec-flags: "-exclude=G702,G703,G704"
 
   gitleaks:
-    uses: karloscodes/workflows/.github/workflows/gitleaks.yml@v1.1.0
+    uses: karloscodes/workflows/.github/workflows/gitleaks.yml@main
 
   # The one check to require on main: it passes when every job above passed.
   test:
