@@ -1,0 +1,4 @@
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --chmod=755 app /app
+EXPOSE 8080
+ENTRYPOINT ["/app"]
