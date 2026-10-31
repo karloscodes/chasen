@@ -72,7 +72,11 @@ CREATE TABLE IF NOT EXISTS activity (
 	finished_at TEXT,
 	output      TEXT NOT NULL DEFAULT ''
 );
-CREATE INDEX IF NOT EXISTS activity_app ON activity (app, id);`
+CREATE INDEX IF NOT EXISTS activity_app ON activity (app, id);
+CREATE TABLE IF NOT EXISTS scan_report (
+	id     INTEGER PRIMARY KEY CHECK (id = 1),
+	report TEXT NOT NULL
+);`
 
 func openServerDB() (*sql.DB, error) {
 	path := root() + "/etc/chasen/server.sqlite3"
