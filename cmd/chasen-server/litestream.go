@@ -74,6 +74,12 @@ func replicaClient(s3 *s3Config, name, rel string) *lss3.ReplicaClient {
 	c.Region, c.Bucket, c.Endpoint = s3.Region, s3.Bucket, s3.Endpoint
 	c.Path = name + "/live/" + rel
 	c.ForcePathStyle = true
+	// R2 limits concurrent uploads. Litestream sends 2 parts of a file at once
+	// there, not 5, when it reads the endpoint from a URL. This client is built
+	// by hand, so it sets the same here.
+	if litestream.IsCloudflareR2Endpoint(s3.Endpoint) {
+		c.Concurrency = lss3.DefaultR2Concurrency
+	}
 	return c
 }
 
