@@ -21,7 +21,7 @@ chasen bucket --endpoint https://fsn1.your-objectstorage.com --region fsn1 \
 # Secret access key:
 ```
 
-The server creates the bucket when it does not exist, and writes a test file to it. It saves the settings only when that works. Then the snapshots go to the bucket too, and the live replica starts.
+The server creates the bucket when it does not exist, and writes a test file to it. It saves the settings only when that works. A key for one bucket only, like an R2 token limited to that bucket, works too: make the bucket first at your store, and the test file decides. Then the snapshots go to the bucket too, and the live replica starts.
 
 ## Restore
 

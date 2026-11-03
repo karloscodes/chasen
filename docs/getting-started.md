@@ -86,7 +86,7 @@ chasen bucket --endpoint https://<your-store> --name chasen-backups --access-key
 # Secret access key:
 ```
 
-The server creates the bucket when it does not exist, and tests it before it saves the settings. Then the snapshots go to the bucket too, and the live replica starts.
+The server creates the bucket when it does not exist, and tests it before it saves the settings. With a key for one bucket only, make the bucket first at your store. Then the snapshots go to the bucket too, and the live replica starts.
 
 ## The setup I recommend
 

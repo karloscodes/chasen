@@ -453,24 +453,7 @@ func serverBucket(args []string) error {
 		return errors.New("the secret access key is missing: nothing changed")
 	}
 
-	// Prove that the keys can create the bucket, write, and delete.
-	if err := s3.createBucket(); err != nil {
-		return fmt.Errorf("the bucket does not work, nothing changed: %w", err)
-	}
-	// A new file with a name of its own: a fixed name in /tmp can be a link that another user made.
-	probe, err := os.CreateTemp("", "chasen-bucket-check-")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(probe.Name())
-	_, err = probe.WriteString("chasen")
-	if err := errors.Join(err, probe.Close()); err != nil {
-		return err
-	}
-	if err := s3.putFile("chasen-bucket-check", probe.Name()); err != nil {
-		return fmt.Errorf("the bucket does not work, nothing changed: %w", err)
-	}
-	if err := s3.delete("chasen-bucket-check"); err != nil {
+	if err := s3.prove(); err != nil {
 		return fmt.Errorf("the bucket does not work, nothing changed: %w", err)
 	}
 
@@ -571,7 +554,7 @@ func serverSetup(args []string) error {
 	}
 
 	if cfg.Backup.S3 != nil {
-		if err := cfg.Backup.S3.createBucket(); err != nil {
+		if err := cfg.Backup.S3.prove(); err != nil {
 			return fmt.Errorf("the backup bucket is not ready: %w", err)
 		}
 	}

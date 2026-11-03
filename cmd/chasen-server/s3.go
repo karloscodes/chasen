@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -120,6 +121,19 @@ func (c *s3Config) createBucket() error {
 		return err
 	}
 	return resp.Body.Close()
+}
+
+// prove makes the bucket when the key may, then writes and deletes a test
+// object. The test write decides whether the bucket works: a key limited to
+// one bucket, like an R2 token, may not create buckets at all.
+func (c *s3Config) prove() error {
+	created := c.createBucket()
+	resp, err := c.do("PUT", "chasen-bucket-check", nil, strings.NewReader("chasen"), 6)
+	if err != nil {
+		return errors.Join(err, created)
+	}
+	resp.Body.Close()
+	return c.delete("chasen-bucket-check")
 }
 
 func (c *s3Config) putFile(key, file string) error {
