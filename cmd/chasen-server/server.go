@@ -46,6 +46,13 @@ type serverConfig struct {
 	// QuietAlerts are the alerts that the owner turned off, by their name:
 	// "firewall" when the firewall of the provider does that job.
 	QuietAlerts []string `yaml:"-"`
+	// Scan turns the nightly image scan on. Without the setting, it is off.
+	Scan bool `yaml:"-"`
+	// ScanIgnore are vulnerability ids left out of the report.
+	ScanIgnore []string `yaml:"-"`
+	// ScanWebhook is called when the set of fixable findings changes. It is
+	// a secret: the server stores it and does not print it.
+	ScanWebhook string `yaml:"-"`
 }
 
 // CHASEN_ROOT moves all server state under one directory. Tests use it.
@@ -111,6 +118,8 @@ func runServer(args []string) error {
 		}
 	case "auto-update":
 		return serverAutoUpdate(args)
+	case "scan":
+		return serverScan(args)
 	}
 
 	if len(args) == 0 {
@@ -270,6 +279,11 @@ func readServerConfig() (cfg serverConfig, found bool, err error) {
 	if saved["quiet_alerts"] != "" {
 		cfg.QuietAlerts = strings.Split(saved["quiet_alerts"], ",")
 	}
+	cfg.Scan = saved["scan"] == "true"
+	if saved["scan_ignore"] != "" {
+		cfg.ScanIgnore = strings.Split(saved["scan_ignore"], ",")
+	}
+	cfg.ScanWebhook = saved["scan_webhook"]
 	if saved["s3_bucket"] != "" {
 		cfg.Backup.S3 = &s3Config{
 			Endpoint:        saved["s3_endpoint"],
@@ -285,7 +299,10 @@ func readServerConfig() (cfg serverConfig, found bool, err error) {
 // saveServerConfig replaces the settings in the database. A value that is
 // empty has no row.
 func saveServerConfig(cfg serverConfig) error {
-	values := map[string]string{"domain": cfg.Domain, "token": cfg.Token, "heartbeat_url": cfg.Backup.HeartbeatURL, "quiet_alerts": strings.Join(cfg.QuietAlerts, ",")}
+	values := map[string]string{"domain": cfg.Domain, "token": cfg.Token, "heartbeat_url": cfg.Backup.HeartbeatURL, "quiet_alerts": strings.Join(cfg.QuietAlerts, ","), "scan_ignore": strings.Join(cfg.ScanIgnore, ","), "scan_webhook": cfg.ScanWebhook}
+	if cfg.Scan {
+		values["scan"] = "true"
+	}
 	if cfg.AutoUpdate != nil {
 		values["auto_update"] = strconv.FormatBool(*cfg.AutoUpdate)
 	}
@@ -327,17 +344,7 @@ func serverSettings(args []string) error {
 	}
 	switch {
 	case len(args) == 0:
-		update, bucket, heartbeat := "on", "none: the backups stay on this server", "none"
-		if cfg.AutoUpdate != nil && !*cfg.AutoUpdate {
-			update = "off"
-		}
-		if s3 := cfg.Backup.S3; s3 != nil {
-			bucket = fmt.Sprintf("%s at %s (region %s)", s3.Bucket, s3.Endpoint, s3.Region)
-		}
-		if cfg.Backup.HeartbeatURL != "" {
-			heartbeat = cfg.Backup.HeartbeatURL
-		}
-		fmt.Printf("domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\nquiet_alerts   %s\n", cmp.Or(cfg.Domain, "none: each app brings its domain"), update, heartbeat, bucket, cmp.Or(strings.Join(cfg.QuietAlerts, ","), "none"))
+		writeSettings(os.Stdout, cfg)
 		fmt.Println("\nThe token: chasen-server token. The bucket: chasen-server bucket.")
 		return nil
 	case len(args) == 2 && args[0] == "auto_update" && (args[1] == "on" || args[1] == "off"):
@@ -401,8 +408,77 @@ func serverSettings(args []string) error {
 			fmt.Println("These alerts are off:", strings.Join(cfg.QuietAlerts, ", "))
 		}
 		return nil
+	case len(args) == 2 && args[0] == "scan" && (args[1] == "on" || args[1] == "off"):
+		cfg.Scan = args[1] == "on"
+		if err := saveServerConfig(cfg); err != nil {
+			return err
+		}
+		if cfg.Scan {
+			fmt.Println("The nightly image scan is on. It runs at 04:15 UTC. chasen scan runs it now.")
+		} else {
+			fmt.Println("The nightly image scan is off.")
+		}
+		return nil
+	case len(args) == 2 && args[0] == "scan_ignore":
+		ids, err := parseScanIgnore(args[1])
+		if err != nil {
+			return err
+		}
+		cfg.ScanIgnore = ids
+		if err := saveServerConfig(cfg); err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			fmt.Println("The scan reports every fixable finding.")
+		} else {
+			fmt.Println("The scan leaves these out:", strings.Join(ids, ", "))
+		}
+		return nil
+	case len(args) == 2 && args[0] == "scan_webhook":
+		if args[1] != "" {
+			parsed, err := url.Parse(args[1])
+			if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
+				return errors.New("the scan webhook must be an http or https URL")
+			}
+		}
+		cfg.ScanWebhook = args[1]
+		if err := saveServerConfig(cfg); err != nil {
+			return err
+		}
+		if args[1] == "" {
+			fmt.Println("No scan webhook.")
+		} else {
+			fmt.Println("The server calls the webhook when the fixable findings change.")
+		}
+		return nil
 	}
-	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url> | quiet_alerts <name,name> | domain none]")
+	return errors.New("usage: chasen-server settings [auto_update on|off | heartbeat_url <url> | quiet_alerts <name,name> | domain none | scan on|off | scan_ignore <id,id> | scan_webhook <url>]")
+}
+
+// writeSettings prints the settings. The scan webhook is a secret, so the
+// line says that one is set and does not print the URL.
+func writeSettings(w io.Writer, cfg serverConfig) {
+	update, bucket, heartbeat := "on", "none: the backups stay on this server", "none"
+	if cfg.AutoUpdate != nil && !*cfg.AutoUpdate {
+		update = "off"
+	}
+	if s3 := cfg.Backup.S3; s3 != nil {
+		bucket = fmt.Sprintf("%s at %s (region %s)", s3.Bucket, s3.Endpoint, s3.Region)
+	}
+	if cfg.Backup.HeartbeatURL != "" {
+		heartbeat = cfg.Backup.HeartbeatURL
+	}
+	scan := "off"
+	if cfg.Scan {
+		scan = "on"
+	}
+	webhook := "none"
+	if cfg.ScanWebhook != "" {
+		webhook = "set"
+	}
+	fmt.Fprintf(w, "domain         %s\nauto_update    %s\nheartbeat_url  %s\nbucket         %s\nquiet_alerts   %s\nscan           %s\nscan_ignore    %s\nscan_webhook   %s\n",
+		cmp.Or(cfg.Domain, "none: each app brings its domain"), update, heartbeat, bucket,
+		cmp.Or(strings.Join(cfg.QuietAlerts, ","), "none"), scan, cmp.Or(strings.Join(cfg.ScanIgnore, ","), "none"), webhook)
 }
 
 // serverBucket sets the S3 bucket for the offsite backups and the live

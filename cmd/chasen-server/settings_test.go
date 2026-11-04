@@ -33,7 +33,7 @@ func TestServerSettings(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if cfg.Domain != "example.com" || cfg.Token != "secret" || cfg.Backup.S3 != nil || cfg.AutoUpdate != nil {
+		if cfg.Domain != "example.com" || cfg.Token != "secret" || cfg.Backup.S3 != nil || cfg.AutoUpdate != nil || cfg.Scan || cfg.ScanWebhook != "" {
 			t.Fatalf("got %+v", cfg)
 		}
 	})

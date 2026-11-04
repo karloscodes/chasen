@@ -49,7 +49,7 @@ Most deploy tools run Docker commands through SSH and leave. Chasen puts one sma
 - **Backups that run without you.** A checked snapshot of every database each hour, kept for six months, and a live replica that is a second behind. A backup before each deploy. `chasen verify` restores them next to the real files to prove they work.
 - **One deploy at a time.** The server locks an app while it changes. Two terminals, or a terminal and CI, cannot deploy over each other.
 - **A memory of what happened.** Every deploy, restart, and restore is in the history, with its output, also while it runs. A deploy from CI shows up live on your screen.
-- **Alerts.** It tells you when an app is down, a backup is late, the disk fills up, or SSH still takes passwords.
+- **Alerts.** It tells you when an app is down, a backup is late, the disk fills up, or SSH still takes passwords. `chasen scan` reads the images that are running for fixable vulnerabilities. It is off until you turn it on, and then it runs once a night. Alerts show the last report. They do not start a scan.
 - **It updates itself** each night, and goes back to the old version when the new one does not answer.
 
 It runs in a container, with the Docker socket, and changes nothing else on the machine.

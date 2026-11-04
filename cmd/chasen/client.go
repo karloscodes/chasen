@@ -248,6 +248,14 @@ func runCommand(creds credentials, args []string) error {
 	switch cmd := args[0]; cmd {
 	case "list", "load", "alerts", "overview":
 		return remote(creds, nil, os.Stdout, cmd)
+	case "scan":
+		if len(args) > 2 {
+			return errors.New("usage: chasen scan [app]")
+		}
+		if len(args) == 1 && appFlag != "" {
+			args = append(args, appFlag)
+		}
+		return remote(creds, nil, os.Stdout, args...)
 	case "bucket":
 		return bucket(creds, args[1:])
 	case "deploy", "check":

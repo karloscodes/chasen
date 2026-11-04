@@ -38,6 +38,7 @@
 | `chasen load` | Show how busy the server is: the load, the memory in use, and the disk of the apps |
 | `chasen overview` | Each app of the server: its state, its version, and the change that runs now. `--json`: every server that you are logged in to, with its apps and alerts, for a desktop. `--watch`: the same JSON again, one line once a minute and every 5 seconds while a deploy runs, on connections that stay open |
 | `chasen alerts` | Show what is wrong with the server, or puts it at risk. See "Alerts" below. `--waybar`: the alerts of every server, for [the top bar of Omarchy](omarchy.md) |
+| `chasen scan [app]` | Look for fixable vulnerabilities in the images that are running: each app, its jobs container, and the proxy. With an app, only that one. See "The image scan" below |
 | `chasen bucket` | Show where the backups of the server go. With `--endpoint`, `--name`, and `--access-key-id`: send them to an S3 bucket too |
 
 On the server, as root:
@@ -51,6 +52,10 @@ On the server, as root:
 | `chasen-server proxy update` | Start the proxy of this release. New visitors wait a few seconds, with no error; the routes and the certificates stay |
 | `chasen-server check` | The same as `chasen alerts`, on the server |
 | `chasen-server settings quiet_alerts <name,name>` | Turn alerts off by their name: `firewall` when the firewall of your provider does that job. An empty value turns them all on again |
+| `chasen-server scan [app]` | The same as `chasen scan`, on the server |
+| `chasen-server settings scan on` | Turn the nightly image scan on. It is off until you do. On: each night at 04:15 UTC. `scan off` turns it off |
+| `chasen-server settings scan_ignore <id,id>` | Leave these vulnerability ids out of the scan. An empty value clears the list |
+| `chasen-server settings scan_webhook <url>` | POST a JSON report when the set of fixable findings changes. An empty value turns it off. The URL is a secret: the server stores it and does not print it |
 | `chasen-server settings domain none` | Remove the base domain. The API no longer answers at `https://api.<domain>`, and the apps keep their domains. `chasen-server setup --domain <domain>` gives it back |
 | `chasen-server list` | List all apps |
 | `chasen-server quiet-hour` | Print the hour of the day with the fewest requests in the last week, for work that takes the server away |
@@ -205,8 +210,56 @@ Every action that changes something asks first, with a `y` to go on: a restart, 
 | The server does not install its security updates by itself (Debian and Ubuntu) | warning | `updates` |
 | An update waits for a reboot for more than a day | warning | `reboot` |
 | The nightly update of `chasen-server` is off | warning | `auto_update` |
+| An image that is running has a fixable high or critical vulnerability | warning | `scan` |
+| The nightly image scan is on, and the last report is more than 36 hours old | warning | `scan` |
 
-The server looks when you ask: nothing runs in the background. Chasen does not fix these for you: the operating system is yours.
+The server looks when you ask. The image scan is the one thing that runs at night, and only after you turn it on: `chasen alerts` reads the report it left and does not start a scan. Chasen does not fix these for you: the operating system is yours.
+
+### The image scan
+
+`chasen scan` exports each image that is running and reads it for vulnerabilities. The nightly run is off until you turn it on:
+
+```bash
+chasen-server settings scan on    # each night at 04:15 UTC
+chasen scan                        # now, every app, its jobs container, and the proxy
+chasen scan shop                   # now, shop only
+```
+
+A finding is listed when it is high or critical and a fix exists. An unfixed one has no action, so it is a count:
+
+```
+shop  sha256:3f9a2c1d5e8b…
+  CRITICAL  GO-2026-6860  golang.org/x/net  v0.61.0 -> v0.62.0  app dependency
+  HIGH  CVE-2024-5535  libssl3  3.3.2-r0 -> 3.3.3-r0  OS package
+  4 more, no fix yet
+
+2 fixable findings. Scanned at 04:15 UTC.
+```
+
+An **OS package** is in the base image. A new image, then `chasen deploy`, replaces it. An **app dependency** is compiled into the app. It needs a new build, then a deploy. The scan does not build or deploy.
+
+`chasen alerts` reads that report. It shows each fixable finding, one line for the unfixed count, and a warning when the nightly scan is on and the report is more than 36 hours old:
+
+```
+WARNING  shop has GO-2026-6860 in golang.org/x/net v0.61.0, fixed in v0.62.0 (app dependency)
+         The fix is in the app. It needs a new build, then chasen deploy.
+WARNING  shop has CVE-2024-5535 in libssl3 3.3.2-r0, fixed in 3.3.3-r0 (OS package)
+         The fix is in the base image. A new image, then chasen deploy, replaces it.
+WARNING  shop: 4 more, no fix yet
+         Nothing to deploy until a fix exists.
+
+3 warnings. Checked at 04:16 UTC.
+```
+
+The command exits 0 when nothing fixable is at high or critical, 1 when something is, and 2 when the scanner failed.
+
+`chasen-server settings scan_ignore CVE-2024-5535,GO-2026-6860` leaves those ids out of the next scan. `quiet_alerts scan` hides the warnings.
+
+The scanner is [Trivy](https://github.com/aquasecurity/trivy), pinned by digest, in a container that starts and exits. It does not get the Docker socket, and it has no network while it reads an image: the server exports the image to a file and mounts that file. The vulnerability database is downloaded in a separate step and cached. The container is limited to one CPU and 1 GB. To hear about a change, set a URL. The server POSTs the report only when the set of fixable findings changes, and it does not print the URL:
+
+```bash
+chasen-server settings scan_webhook https://example.com/hooks/scan
+```
 
 ### Keep SSH off the internet
 

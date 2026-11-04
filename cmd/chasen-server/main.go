@@ -21,6 +21,9 @@ Run these on the server, as root:
   settings auto_update on|off    Turn the nightly update on or off
   settings heartbeat_url <url>   Call this URL after each hourly backup that worked. "" turns it off
   settings domain none           Remove the base domain: the API leaves the web, the apps keep theirs
+  settings scan on|off           Turn the nightly image scan on or off. It is off until you turn it on
+  settings scan_ignore <id,id>   Leave these vulnerability ids out of the scan. An empty value clears them
+  settings scan_webhook <url>    POST JSON when the fixable findings change. "" turns it off. The URL is not printed
   token                          Print the login token
   update                         Install the newest release now, and the proxy it names. A timer does
                                  this each night, at the quiet hour of the server
@@ -34,6 +37,8 @@ Run these on the server, as root:
   backup                         Back up every app now
   auto-update [app]              Deploy the newest image of each app deployed with --auto-update,
                                  now. The API does it each night at 05:30 UTC
+  scan [app]                     Look for fixable vulnerabilities in the images that are running.
+                                 The API does it each night at 04:15 UTC, when the scan is on
   adopt <app>                    Take over an app that matcha runs on this server. Nothing restarts
   adopt --undo <app>             Give it back to matcha
 

@@ -49,6 +49,9 @@ func cronLoop(self string) {
 				}
 			}()
 		}
+		if scanDue(from, to) {
+			go nightlyScan(self)
+		}
 		for _, due := range jobs {
 			mu.Lock()
 			busy := running[due]

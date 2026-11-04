@@ -38,11 +38,13 @@ var Commands = []string{"list", "load", "deploy", "check", "enable", "restart", 
 
 // ServerCommands are the commands about the server itself, for its owner:
 // `bucket` shows or sets where the backups go, `alerts` says what is wrong
-// with the server or puts it at risk, and `overview` gives the state, the
-// version, and the running change of each app in one call. Their first
-// argument is not an app. A server answers them. A service in front of
-// servers, which owns the servers it runs, does not pass them on.
-var ServerCommands = []string{"bucket", "alerts", "overview"}
+// with the server or puts it at risk, `overview` gives the state, the
+// version, and the running change of each app in one call, and `scan`
+// reports vulnerabilities in the images that are running. Their first
+// argument is not an app, except `scan`, which takes an optional app. A
+// server answers them. A service in front of servers, which owns the
+// servers it runs, does not pass them on.
+var ServerCommands = []string{"bucket", "alerts", "overview", "scan"}
 
 // Settings is what the client sends with `deploy`, `check`, and `restart`:
 // the image, the env and the secrets of the app, and the overrides of the

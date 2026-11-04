@@ -66,7 +66,16 @@ Every command except `logs` runs to its end on the server, also when the client 
 
 ## A command about the server
 
-One command is about the server and not about an app: `bucket`. With no arguments it prints where the backups go. With `--endpoint`, `--name`, `--access-key-id`, and `--region` as arguments, it sets the bucket; the secret access key is the first line of the request body. It is in the list `ServerCommands`, apart from the commands of the apps. A server answers it. A service that runs servers for its users does not pass it on: there the bucket is not the user's to change.
+Some commands are about the server and not about an app. They are in the list `ServerCommands`, apart from the commands of the apps. A server answers them. A service that runs servers for its users does not pass them on.
+
+| Command | Arguments | What it does |
+|---|---|---|
+| `bucket` | none, or `--endpoint`, `--name`, `--access-key-id`, `--region` | Where the backups go. With the arguments, it sets the bucket; the secret access key is the first line of the request body |
+| `alerts` | | What is wrong with the server, or puts it at risk |
+| `overview` | optional `--json` | The state of each app |
+| `scan` | optional app | Fixable vulnerabilities in the images that are running. Exit 0 when nothing fixable is high or critical, 1 when something is, 2 when the scanner failed |
+
+`bucket` with arguments is not the user's to change on a service that runs servers for them, and neither is a scan of the machine.
 
 ## Two requests that are not commands
 

@@ -331,6 +331,9 @@ func (s *Server) run(ctx context.Context, out io.Writer, body io.Reader, command
 		}
 		w.Flush()
 		return 0
+	case "scan":
+		fmt.Fprint(out, "shop  sha256:3f9a2c1d5e8b7a6094c3f2e1d0b9a8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1\n  No fixable findings.\nproxy  sha256:727846a0c4f1e2d3b4a5968778695a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7\n  No fixable findings.\n\nNothing fixable. Scanned at 04:15 UTC.\n")
+		return 0
 	case "alerts":
 		// Two warnings, so the screen has its alerts to show.
 		fmt.Fprint(out, "WARNING  SSH accepts passwords: a bot can guess one\n         Log in with a key, then add PasswordAuthentication no to /etc/ssh/sshd_config and run: systemctl reload ssh\nWARNING  a reboot waits since 2 days: the server runs an old kernel, for linux-image-6.8.0-45-generic\n         Run reboot on the server: about one minute of downtime.\n\n2 warnings. Checked at 10:19 UTC.\n")
