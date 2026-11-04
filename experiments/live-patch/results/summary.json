@@ -1,0 +1,2242 @@
+{
+  "go-alpine": {
+    "copa": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 15528082,
+      "seconds": 2.4,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    },
+    "orig": {
+      "os": {
+        "findings": {
+          "CRITICAL": 2,
+          "HIGH": 19,
+          "MEDIUM": 35,
+          "LOW": 53,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 2,
+          "HIGH": 19,
+          "MEDIUM": 35,
+          "LOW": 53,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "libcrypto3",
+            "severity": "CRITICAL",
+            "installed": "3.5.0-r0",
+            "fixed": "3.5.6-r0"
+          },
+          {
+            "pkg": "libssl3",
+            "severity": "CRITICAL",
+            "installed": "3.5.0-r0",
+            "fixed": "3.5.6-r0"
+          },
+          {
+            "pkg": "musl",
+            "severity": "HIGH",
+            "installed": "1.2.5-r10",
+            "fixed": "1.2.5-r12"
+          },
+          {
+            "pkg": "musl-utils",
+            "severity": "HIGH",
+            "installed": "1.2.5-r10",
+            "fixed": "1.2.5-r12"
+          },
+          {
+            "pkg": "zlib",
+            "severity": "HIGH",
+            "installed": "1.3.1-r2",
+            "fixed": "1.3.2-r0"
+          }
+        ]
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 7692712,
+      "seconds": null,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    },
+    "rebase": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 7690298,
+      "seconds": 0.6,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    },
+    "upgrade": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 14024005,
+      "seconds": 1.8,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    }
+  },
+  "go-debian": {
+    "copa": {
+      "os": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 56,
+          "MEDIUM": 89,
+          "LOW": 83,
+          "UNKNOWN": 1
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 82289583,
+      "seconds": 11.8,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    },
+    "orig": {
+      "os": {
+        "findings": {
+          "CRITICAL": 6,
+          "HIGH": 92,
+          "MEDIUM": 151,
+          "LOW": 111,
+          "UNKNOWN": 6
+        },
+        "fixable": {
+          "CRITICAL": 5,
+          "HIGH": 36,
+          "MEDIUM": 62,
+          "LOW": 28,
+          "UNKNOWN": 5
+        },
+        "examples": [
+          {
+            "pkg": "libgnutls30",
+            "severity": "CRITICAL",
+            "installed": "3.7.9-2+deb12u1",
+            "fixed": "3.7.9-2+deb12u7"
+          },
+          {
+            "pkg": "perl-base",
+            "severity": "CRITICAL",
+            "installed": "5.36.0-7+deb12u1",
+            "fixed": "5.36.0-7+deb12u4"
+          },
+          {
+            "pkg": "gpgv",
+            "severity": "HIGH",
+            "installed": "2.2.40-1.1",
+            "fixed": "2.2.40-1.1+deb12u2"
+          },
+          {
+            "pkg": "libc-bin",
+            "severity": "HIGH",
+            "installed": "2.36-9+deb12u3",
+            "fixed": "2.36-9+deb12u4"
+          },
+          {
+            "pkg": "libc6",
+            "severity": "HIGH",
+            "installed": "2.36-9+deb12u3",
+            "fixed": "2.36-9+deb12u4"
+          },
+          {
+            "pkg": "libcap2",
+            "severity": "HIGH",
+            "installed": "1:2.66-4",
+            "fixed": "1:2.66-4+deb12u3"
+          },
+          {
+            "pkg": "liblzma5",
+            "severity": "HIGH",
+            "installed": "5.4.1-0.2",
+            "fixed": "5.4.1-1"
+          },
+          {
+            "pkg": "libpam-modules",
+            "severity": "HIGH",
+            "installed": "1.5.2-6+deb12u1",
+            "fixed": "1.5.2-6+deb12u2"
+          }
+        ]
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 33021779,
+      "seconds": null,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    },
+    "rebase": {
+      "os": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 56,
+          "MEDIUM": 89,
+          "LOW": 83,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 1
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 32143226,
+      "seconds": 0.8,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    },
+    "upgrade": {
+      "os": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 56,
+          "MEDIUM": 89,
+          "LOW": 83,
+          "UNKNOWN": 1
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 52063476,
+      "seconds": 8.9,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    }
+  },
+  "go-distroless": {
+    "orig": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 4
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 4
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 4615280,
+      "seconds": null,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    }
+  },
+  "go-scratch": {
+    "orig": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 26,
+          "MEDIUM": 41,
+          "LOW": 4,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "stdlib",
+            "severity": "CRITICAL",
+            "installed": "v1.21.13",
+            "fixed": "1.24.13, 1.25.7, 1.26.0-rc.3"
+          }
+        ]
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 8,
+          "MEDIUM": 11,
+          "LOW": 0,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "golang.org/x/net",
+            "severity": "HIGH",
+            "installed": "v0.17.0",
+            "fixed": "0.23.0"
+          }
+        ]
+      },
+      "size": 3895189,
+      "seconds": null,
+      "health": "status=ok\nup=200\nroot=200\nbody=go go1.21.13 path /\n"
+    }
+  },
+  "node": {
+    "copa": {
+      "os": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 56,
+          "MEDIUM": 89,
+          "LOW": 83,
+          "UNKNOWN": 1
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 28,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "tar",
+            "severity": "CRITICAL",
+            "installed": "6.2.0",
+            "fixed": "7.5.19"
+          },
+          {
+            "pkg": "body-parser",
+            "severity": "HIGH",
+            "installed": "1.19.0",
+            "fixed": "1.20.3"
+          },
+          {
+            "pkg": "brace-expansion",
+            "severity": "HIGH",
+            "installed": "2.0.1",
+            "fixed": "5.0.10, 3.0.7, 2.1.5, 1.1.19"
+          },
+          {
+            "pkg": "cross-spawn",
+            "severity": "HIGH",
+            "installed": "7.0.3",
+            "fixed": "7.0.5, 6.0.6"
+          },
+          {
+            "pkg": "glob",
+            "severity": "HIGH",
+            "installed": "10.3.10",
+            "fixed": "11.1.0, 10.5.0"
+          },
+          {
+            "pkg": "lodash",
+            "severity": "HIGH",
+            "installed": "4.17.20",
+            "fixed": "4.17.21"
+          },
+          {
+            "pkg": "minimatch",
+            "severity": "HIGH",
+            "installed": "9.0.3",
+            "fixed": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3"
+          },
+          {
+            "pkg": "pacote",
+            "severity": "HIGH",
+            "installed": "17.0.4",
+            "fixed": "21.5.1"
+          }
+        ]
+      },
+      "size": 123437252,
+      "seconds": 11.9,
+      "health": "status=ok\nup=200\nroot=200\nbody=node v20.11.1 path /\n"
+    },
+    "orig": {
+      "os": {
+        "findings": {
+          "CRITICAL": 6,
+          "HIGH": 86,
+          "MEDIUM": 147,
+          "LOW": 109,
+          "UNKNOWN": 6
+        },
+        "fixable": {
+          "CRITICAL": 5,
+          "HIGH": 30,
+          "MEDIUM": 58,
+          "LOW": 26,
+          "UNKNOWN": 5
+        },
+        "examples": [
+          {
+            "pkg": "libgnutls30",
+            "severity": "CRITICAL",
+            "installed": "3.7.9-2+deb12u2",
+            "fixed": "3.7.9-2+deb12u7"
+          },
+          {
+            "pkg": "perl-base",
+            "severity": "CRITICAL",
+            "installed": "5.36.0-7+deb12u1",
+            "fixed": "5.36.0-7+deb12u4"
+          },
+          {
+            "pkg": "gpgv",
+            "severity": "HIGH",
+            "installed": "2.2.40-1.1",
+            "fixed": "2.2.40-1.1+deb12u2"
+          },
+          {
+            "pkg": "libc-bin",
+            "severity": "HIGH",
+            "installed": "2.36-9+deb12u4",
+            "fixed": "2.36-9+deb12u6"
+          },
+          {
+            "pkg": "libc6",
+            "severity": "HIGH",
+            "installed": "2.36-9+deb12u4",
+            "fixed": "2.36-9+deb12u6"
+          },
+          {
+            "pkg": "libcap2",
+            "severity": "HIGH",
+            "installed": "1:2.66-4",
+            "fixed": "1:2.66-4+deb12u3"
+          },
+          {
+            "pkg": "liblzma5",
+            "severity": "HIGH",
+            "installed": "5.4.1-0.2",
+            "fixed": "5.4.1-1"
+          },
+          {
+            "pkg": "libpam-modules",
+            "severity": "HIGH",
+            "installed": "1.5.2-6+deb12u1",
+            "fixed": "1.5.2-6+deb12u2"
+          }
+        ]
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 28,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "tar",
+            "severity": "CRITICAL",
+            "installed": "6.2.0",
+            "fixed": "7.5.19"
+          },
+          {
+            "pkg": "body-parser",
+            "severity": "HIGH",
+            "installed": "1.19.0",
+            "fixed": "1.20.3"
+          },
+          {
+            "pkg": "brace-expansion",
+            "severity": "HIGH",
+            "installed": "2.0.1",
+            "fixed": "5.0.10, 3.0.7, 2.1.5, 1.1.19"
+          },
+          {
+            "pkg": "cross-spawn",
+            "severity": "HIGH",
+            "installed": "7.0.3",
+            "fixed": "7.0.5, 6.0.6"
+          },
+          {
+            "pkg": "glob",
+            "severity": "HIGH",
+            "installed": "10.3.10",
+            "fixed": "11.1.0, 10.5.0"
+          },
+          {
+            "pkg": "lodash",
+            "severity": "HIGH",
+            "installed": "4.17.20",
+            "fixed": "4.17.21"
+          },
+          {
+            "pkg": "minimatch",
+            "severity": "HIGH",
+            "installed": "9.0.3",
+            "fixed": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3"
+          },
+          {
+            "pkg": "pacote",
+            "severity": "HIGH",
+            "installed": "17.0.4",
+            "fixed": "21.5.1"
+          }
+        ]
+      },
+      "size": 74680433,
+      "seconds": null,
+      "health": "status=ok\nup=200\nroot=200\nbody=node v20.11.1 path /\n"
+    },
+    "rebase": {
+      "os": {
+        "findings": {
+          "CRITICAL": 6,
+          "HIGH": 68,
+          "MEDIUM": 122,
+          "LOW": 91,
+          "UNKNOWN": 6
+        },
+        "fixable": {
+          "CRITICAL": 5,
+          "HIGH": 12,
+          "MEDIUM": 33,
+          "LOW": 8,
+          "UNKNOWN": 5
+        },
+        "examples": [
+          {
+            "pkg": "libgnutls30",
+            "severity": "CRITICAL",
+            "installed": "3.7.9-2+deb12u6",
+            "fixed": "3.7.9-2+deb12u7"
+          },
+          {
+            "pkg": "perl-base",
+            "severity": "CRITICAL",
+            "installed": "5.36.0-7+deb12u3",
+            "fixed": "5.36.0-7+deb12u4"
+          },
+          {
+            "pkg": "libcap2",
+            "severity": "HIGH",
+            "installed": "1:2.66-4+deb12u2+b2",
+            "fixed": "1:2.66-4+deb12u3"
+          },
+          {
+            "pkg": "libpcre2-8-0",
+            "severity": "HIGH",
+            "installed": "10.42-1",
+            "fixed": "10.42-1+deb12u2"
+          }
+        ]
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 21,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 21,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "tar",
+            "severity": "CRITICAL",
+            "installed": "6.2.1",
+            "fixed": "7.5.19"
+          },
+          {
+            "pkg": "body-parser",
+            "severity": "HIGH",
+            "installed": "1.19.0",
+            "fixed": "1.20.3"
+          },
+          {
+            "pkg": "brace-expansion",
+            "severity": "HIGH",
+            "installed": "2.0.1",
+            "fixed": "5.0.10, 3.0.7, 2.1.5, 1.1.19"
+          },
+          {
+            "pkg": "cross-spawn",
+            "severity": "HIGH",
+            "installed": "7.0.3",
+            "fixed": "7.0.5, 6.0.6"
+          },
+          {
+            "pkg": "glob",
+            "severity": "HIGH",
+            "installed": "10.4.2",
+            "fixed": "11.1.0, 10.5.0"
+          },
+          {
+            "pkg": "ip-address",
+            "severity": "HIGH",
+            "installed": "9.0.5",
+            "fixed": "10.3.1"
+          },
+          {
+            "pkg": "lodash",
+            "severity": "HIGH",
+            "installed": "4.17.20",
+            "fixed": "4.17.21"
+          },
+          {
+            "pkg": "minimatch",
+            "severity": "HIGH",
+            "installed": "9.0.5",
+            "fixed": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3"
+          }
+        ]
+      },
+      "size": 73706984,
+      "seconds": 1.1,
+      "health": "status=ok\nup=200\nroot=200\nbody=node v20.20.2 path /\n"
+    },
+    "upgrade": {
+      "os": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 56,
+          "MEDIUM": 89,
+          "LOW": 83,
+          "UNKNOWN": 1
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 28,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "tar",
+            "severity": "CRITICAL",
+            "installed": "6.2.0",
+            "fixed": "7.5.19"
+          },
+          {
+            "pkg": "body-parser",
+            "severity": "HIGH",
+            "installed": "1.19.0",
+            "fixed": "1.20.3"
+          },
+          {
+            "pkg": "brace-expansion",
+            "severity": "HIGH",
+            "installed": "2.0.1",
+            "fixed": "5.0.10, 3.0.7, 2.1.5, 1.1.19"
+          },
+          {
+            "pkg": "cross-spawn",
+            "severity": "HIGH",
+            "installed": "7.0.3",
+            "fixed": "7.0.5, 6.0.6"
+          },
+          {
+            "pkg": "glob",
+            "severity": "HIGH",
+            "installed": "10.3.10",
+            "fixed": "11.1.0, 10.5.0"
+          },
+          {
+            "pkg": "lodash",
+            "severity": "HIGH",
+            "installed": "4.17.20",
+            "fixed": "4.17.21"
+          },
+          {
+            "pkg": "minimatch",
+            "severity": "HIGH",
+            "installed": "9.0.3",
+            "fixed": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3"
+          },
+          {
+            "pkg": "pacote",
+            "severity": "HIGH",
+            "installed": "17.0.4",
+            "fixed": "21.5.1"
+          }
+        ]
+      },
+      "size": 93434735,
+      "seconds": 9.3,
+      "health": "status=ok\nup=200\nroot=200\nbody=node v20.11.1 path /\n"
+    }
+  },
+  "node-alpine": {
+    "copa": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 28,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "tar",
+            "severity": "CRITICAL",
+            "installed": "6.2.0",
+            "fixed": "7.5.19"
+          },
+          {
+            "pkg": "body-parser",
+            "severity": "HIGH",
+            "installed": "1.19.0",
+            "fixed": "1.20.3"
+          },
+          {
+            "pkg": "brace-expansion",
+            "severity": "HIGH",
+            "installed": "2.0.1",
+            "fixed": "5.0.10, 3.0.7, 2.1.5, 1.1.19"
+          },
+          {
+            "pkg": "cross-spawn",
+            "severity": "HIGH",
+            "installed": "7.0.3",
+            "fixed": "7.0.5, 6.0.6"
+          },
+          {
+            "pkg": "glob",
+            "severity": "HIGH",
+            "installed": "10.3.10",
+            "fixed": "11.1.0, 10.5.0"
+          },
+          {
+            "pkg": "lodash",
+            "severity": "HIGH",
+            "installed": "4.17.20",
+            "fixed": "4.17.21"
+          },
+          {
+            "pkg": "minimatch",
+            "severity": "HIGH",
+            "installed": "9.0.3",
+            "fixed": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3"
+          },
+          {
+            "pkg": "pacote",
+            "severity": "HIGH",
+            "installed": "17.0.4",
+            "fixed": "21.5.1"
+          }
+        ]
+      },
+      "size": 57051847,
+      "seconds": 3.5,
+      "health": "status=ok\nup=200\nroot=200\nbody=node v20.11.1 path /\n"
+    },
+    "orig": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 6,
+          "MEDIUM": 19,
+          "LOW": 17,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 6,
+          "MEDIUM": 19,
+          "LOW": 17,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "libcrypto3",
+            "severity": "HIGH",
+            "installed": "3.1.4-r5",
+            "fixed": "3.1.7-r0"
+          },
+          {
+            "pkg": "libssl3",
+            "severity": "HIGH",
+            "installed": "3.1.4-r5",
+            "fixed": "3.1.7-r0"
+          },
+          {
+            "pkg": "musl",
+            "severity": "HIGH",
+            "installed": "1.2.4_git20230717-r4",
+            "fixed": "1.2.4_git20230717-r5"
+          },
+          {
+            "pkg": "musl-utils",
+            "severity": "HIGH",
+            "installed": "1.2.4_git20230717-r4",
+            "fixed": "1.2.4_git20230717-r5"
+          }
+        ]
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 28,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "tar",
+            "severity": "CRITICAL",
+            "installed": "6.2.0",
+            "fixed": "7.5.19"
+          },
+          {
+            "pkg": "body-parser",
+            "severity": "HIGH",
+            "installed": "1.19.0",
+            "fixed": "1.20.3"
+          },
+          {
+            "pkg": "brace-expansion",
+            "severity": "HIGH",
+            "installed": "2.0.1",
+            "fixed": "5.0.10, 3.0.7, 2.1.5, 1.1.19"
+          },
+          {
+            "pkg": "cross-spawn",
+            "severity": "HIGH",
+            "installed": "7.0.3",
+            "fixed": "7.0.5, 6.0.6"
+          },
+          {
+            "pkg": "glob",
+            "severity": "HIGH",
+            "installed": "10.3.10",
+            "fixed": "11.1.0, 10.5.0"
+          },
+          {
+            "pkg": "lodash",
+            "severity": "HIGH",
+            "installed": "4.17.20",
+            "fixed": "4.17.21"
+          },
+          {
+            "pkg": "minimatch",
+            "severity": "HIGH",
+            "installed": "9.0.3",
+            "fixed": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3"
+          },
+          {
+            "pkg": "pacote",
+            "severity": "HIGH",
+            "installed": "17.0.4",
+            "fixed": "21.5.1"
+          }
+        ]
+      },
+      "size": 50268133,
+      "seconds": null,
+      "health": "status=ok\nup=200\nroot=200\nbody=node v20.11.1 path /\n"
+    },
+    "rebase": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 4,
+          "MEDIUM": 15,
+          "LOW": 32,
+          "UNKNOWN": 2
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 4,
+          "MEDIUM": 15,
+          "LOW": 32,
+          "UNKNOWN": 2
+        },
+        "examples": [
+          {
+            "pkg": "libcrypto3",
+            "severity": "HIGH",
+            "installed": "3.5.6-r0",
+            "fixed": "3.5.8-r0"
+          },
+          {
+            "pkg": "libssl3",
+            "severity": "HIGH",
+            "installed": "3.5.6-r0",
+            "fixed": "3.5.8-r0"
+          }
+        ]
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 21,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 21,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "tar",
+            "severity": "CRITICAL",
+            "installed": "6.2.1",
+            "fixed": "7.5.19"
+          },
+          {
+            "pkg": "body-parser",
+            "severity": "HIGH",
+            "installed": "1.19.0",
+            "fixed": "1.20.3"
+          },
+          {
+            "pkg": "brace-expansion",
+            "severity": "HIGH",
+            "installed": "2.0.1",
+            "fixed": "5.0.10, 3.0.7, 2.1.5, 1.1.19"
+          },
+          {
+            "pkg": "cross-spawn",
+            "severity": "HIGH",
+            "installed": "7.0.3",
+            "fixed": "7.0.5, 6.0.6"
+          },
+          {
+            "pkg": "glob",
+            "severity": "HIGH",
+            "installed": "10.4.2",
+            "fixed": "11.1.0, 10.5.0"
+          },
+          {
+            "pkg": "ip-address",
+            "severity": "HIGH",
+            "installed": "9.0.5",
+            "fixed": "10.3.1"
+          },
+          {
+            "pkg": "lodash",
+            "severity": "HIGH",
+            "installed": "4.17.20",
+            "fixed": "4.17.21"
+          },
+          {
+            "pkg": "minimatch",
+            "severity": "HIGH",
+            "installed": "9.0.5",
+            "fixed": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3"
+          }
+        ]
+      },
+      "size": 50687421,
+      "seconds": 1.1,
+      "health": "status=ok\nup=200\nroot=200\nbody=node v20.20.2 path /\n"
+    },
+    "upgrade": {
+      "os": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 1,
+          "HIGH": 29,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 1,
+          "HIGH": 28,
+          "MEDIUM": 16,
+          "LOW": 9,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "tar",
+            "severity": "CRITICAL",
+            "installed": "6.2.0",
+            "fixed": "7.5.19"
+          },
+          {
+            "pkg": "body-parser",
+            "severity": "HIGH",
+            "installed": "1.19.0",
+            "fixed": "1.20.3"
+          },
+          {
+            "pkg": "brace-expansion",
+            "severity": "HIGH",
+            "installed": "2.0.1",
+            "fixed": "5.0.10, 3.0.7, 2.1.5, 1.1.19"
+          },
+          {
+            "pkg": "cross-spawn",
+            "severity": "HIGH",
+            "installed": "7.0.3",
+            "fixed": "7.0.5, 6.0.6"
+          },
+          {
+            "pkg": "glob",
+            "severity": "HIGH",
+            "installed": "10.3.10",
+            "fixed": "11.1.0, 10.5.0"
+          },
+          {
+            "pkg": "lodash",
+            "severity": "HIGH",
+            "installed": "4.17.20",
+            "fixed": "4.17.21"
+          },
+          {
+            "pkg": "minimatch",
+            "severity": "HIGH",
+            "installed": "9.0.3",
+            "fixed": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3"
+          },
+          {
+            "pkg": "pacote",
+            "severity": "HIGH",
+            "installed": "17.0.4",
+            "fixed": "21.5.1"
+          }
+        ]
+      },
+      "size": 55728732,
+      "seconds": 2.0,
+      "health": "status=ok\nup=200\nroot=200\nbody=node v20.11.1 path /\n"
+    }
+  },
+  "rails": {
+    "copa": {
+      "os": {
+        "findings": {
+          "CRITICAL": 3,
+          "HIGH": 241,
+          "MEDIUM": 1544,
+          "LOW": 478,
+          "UNKNOWN": 1
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 4,
+          "HIGH": 12,
+          "MEDIUM": 24,
+          "LOW": 6,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 4,
+          "HIGH": 12,
+          "MEDIUM": 24,
+          "LOW": 6,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "activestorage",
+            "severity": "CRITICAL",
+            "installed": "7.1.3",
+            "fixed": "~> 7.2.3, >= 7.2.3.1, ~> 8.0.4, >= 8.0.4.1, >= 8.1.2.1"
+          },
+          {
+            "pkg": "net-imap",
+            "severity": "CRITICAL",
+            "installed": "0.3.4.1",
+            "fixed": "~> 0.4.24, ~> 0.5.14, >= 0.6.4"
+          },
+          {
+            "pkg": "zlib",
+            "severity": "CRITICAL",
+            "installed": "3.0.0",
+            "fixed": "~> 3.0.1, ~> 3.1.2, >= 3.2.3"
+          },
+          {
+            "pkg": "actionpack",
+            "severity": "HIGH",
+            "installed": "7.1.3",
+            "fixed": ">= 7.1.3.1"
+          },
+          {
+            "pkg": "activesupport",
+            "severity": "HIGH",
+            "installed": "7.1.3",
+            "fixed": "~> 7.2.3, >= 7.2.3.1, ~> 8.0.4, >= 8.0.4.1, >= 8.1.2.1"
+          },
+          {
+            "pkg": "erb",
+            "severity": "HIGH",
+            "installed": "4.0.2",
+            "fixed": "~> 4.0.3.1, ~> 4.0.4.1, ~> 6.0.1.1, >= 6.0.4"
+          },
+          {
+            "pkg": "resolv",
+            "severity": "HIGH",
+            "installed": "0.2.2",
+            "fixed": "~> 0.3.2, >= 0.7.2"
+          },
+          {
+            "pkg": "rexml",
+            "severity": "HIGH",
+            "installed": "3.2.5",
+            "fixed": ">= 3.3.9"
+          }
+        ]
+      },
+      "size": 190632762,
+      "seconds": 16.7,
+      "health": "status=ok\nup=200\nroot=200\nbody=rails 7.1.3\n"
+    },
+    "orig": {
+      "os": {
+        "findings": {
+          "CRITICAL": 16,
+          "HIGH": 1369,
+          "MEDIUM": 6034,
+          "LOW": 1098,
+          "UNKNOWN": 9
+        },
+        "fixable": {
+          "CRITICAL": 13,
+          "HIGH": 1128,
+          "MEDIUM": 4490,
+          "LOW": 620,
+          "UNKNOWN": 8
+        },
+        "examples": [
+          {
+            "pkg": "libgnutls30",
+            "severity": "CRITICAL",
+            "installed": "3.7.9-2+deb12u3",
+            "fixed": "3.7.9-2+deb12u7"
+          },
+          {
+            "pkg": "libssl-dev",
+            "severity": "CRITICAL",
+            "installed": "3.0.13-1~deb12u1",
+            "fixed": "3.0.19-1~deb12u2"
+          },
+          {
+            "pkg": "libssl3",
+            "severity": "CRITICAL",
+            "installed": "3.0.13-1~deb12u1",
+            "fixed": "3.0.19-1~deb12u2"
+          },
+          {
+            "pkg": "linux-libc-dev",
+            "severity": "CRITICAL",
+            "installed": "6.1.99-1",
+            "fixed": "6.1.115-1"
+          },
+          {
+            "pkg": "openssl",
+            "severity": "CRITICAL",
+            "installed": "3.0.13-1~deb12u1",
+            "fixed": "3.0.19-1~deb12u2"
+          },
+          {
+            "pkg": "perl-base",
+            "severity": "CRITICAL",
+            "installed": "5.36.0-7+deb12u1",
+            "fixed": "5.36.0-7+deb12u4"
+          },
+          {
+            "pkg": "gpgv",
+            "severity": "HIGH",
+            "installed": "2.2.40-1.1",
+            "fixed": "2.2.40-1.1+deb12u2"
+          },
+          {
+            "pkg": "libcap2",
+            "severity": "HIGH",
+            "installed": "1:2.66-4",
+            "fixed": "1:2.66-4+deb12u3"
+          }
+        ]
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 4,
+          "HIGH": 12,
+          "MEDIUM": 24,
+          "LOW": 6,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 4,
+          "HIGH": 12,
+          "MEDIUM": 24,
+          "LOW": 6,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "activestorage",
+            "severity": "CRITICAL",
+            "installed": "7.1.3",
+            "fixed": "~> 7.2.3, >= 7.2.3.1, ~> 8.0.4, >= 8.0.4.1, >= 8.1.2.1"
+          },
+          {
+            "pkg": "net-imap",
+            "severity": "CRITICAL",
+            "installed": "0.3.4.1",
+            "fixed": "~> 0.4.24, ~> 0.5.14, >= 0.6.4"
+          },
+          {
+            "pkg": "zlib",
+            "severity": "CRITICAL",
+            "installed": "3.0.0",
+            "fixed": "~> 3.0.1, ~> 3.1.2, >= 3.2.3"
+          },
+          {
+            "pkg": "actionpack",
+            "severity": "HIGH",
+            "installed": "7.1.3",
+            "fixed": ">= 7.1.3.1"
+          },
+          {
+            "pkg": "activesupport",
+            "severity": "HIGH",
+            "installed": "7.1.3",
+            "fixed": "~> 7.2.3, >= 7.2.3.1, ~> 8.0.4, >= 8.0.4.1, >= 8.1.2.1"
+          },
+          {
+            "pkg": "erb",
+            "severity": "HIGH",
+            "installed": "4.0.2",
+            "fixed": "~> 4.0.3.1, ~> 4.0.4.1, ~> 6.0.1.1, >= 6.0.4"
+          },
+          {
+            "pkg": "resolv",
+            "severity": "HIGH",
+            "installed": "0.2.2",
+            "fixed": "~> 0.3.2, >= 0.7.2"
+          },
+          {
+            "pkg": "rexml",
+            "severity": "HIGH",
+            "installed": "3.2.5",
+            "fixed": ">= 3.3.9"
+          }
+        ]
+      },
+      "size": 107760307,
+      "seconds": null,
+      "health": "status=ok\nup=200\nroot=200\nbody=rails 7.1.3\n"
+    },
+    "rebase": {
+      "os": {
+        "findings": {
+          "CRITICAL": 8,
+          "HIGH": 81,
+          "MEDIUM": 141,
+          "LOW": 116,
+          "UNKNOWN": 8
+        },
+        "fixable": {
+          "CRITICAL": 7,
+          "HIGH": 24,
+          "MEDIUM": 51,
+          "LOW": 30,
+          "UNKNOWN": 7
+        },
+        "examples": [
+          {
+            "pkg": "libgnutls30",
+            "severity": "CRITICAL",
+            "installed": "3.7.9-2+deb12u6",
+            "fixed": "3.7.9-2+deb12u7"
+          },
+          {
+            "pkg": "libssl3",
+            "severity": "CRITICAL",
+            "installed": "3.0.18-1~deb12u2",
+            "fixed": "3.0.19-1~deb12u2"
+          },
+          {
+            "pkg": "openssl",
+            "severity": "CRITICAL",
+            "installed": "3.0.18-1~deb12u2",
+            "fixed": "3.0.19-1~deb12u2"
+          },
+          {
+            "pkg": "perl-base",
+            "severity": "CRITICAL",
+            "installed": "5.36.0-7+deb12u3",
+            "fixed": "5.36.0-7+deb12u4"
+          },
+          {
+            "pkg": "libcap2",
+            "severity": "HIGH",
+            "installed": "1:2.66-4+deb12u2+b2",
+            "fixed": "1:2.66-4+deb12u3"
+          },
+          {
+            "pkg": "libpcre2-8-0",
+            "severity": "HIGH",
+            "installed": "10.42-1",
+            "fixed": "10.42-1+deb12u2"
+          }
+        ]
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 3,
+          "HIGH": 10,
+          "MEDIUM": 14,
+          "LOW": 6,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 3,
+          "HIGH": 10,
+          "MEDIUM": 14,
+          "LOW": 6,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "activestorage",
+            "severity": "CRITICAL",
+            "installed": "7.1.3",
+            "fixed": "~> 7.2.3, >= 7.2.3.1, ~> 8.0.4, >= 8.0.4.1, >= 8.1.2.1"
+          },
+          {
+            "pkg": "net-imap",
+            "severity": "CRITICAL",
+            "installed": "0.3.9",
+            "fixed": "~> 0.4.24, ~> 0.5.14, >= 0.6.4"
+          },
+          {
+            "pkg": "actionpack",
+            "severity": "HIGH",
+            "installed": "7.1.3",
+            "fixed": ">= 7.1.3.1"
+          },
+          {
+            "pkg": "activesupport",
+            "severity": "HIGH",
+            "installed": "7.1.3",
+            "fixed": "~> 7.2.3, >= 7.2.3.1, ~> 8.0.4, >= 8.0.4.1, >= 8.1.2.1"
+          },
+          {
+            "pkg": "erb",
+            "severity": "HIGH",
+            "installed": "4.0.2",
+            "fixed": "~> 4.0.3.1, ~> 4.0.4.1, ~> 6.0.1.1, >= 6.0.4"
+          },
+          {
+            "pkg": "resolv",
+            "severity": "HIGH",
+            "installed": "0.2.3",
+            "fixed": "~> 0.3.2, >= 0.7.2"
+          }
+        ]
+      },
+      "size": 97472820,
+      "seconds": 0.6,
+      "health": "status=ok\nup=200\nroot=200\nbody=rails 7.1.3\n"
+    },
+    "upgrade": {
+      "os": {
+        "findings": {
+          "CRITICAL": 3,
+          "HIGH": 241,
+          "MEDIUM": 1544,
+          "LOW": 478,
+          "UNKNOWN": 1
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "runtime": {
+        "findings": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "examples": []
+      },
+      "app": {
+        "findings": {
+          "CRITICAL": 4,
+          "HIGH": 12,
+          "MEDIUM": 24,
+          "LOW": 6,
+          "UNKNOWN": 0
+        },
+        "fixable": {
+          "CRITICAL": 4,
+          "HIGH": 12,
+          "MEDIUM": 24,
+          "LOW": 6,
+          "UNKNOWN": 0
+        },
+        "examples": [
+          {
+            "pkg": "activestorage",
+            "severity": "CRITICAL",
+            "installed": "7.1.3",
+            "fixed": "~> 7.2.3, >= 7.2.3.1, ~> 8.0.4, >= 8.0.4.1, >= 8.1.2.1"
+          },
+          {
+            "pkg": "net-imap",
+            "severity": "CRITICAL",
+            "installed": "0.3.4.1",
+            "fixed": "~> 0.4.24, ~> 0.5.14, >= 0.6.4"
+          },
+          {
+            "pkg": "zlib",
+            "severity": "CRITICAL",
+            "installed": "3.0.0",
+            "fixed": "~> 3.0.1, ~> 3.1.2, >= 3.2.3"
+          },
+          {
+            "pkg": "actionpack",
+            "severity": "HIGH",
+            "installed": "7.1.3",
+            "fixed": ">= 7.1.3.1"
+          },
+          {
+            "pkg": "activesupport",
+            "severity": "HIGH",
+            "installed": "7.1.3",
+            "fixed": "~> 7.2.3, >= 7.2.3.1, ~> 8.0.4, >= 8.0.4.1, >= 8.1.2.1"
+          },
+          {
+            "pkg": "erb",
+            "severity": "HIGH",
+            "installed": "4.0.2",
+            "fixed": "~> 4.0.3.1, ~> 4.0.4.1, ~> 6.0.1.1, >= 6.0.4"
+          },
+          {
+            "pkg": "resolv",
+            "severity": "HIGH",
+            "installed": "0.2.2",
+            "fixed": "~> 0.3.2, >= 0.7.2"
+          },
+          {
+            "pkg": "rexml",
+            "severity": "HIGH",
+            "installed": "3.2.5",
+            "fixed": ">= 3.3.9"
+          }
+        ]
+      },
+      "size": 138145320,
+      "seconds": 13.8,
+      "health": "status=ok\nup=200\nroot=200\nbody=rails 7.1.3\n"
+    }
+  }
+}

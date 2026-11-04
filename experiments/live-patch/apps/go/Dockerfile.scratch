@@ -1,0 +1,4 @@
+FROM scratch
+COPY --chmod=755 app /app
+EXPOSE 8080
+ENTRYPOINT ["/app"]
